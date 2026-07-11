@@ -1,66 +1,54 @@
-
 .background-wrapper {
     position: fixed;
     z-index: -1;
     width: 100%;
     height: 100%;
 }
-.wrapper-images {
+
+.slide {
     position: absolute;
-    z-index: -10;
-    width: 100%;
-    height: 100%;
+    inset: 0;
+    opacity: 0;
 }
+
 .wrapper-img {
   position: absolute;
-  width: 100%;
-  height: 100%;
-// background-image: url("../assets/images/bg-1.webp");
+  inset: 0;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  inset: calc(0.25rem * 0);
+  opacity: 0;
+  transition: opacity 2s ease-in-out;
 }
-.bg-1 {
-  background-image: url("@/assets/images/bg-1.webp");
+.wrapper-img.active {
+    opacity: 1;
 }
-.bg-2 {
-    background-image: url("@/assets/images/bg-2.webp");
-}
-.bg-3 {
-    background-image: url("@/assets/images/bg-3.webp");
-}
-.bg-4 {
-    background-image: url("@/assets/images/bg-4.webp");
-}
+
+.bg-0 { background-image: url("@/assets/images/bg-0.webp"); }
+.bg-1 { background-image: url("@/assets/images/bg-1.webp"); }
+.bg-2 { background-image: url("@/assets/images/bg-2.webp"); }
+.bg-3 { background-image: url("@/assets/images/bg-3.webp"); }
+.bg-4 { background-image: url("@/assets/images/bg-4.webp"); }
+.bg-5 { background-image: url("@/assets/images/bg-5.webp"); }
 
 .wrapper-blur {
     position: absolute;
-    z-index: -9;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     backdrop-filter: blur(12px);
-    --tw-backdrop-blur: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    will-change: backdrop-filter;
 }
 
 .wrapper-color {
     position: absolute;
-    z-index: -8;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     background: linear-gradient(-45deg, rgb(161, 140, 209), rgb(251, 194, 235), rgb(161, 196, 253), rgb(194, 233, 251)) 0% 0% / 400% 400%;
     animation: 15s infinite colorchange ease-in-out;
     opacity: 0.6;
-    transition-property: opacity;
-    transition-timing-function: cubic-bezier(.4, 0, .2, 1), cubic-bezier(.4, 0, .2, 1);
     mix-blend-mode: color;
-    transform: translateZ(0);
 }
 
 @keyframes colorchange {
-	0% { background-position: 0% 50% }
-	50% { background-position: 100% 50% }
-	100% { background-position: 0% 50% }
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }

@@ -1,16 +1,23 @@
+import { useState, useEffect } from 'react';
 import '@/styles/home/backgroundImg.scss';
 
 export default function BackgroundImg() {
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActive(prev => (prev + 1) % 6);
+    }, 8000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="background-wrapper">
+        {/* 每8s更换一次背景图片 */}
         <div className="wrapper-images">
-            <div className="wrapper-img bg-0"></div>
-            <div className="wrapper-img bg-1"></div>
-            <div className="wrapper-img bg-2"></div>
-            <div className="wrapper-img bg-3"></div>
-            <div className="wrapper-img bg-4"></div>
-            <div className="wrapper-img bg-5"></div>
-            <div className="wrapper-img bg-6"></div>
+            {Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className={`wrapper-img bg-${i}${i === active ? ' active' : ''}`} />
+            ))}
         </div>
         <div className="wrapper-blur"></div>
         <div className="wrapper-color"></div>
