@@ -7,6 +7,11 @@
     * Typescript + scss
     * react-router
 
+### 功能
+* music
+* video
+* chat
+
 ### packages
 ```sh
 pnpm create tauri-app web-app --template react-ts # tarui, react, typescript
