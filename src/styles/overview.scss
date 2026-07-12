@@ -7,4 +7,314 @@
     z-index: 0;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-user-drag: none;
+}
+
+// * ========= Home Content ========= */
+.home .content {
+    position: absolute;
+    -webkit-transform-style: preserve-3d;
+    transform-style: preserve-3d;
+    top: 50%;
+    -webkit-transform: translateY(-50%);
+    transform: translateY(-50%);
+    left: 0;
+    color: #fff;
+    z-index: 7;
+    margin: 0 auto;
+    padding-left: 200px;
+    display: flex;
+    flex-direction: column;
+    animation: content-in 0.4s ease-out 0.1s both;
+}
+
+@keyframes content-in {
+  from { opacity: 0; transform: translateY(calc(-50% + 12px)); }
+  to { opacity: 1; transform: translateY(-50%); }
+}
+
+.home .content .content-name {
+    font-family: 'Bellefair', serif;
+    font-weight: 500;
+    font-size: 8rem;
+    color: #fff;
+    text-shadow: 0 .3rem .5rem rgba(0, 0, 0, .1);
+    font-style: italic;
+    letter-spacing: 4px;
+    cursor: default;
+}
+
+.content-name span:nth-child(1) {
+    color: hsl(0, 45%, 48%);
+}
+
+.content-name span:nth-child(2) {
+    color: hsl(281, 61%, 48%);
+}
+
+.home .content p {
+    font-size: 2.4rem;
+    color: #fff;
+    padding: .5rem 0;
+    font-family: 'Parisienne', cursive;
+    font-weight: 400;
+    margin: 25px 0;
+    letter-spacing: 6px;
+    cursor: default;
+    text-indent: 1rem;
+}
+
+.content .content-btn {
+    width: fit-content;
+    position: relative;
+    border: 2px solid rgb(218, 135, 80);
+    padding: 1.1rem 4rem;
+    margin-top: 3rem;
+    border-radius: 50px;
+    display: flex;
+    justify-items: center;
+    align-items: center;
+    transition: .3s cubic-bezier(0.39, 0.575, 0.565, 1);
+    overflow: hidden;
+}
+
+.content-btn::before {
+    position: absolute;
+    content: '';
+    left: 0;
+    top: 0;
+    width: 10px;
+    height: 100%;
+    background: rgba(100, 233, 111, 0.1);
+    z-index: 0;
+    transition: .5s cubic-bezier(.75, 0, .25, 1);
+}
+
+.content-btn:hover::before {
+    width: 100%;
+}
+
+.content-btn span {
+    color: #fff;
+    font-size: 2rem;
+    font-family: 'Bellefair', serif;
+}
+
+.content-btn:hover span {
+    transform: translateX(18px);
+}
+
+.arrow {
+    position: relative;
+    transition: transform .5s cubic-bezier(0, 0, .25, 1);
+    will-change: transform;
+    width: 30px;
+    height: 100%;
+}
+
+.content-btn:hover .bar {
+    width: 10px;
+    height: 0;
+}
+
+.content-btn:hover .triangle {
+    right: -12px;
+    border-left-color: #c24b43;
+}
+
+.arrow .bar {
+    position: absolute;
+    top: 50%;
+    right: -1.3rem;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 1px;
+    background: rgb(255, 255, 255);
+    opacity: 1;
+    transition: width .15s cubic-bezier(0.645, 0.045, 0.355, 1) .07s;
+}
+
+.triangle {
+    position: absolute;
+    top: -5px;
+    right: -16px;
+    width: 6px;
+    height: 10px;
+    border-top: 5px solid transparent;
+    border-left: 5px solid #fff;
+    border-bottom: 5px solid transparent;
+    transform: initial;
+    transition: right .2s ease, border-left-color .2s ease;
+}
+
+
+/* ========== Awwwards ========== */
+#awwwards {
+    position: absolute;
+    top: 12%;
+    right: 0;
+    width: 90px;
+    height: 135px;
+}
+
+#awwwards img[alt=awwwards] {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    object-fit: cover;
+    -webkit-object-fit: cover;
+    transition: right .3s ease-in-out;
+}
+
+#awwwards:hover img[alt=awwwards] {
+    right: -5px;
+}
+
+/* ========== icons(右侧) ========== */
+
+.social {
+    position: absolute;
+    top: 70%;
+    right: 3%;
+    z-index: 7;
+    -webkit-transform-style: preserve-3d;
+    transform-style: preserve-3d;
+    -webkit-transform: translateY(-50%);
+    transform: translateY(-50%);
+    transition: opacity .35s ease .75s;
+}
+
+.social li:not(:last-child) {
+    position: relative;
+    margin: 1.5rem;
+    /* margin-top: 2rem; */
+    padding: .5rem;
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    transition: background .1s ease-out;
+}
+
+.social li:not(:last-child):hover img {
+    filter: brightness(1.3);
+}
+
+
+/* ===== icon 线条 ====== */
+
+.social li:last-child {
+    margin-top: 2rem;
+}
+
+
+.social .icon-line {
+    position: absolute;
+    right: 48%;
+    /* right: 40%; */
+    transform: translateX(-50%);
+    width: 1.5px;
+    height: 120px;
+    background: rgba(233, 233, 233, 0.4);
+}
+
+.social:hover .icon-line {
+    background: rgba(219, 251, 252, 0.8);
+}
+
+
+/* ========== 图标提示信息Tootips(右侧) ========= */
+
+.box-tooltip {
+    visibility: visible;
+    opacity: 0;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    margin-bottom: 8px;
+    transform: translateY(-15px);
+    transition: opacity .3s ease-in-out, bottom .3s ease-in-out, transform .3s ease-in-out;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.box-tooltip[data-name=codepen] {
+    opacity: 0;
+    bottom: -220%;
+    /* bottom: -280%; */
+}
+
+.social li {
+    display: flex;
+    flex-direction: column;
+}
+
+.social li:hover .box-tooltip {
+    opacity: 1;
+    bottom: 70%;
+    transition: opacity .3s ease-in-out, bottom .3s ease-in-out, transform .3s ease-in-out;
+}
+
+.social li:hover .box-tooltip[data-name="codepen"] {
+    bottom: -180%;
+    /* bottom: -250%; */
+    transition: opacity .3s ease-in-out, bottom .3s ease-in-out, transform .3s ease-in-out;
+}
+
+
+/* ======== 文字提示 ======== */
+
+.tooltip-text {
+    position: relative;
+    top: 0;
+    left: -50%;
+    width: auto;
+    padding: 8px 16px;
+    background-color: #49c5b6;
+    white-space: nowrap;
+    // color: #fff;
+    color: #202121;
+    font-size: 1.2rem;
+    line-height: normal;
+    text-align: center;
+    border-radius: 30px;
+    z-index: 1;
+    letter-spacing: 2px;
+}
+
+.tooltip-text[data-color=github] {
+    background-color: #d9e4c4;
+}
+
+.tooltip-text[data-color=codepen] {
+    background-color: #d2c4e4;
+    letter-spacing: 1px;
+}
+
+
+/* ========== 提示框三角形 ========= */
+
+.tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    height: 0;
+    width: 0;
+    margin-left: -6px;
+    border: solid transparent;
+    border-top-color: #49c5b6;
+    border-width: 8px 6px;
+    /* transform: translate(4px, -1px); */
+}
+
+.tooltip-text[data-color=github]::after {
+    border-top-color: #d9e4c4;
+}
+
+.tooltip-text[data-color=codepen]::after {
+    border-top-color: #d2c4e4;
+    /* transform: rotateX(180deg) translate(4px, -100%); */
+    transform: rotateX(180deg) translateY(-100%);
+    top: -90%;
 }

@@ -5,6 +5,12 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  transition: opacity 0.3s ease,
+              transform 0.3s ease,
+              width 0.3s ease,
+              height 0.3s ease,
+              background-color 0.3s ease,
+              color 0.3s ease;
 }
 
 *::before,
@@ -43,4 +49,8 @@ button {
     cursor: pointer;
     outline: none;
     border: none;
+}
+
+section {
+    padding: 6% 9%;
 }
