@@ -1,0 +1,14 @@
+{
+  "header": {
+    "overview": "Overview",
+    "chat": "Chat",
+    "music": "Music",
+    "video": "Video",
+    "guest": "Guest",
+    "notifications": "Notifications",
+    "noNotifications": "No notifications yet",
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "language": "Language"
+  }
+}

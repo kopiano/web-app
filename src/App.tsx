@@ -1,3 +1,4 @@
+import '@/i18n';
 import { Outlet, createBrowserRouter, RouterProvider } from 'react-router-dom';
 import Overview from '@/pages/Overview';
 import Chat from '@/pages/Chat';

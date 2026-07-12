@@ -6,6 +6,7 @@
     * React19 + Vite7 + pnpm
     * Typescript + scss
     * react-router
+    * react-i18next
 
 ### 功能
 * music

@@ -1,0 +1,14 @@
+{
+  "header": {
+    "overview": "概览",
+    "chat": "聊天",
+    "music": "音乐",
+    "video": "视频",
+    "guest": "访客",
+    "notifications": "通知",
+    "noNotifications": "暂无通知",
+    "signIn": "登录",
+    "signUp": "注册",
+    "language": "语言"
+  }
+}
