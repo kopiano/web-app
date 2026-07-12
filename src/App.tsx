@@ -1,13 +1,31 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import Home from '@/pages/Home';
+import { Outlet, createBrowserRouter, RouterProvider } from 'react-router-dom';
+import Overview from '@/pages/Overview';
+import Chat from '@/pages/Chat';
 import Music from '@/pages/Music';
 import Video from '@/pages/Video';
+import Header from '@/pages/Header';
+import BackgroundImg from '@/components/home/BackgroundImg';
+import { ThemeProvider } from '@/context/ThemeContext';
 import "@/App.scss";
 
+const Layout = () => (
+  <ThemeProvider>
+    <BackgroundImg />
+    <Header />
+    <Outlet />
+  </ThemeProvider>
+);
+
 const router = createBrowserRouter([
-  { path: '/', element: <Home /> },
-  { path: '/music', element: <Music /> },
-  { path: '/video', element: <Video /> },
+  {
+    element: <Layout />,
+    children: [
+      { path: '/', element: <Overview /> },
+      { path: '/chat', element: <Chat /> },
+      { path: '/music', element: <Music /> },
+      { path: '/video', element: <Video /> },
+    ],
+  },
 ]);
 
 function App() {
