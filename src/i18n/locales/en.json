@@ -9,6 +9,8 @@
     "noNotifications": "No notifications yet",
     "signIn": "Sign In",
     "signUp": "Sign Up",
-    "language": "Language"
+    "language": "Language",
+    "en": "en",
+    "zh": "zh"
   }
 }

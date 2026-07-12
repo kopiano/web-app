@@ -7,11 +7,18 @@
   height: 32px;
   border-radius: 999px;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
   outline: none;
   font-family: inherit;
   padding: 0;
   overflow: hidden;
+  border: none;
+  background: transparent;
+  color: inherit;
+}
+
+.lang-toggle:hover {
+  transform: translateY(-1px);
 }
 
 .lang-toggle:active {
@@ -22,14 +29,18 @@
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: linear-gradient(135deg, #a78bfa, #818cf8);
-  box-shadow: 0 2px 8px rgba(129, 140, 248, 0.4);
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 2px 8px rgba(129, 140, 248, 0.4), 0 0 20px rgba(129, 140, 248, 0.15);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 1;
   pointer-events: none;
+}
+
+.lang-toggle:hover .lang-slider {
+  box-shadow: 0 2px 12px rgba(129, 140, 248, 0.5), 0 0 24px rgba(129, 140, 248, 0.2);
 }
 
 .lang-slider.right {
@@ -45,32 +56,72 @@
   justify-content: center;
   height: 100%;
   font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   line-height: 1;
-  transition: color 0.25s ease;
+  transition: color 0.3s ease;
   user-select: none;
   -webkit-user-select: none;
 }
 
 .lang-option.active {
   color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
 .lang-option:not(.active) {
-  color: rgba(0, 0, 0, 0.35);
+  color: rgba(0, 0, 0, 0.4);
 }
 
 [data-theme='dark'] .lang-option:not(.active) {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.45);
 }
 
-/* === Header-actions === */
+/* === Header-actions unified glass container === */
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 2px;
   flex-shrink: 0;
+  padding: 4px;
+  border-radius: 999px;
+  position: relative;
+  isolation: isolate;
+}
+
+.header-actions::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: -1;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(32px) saturate(220%);
+  -webkit-backdrop-filter: blur(32px) saturate(220%);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+[data-theme='dark'] .header-actions::before {
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Divider between lang toggle and icon buttons */
+.header-actions-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(0,0,0,0.07);
+  margin: 0 5px;
+  flex-shrink: 0;
+}
+
+[data-theme='dark'] .header-actions-divider {
+  background: rgba(255,255,255,0.08);
 }
 
 /* === Center the navbar === */
@@ -86,88 +137,167 @@
 
 /* ===== Shared button base ===== */
 .action-btn {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   cursor: pointer;
   position: relative;
-  transition: all 0.25s ease;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease;
   outline: none;
   font-family: inherit;
+  border: none;
+  background: transparent;
+  color: inherit;
+}
+
+.action-btn:hover {
+  background: rgba(129, 140, 248, 0.12);
+  transform: translateY(-2px) scale(1.02);
 }
 
 .action-btn:active {
-  transform: scale(0.92);
+  transform: scale(0.88);
+}
+
+/* Hover glow ring */
+.action-btn::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+/* Theme button specific hover glow */
+.theme-btn::before {
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, transparent 70%);
+}
+
+[data-theme='dark'] .theme-btn::before {
+  background: radial-gradient(circle, rgba(192, 132, 252, 0.15) 0%, transparent 70%);
+}
+
+.theme-btn:hover::before {
+  opacity: 1;
+}
+
+.action-btn svg {
+  position: relative;
+  z-index: 1;
+}
+
+/* Theme icon transition */
+.theme-btn svg {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.theme-btn:hover svg {
+  transform: scale(1.15);
 }
 
 /* ===== Notification dot ===== */
 .notif-dot {
   position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 10px;
-  height: 10px;
+  top: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #f43f5e;
-  border: 2px solid transparent;
-  box-shadow: 0 0 0 2px var(--header-bg, rgba(255,255,255,0.72)), 0 0 12px rgba(244, 63, 94, 0.5);
-  animation: notif-glow 2s ease-in-out infinite;
+  box-shadow: 0 0 0 2px hsla(0, 0%, 100%, 0.75), 0 0 10px rgba(244, 63, 94, 0.5);
+  animation: notif-glow 2.5s ease-in-out infinite;
+}
+
+[data-theme='dark'] .notif-dot {
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35), 0 0 10px rgba(244, 63, 94, 0.35);
+  animation-name: notif-glow-dark;
 }
 
 @keyframes notif-glow {
-  0%, 100% { box-shadow: 0 0 0 2px var(--header-bg, rgba(255,255,255,0.72)), 0 0 8px rgba(244, 63, 94, 0.4); }
-  50% { box-shadow: 0 0 0 2px var(--header-bg, rgba(255,255,255,0.72)), 0 0 16px rgba(244, 63, 94, 0.7); }
+  0%, 100% { box-shadow: 0 0 0 2px hsla(0, 0%, 100%, 0.75), 0 0 8px rgba(244, 63, 94, 0.4); }
+  50% { box-shadow: 0 0 0 2px hsla(0, 0%, 100%, 0.75), 0 0 16px rgba(244, 63, 94, 0.7); }
+}
+
+@keyframes notif-glow-dark {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35), 0 0 8px rgba(244, 63, 94, 0.3); }
+  50% { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35), 0 0 16px rgba(244, 63, 94, 0.6); }
+}
+
+/* Bell shake on hover */
+.notification-btn:hover svg {
+  animation: bell-shake 0.5s ease-in-out;
+}
+
+@keyframes bell-shake {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(10deg); }
+  40% { transform: rotate(-8deg); }
+  60% { transform: rotate(5deg); }
+  80% { transform: rotate(-3deg); }
 }
 
 /* ===== User Profile Pill ===== */
 .user-pill {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px 4px 4px;
-  height: 40px;
+  gap: 6px;
+  padding: 3px 6px 3px 3px;
+  height: 34px;
   border-radius: 999px;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease;
   overflow: hidden;
   position: relative;
   font-family: inherit;
   outline: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+}
+
+.user-pill:hover {
+  background: rgba(129, 140, 248, 0.12);
+  transform: translateY(-1px);
 }
 
 .user-pill:active {
-  transform: scale(0.96);
+  transform: scale(0.94);
 }
 
-/* Avatar container — gradient background like web-alpha */
+/* Avatar container */
 .user-avatar-box {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  transition: transform 0.25s ease;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: #818cf8;
+  background: linear-gradient(135deg, #a78bfa, #818cf8);
+  z-index: 1;
 }
 
 .user-pill:hover .user-avatar-box {
-  transform: scale(1.05);
+  transform: scale(1.08);
 }
 
 .user-avatar-initials {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: #fff;
   line-height: 1;
   letter-spacing: 0.02em;
 }
 
-/* Username — fixed width so EN/zh toggle doesn't shift buttons */
+/* Username */
 .user-pill-name {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: inherit;
   width: 5rem;
@@ -180,6 +310,7 @@
 /* Chevron */
 .user-pill-chevron {
   flex-shrink: 0;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* ===== Dropdown Panel (shared) ===== */
@@ -226,7 +357,7 @@
   text-decoration: none;
   border: none;
   background: none;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, transform 0.15s ease, color 0.15s ease;
   cursor: pointer;
   line-height: 1;
   text-align: left;
@@ -234,7 +365,8 @@
 }
 
 .dropdown-action-item:hover {
-  background: rgba(129, 140, 248, 0.08);
+  background: rgba(129, 140, 248, 0.1);
+  transform: translateX(3px);
 }
 
 /* ===== Notifications ===== */
@@ -263,12 +395,13 @@
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
   padding: 0;
 }
 
 .notif-header-close:hover {
   background: rgba(129, 140, 248, 0.1);
+  transform: rotate(90deg);
 }
 
 .notif-empty-state {
@@ -287,6 +420,6 @@
   }
   .user-pill {
     gap: 0;
-    padding: 4px;
+    padding: 3px;
   }
 }

@@ -33,49 +33,8 @@ export default function Header() {
 
   const initials = 'G';
 
-  const glassStyle = {
-    background: theme === 'light'
-      ? 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.5))'
-      : 'linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04))',
-    backdropFilter: 'blur(24px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-    border: theme === 'light'
-      ? '1px solid rgba(255,255,255,0.8)'
-      : '1px solid rgba(255,255,255,0.08)',
-    boxShadow: theme === 'light'
-      ? '0 4px 20px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -1px 0 rgba(0,0,0,0.02)'
-      : '0 4px 20px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -1px 0 rgba(0,0,0,0.15)',
-  };
-
-  const glassHover = useCallback((e: React.MouseEvent) => {
-    const el = e.currentTarget as HTMLElement;
-    if (theme === 'light') {
-      el.style.background = 'linear-gradient(135deg, rgba(255,255,255,1), rgba(255,255,255,0.7))';
-      el.style.borderColor = 'rgba(255,255,255,1)';
-      el.style.boxShadow = '0 6px 28px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.9)';
-    } else {
-      el.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.07))';
-      el.style.borderColor = 'rgba(255,255,255,0.15)';
-      el.style.boxShadow = '0 6px 28px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.12)';
-    }
-  }, [theme]);
-
-  const glassLeave = useCallback((e: React.MouseEvent) => {
-    const el = e.currentTarget as HTMLElement;
-    if (theme === 'light') {
-      el.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.5))';
-      el.style.borderColor = 'rgba(255,255,255,0.8)';
-      el.style.boxShadow = '0 4px 20px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -1px 0 rgba(0,0,0,0.02)';
-    } else {
-      el.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04))';
-      el.style.borderColor = 'rgba(255,255,255,0.08)';
-      el.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -1px 0 rgba(0,0,0,0.15)';
-    }
-  }, [theme]);
-
   const avatarBoxStyle = {
     background: 'linear-gradient(135deg, #a78bfa, #818cf8)',
-    boxShadow: '0 2px 8px rgba(129, 140, 248, 0.35)',
   };
 
   const updateProfilePos = useCallback(() => {
@@ -145,14 +104,16 @@ export default function Header() {
 
         <div className="header-actions">
           {/* Language Toggle */}
-          <button className="lang-toggle" style={glassStyle} onClick={toggleLang} aria-label="Language">
+          <button className="lang-toggle" onClick={toggleLang} aria-label="Language">
             <span className={`lang-slider ${currentLang === 'zh' ? 'right' : ''}`} />
-            <span className={`lang-option ${currentLang === 'en' ? 'active' : ''}`}>EN</span>
-            <span className={`lang-option ${currentLang === 'zh' ? 'active' : ''}`}>中</span>
+            <span className={`lang-option ${currentLang === 'en' ? 'active' : ''}`}>{t('header.en')}</span>
+                      <span className={`lang-option ${currentLang === 'zh' ? 'active' : ''}`}>{t('header.zh')}</span>
           </button>
 
+          <span className="header-actions-divider" />
+
           {/* Theme Toggle */}
-          <button className="action-btn" style={glassStyle} onClick={toggleTheme} onMouseEnter={glassHover} onMouseLeave={glassLeave}>
+          <button className="action-btn theme-btn" onClick={toggleTheme}>
             {theme === 'light' ? (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, color: '#f59e0b' }}>
                 <circle cx="12" cy="12" r="5" />
@@ -169,7 +130,7 @@ export default function Header() {
           </button>
 
           {/* Notification Bell */}
-          <button ref={bellRef} className="action-btn" style={glassStyle} onClick={() => setNotifOpen(o => !o)} onMouseEnter={glassHover} onMouseLeave={glassLeave}>
+          <button ref={bellRef} className="action-btn notification-btn" onClick={() => setNotifOpen(o => !o)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, color: theme === 'light' ? '#6366f1' : '#a5b4fc' }}>
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -178,7 +139,7 @@ export default function Header() {
           </button>
 
           {/* User Profile Pill */}
-          <button ref={avatarRef} className="user-pill" style={glassStyle} onClick={() => setProfileOpen(o => !o)} onMouseEnter={glassHover} onMouseLeave={glassLeave}>
+          <button ref={avatarRef} className="user-pill" onClick={() => setProfileOpen(o => !o)}>
             <div className="user-avatar-box" style={avatarBoxStyle}>
               <span className="user-avatar-initials">{initials}</span>
             </div>

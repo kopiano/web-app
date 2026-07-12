@@ -1,6 +1,6 @@
 {
   "header": {
-    "overview": "概览",
+    "overview": "主页",
     "chat": "聊天",
     "music": "音乐",
     "video": "视频",
@@ -9,6 +9,8 @@
     "noNotifications": "暂无通知",
     "signIn": "登录",
     "signUp": "注册",
-    "language": "语言"
+    "language": "语言",
+    "en": "英",
+    "zh": "中"
   }
 }
