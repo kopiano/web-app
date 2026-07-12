@@ -14,10 +14,46 @@
         }
       })();
     </script>
+    <style>
+      .bg-fallback {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+      }
+      .bg-fallback .wrapper-img {
+        position: absolute;
+        inset: 0;
+        background: url(/bg-0.webp) center/cover no-repeat;
+      }
+      .bg-fallback .wrapper-blur {
+        position: absolute;
+        inset: 0;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+      .bg-fallback .wrapper-color {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(-45deg, rgb(161, 140, 209), rgb(251, 194, 235), rgb(161, 196, 253), rgb(194, 233, 251)) 0% 0% / 400% 400%;
+        animation: 15s infinite bg-color-change ease-in-out;
+        opacity: 0.6;
+        mix-blend-mode: color;
+      }
+      @keyframes bg-color-change {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+    </style>
     <title>Tauri + React + Typescript</title>
   </head>
 
   <body>
+    <div class="bg-fallback">
+      <div class="wrapper-img"></div>
+      <div class="wrapper-blur"></div>
+      <div class="wrapper-color"></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

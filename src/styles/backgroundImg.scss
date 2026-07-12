@@ -1,0 +1,61 @@
+.background-wrapper {
+    position: fixed;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+}
+
+/* Override the HTML fallback once React renders */
+.background-wrapper ~ .bg-fallback {
+  display: none;
+}
+
+.wrapper-img {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 2s ease-in-out;
+}
+.wrapper-img.active {
+    opacity: 1;
+}
+
+.wrapper-img:first-child {
+  opacity: 1;
+}
+
+.wrapper-img:first-child.active {
+  opacity: 1;
+}
+
+.bg-0 { background-image: url("@/assets/images/bg-0.webp"); }
+.bg-1 { background-image: url("@/assets/images/bg-1.webp"); }
+.bg-2 { background-image: url("@/assets/images/bg-2.webp"); }
+.bg-3 { background-image: url("@/assets/images/bg-3.webp"); }
+.bg-4 { background-image: url("@/assets/images/bg-4.webp"); }
+.bg-5 { background-image: url("@/assets/images/bg-5.webp"); }
+
+.wrapper-blur {
+    position: absolute;
+    inset: 0;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.wrapper-color {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(-45deg, rgb(161, 140, 209), rgb(251, 194, 235), rgb(161, 196, 253), rgb(194, 233, 251)) 0% 0% / 400% 400%;
+    animation: 15s infinite colorchange ease-in-out;
+    opacity: 0.6;
+    mix-blend-mode: color;
+}
+
+@keyframes colorchange {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}

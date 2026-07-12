@@ -107,7 +107,7 @@ export default function Header() {
           <button className="lang-toggle" onClick={toggleLang} aria-label="Language">
             <span className={`lang-slider ${currentLang === 'zh' ? 'right' : ''}`} />
             <span className={`lang-option ${currentLang === 'en' ? 'active' : ''}`}>{t('header.en')}</span>
-                      <span className={`lang-option ${currentLang === 'zh' ? 'active' : ''}`}>{t('header.zh')}</span>
+            <span className={`lang-option ${currentLang === 'zh' ? 'active' : ''}`}>{t('header.zh')}</span>
           </button>
 
           <span className="header-actions-divider" />

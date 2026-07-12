@@ -5,7 +5,7 @@ import Chat from '@/pages/Chat';
 import Music from '@/pages/Music';
 import Video from '@/pages/Video';
 import Header from '@/pages/Header';
-import BackgroundImg from '@/components/home/BackgroundImg';
+import BackgroundImg from '@/components/BackgroundImg';
 import { ThemeProvider } from '@/context/ThemeContext';
 import "@/App.scss";
 

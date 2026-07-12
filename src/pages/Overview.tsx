@@ -1,4 +1,4 @@
-import '@/styles/home.scss';
+import '@/styles/overview.scss';
 
 
 function Overview() {

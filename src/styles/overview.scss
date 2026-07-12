@@ -1,0 +1,10 @@
+@use '@/styles/backgroundImg.scss';
+
+.home {
+    position: relative;
+    min-height: 100vh;
+    // flex-flow: column;
+    z-index: 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
