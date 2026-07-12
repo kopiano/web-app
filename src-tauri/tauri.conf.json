@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "my-app",
+  "productName": "web-app",
   "version": "0.1.0",
-  "identifier": "com.kopiano.my-app",
+  "identifier": "com.kopiano.web-app",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,8 +12,8 @@
   "app": {
     "windows": [
       {
-        "title": "my-app",
-        "width": 800,
+        "title": "web-app",
+        "width": 1060,
         "height": 600
       }
     ],
