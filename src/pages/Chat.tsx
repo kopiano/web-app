@@ -267,11 +267,12 @@ function Chat() {
       m.id === postId ? { ...m, comments: [...m.comments, { id: Date.now(), author: 'You', text }] } : m
     ));
     setCommentTexts(p => ({ ...p, [postId]: '' }));
-    setShowCommentInput(p => ({ ...p, [postId]: false }));
+    setCommentEmojiPost(null);
   }
 
   function toggleCommentInput(postId: number) {
-    setShowCommentInput(p => ({ ...p, [postId]: true }));
+    setShowCommentInput(p => ({ ...p, [postId]: !p[postId] }));
+    setCommentEmojiPost(null);
   }
 
   function pickCommentEmoji(postId: number, emoji: string) {
@@ -552,7 +553,7 @@ function Chat() {
                         </span>
                         <span className="action-label">{post.likes}</span>
                       </button>
-                      <button className="card-action-btn" onClick={() => toggleCommentInput(post.id)}>
+                      <button className={`card-action-btn comment-action-btn${showCommentInput[post.id] ? ' comment-active' : ''}`} onClick={() => toggleCommentInput(post.id)}>
                         <span className="action-svg">
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -581,57 +582,57 @@ function Chat() {
                       </button>
                     </div>
 
-                    {/* Comments visible by default + input below */}
-                    <div className="card-comments">
-                      {post.comments.map(c => (
-                        <div key={c.id} className="comment-item">
-                          <span className="comment-author">{c.author}</span>
-                          <span className="comment-text">{c.text}</span>
-                        </div>
-                      ))}
-                      <div className="comment-input-row">
-                        <div className="comment-emoji-wrap">
-                          <button
-                            className="comment-emoji-btn"
-                            onClick={() => {
-                              setCommentEmojiPost(p => p === post.id ? null : post.id);
-                              setShowCommentInput(p => ({ ...p, [post.id]: true }));
-                            }}
-                            title="Add emoji"
-                            aria-label="Add emoji to comment"
-                          >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10" />
-                              <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-                              <line x1="9" y1="9" x2="9.01" y2="9" />
-                              <line x1="15" y1="9" x2="15.01" y2="9" />
-                            </svg>
-                          </button>
-                          {commentEmojiPost === post.id && (
-                            <div className="emoji-picker comment-emoji-picker">
-                              <div className="emoji-grid">
-                                {EMOJIS.map(e => (
-                                  <button key={e} className="emoji-btn" onClick={() => pickCommentEmoji(post.id, e)}>{e}</button>
-                                ))}
+                    {showCommentInput[post.id] && (
+                      <div className="card-comments">
+                        {post.comments.map(c => (
+                          <div key={c.id} className="comment-item">
+                            <span className="comment-author">{c.author}</span>
+                            <span className="comment-text">{c.text}</span>
+                          </div>
+                        ))}
+                        <div className="comment-input-row">
+                          <div className="comment-emoji-wrap">
+                            <button
+                              className="comment-emoji-btn"
+                              onClick={() => {
+                                setCommentEmojiPost(p => p === post.id ? null : post.id);
+                                setShowCommentInput(p => ({ ...p, [post.id]: true }));
+                              }}
+                              title="Add emoji"
+                              aria-label="Add emoji to comment"
+                            >
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                                <line x1="9" y1="9" x2="9.01" y2="9" />
+                                <line x1="15" y1="9" x2="15.01" y2="9" />
+                              </svg>
+                            </button>
+                            {commentEmojiPost === post.id && (
+                              <div className="emoji-picker comment-emoji-picker">
+                                <div className="emoji-grid">
+                                  {EMOJIS.map(e => (
+                                    <button key={e} className="emoji-btn" onClick={() => pickCommentEmoji(post.id, e)}>{e}</button>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
+                            )}
+                          </div>
+                          <input className="comment-input" type="text"
+                            placeholder="Write a comment..."
+                            value={commentTexts[post.id] || ''}
+                            onChange={e => setCommentTexts(p => ({ ...p, [post.id]: e.target.value }))}
+                            onKeyDown={e => { if (e.key === 'Enter') handleCommentSubmit(post.id); }} />
+                          {commentTexts[post.id]?.trim() && (
+                            <button className="comment-submit" onClick={() => handleCommentSubmit(post.id)} title="Send comment" aria-label="Send comment">
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+                              </svg>
+                            </button>
                           )}
                         </div>
-                        <input className="comment-input" type="text"
-                          placeholder={showCommentInput[post.id] ? "Write a comment..." : ""}
-                          value={commentTexts[post.id] || ''}
-                          onChange={e => setCommentTexts(p => ({ ...p, [post.id]: e.target.value }))}
-                          onFocus={() => setShowCommentInput(p => ({ ...p, [post.id]: true }))}
-                          onKeyDown={e => { if (e.key === 'Enter') handleCommentSubmit(post.id); }} />
-                        {showCommentInput[post.id] && commentTexts[post.id]?.trim() && (
-                          <button className="comment-submit" onClick={() => handleCommentSubmit(post.id)} title="Send comment" aria-label="Send comment">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
-                            </svg>
-                          </button>
-                        )}
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })
