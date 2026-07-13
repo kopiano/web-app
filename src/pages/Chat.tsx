@@ -362,7 +362,7 @@ function Chat() {
                 {(messages[activeContact] || []).length === 0 ? (
                   <div className="msg-empty">No messages yet</div>
                 ) : (
-                  (messages[activeContact] || []).map(msg => (
+                  (messages[activeContact] || []).map((msg, msgIndex, contactMessages) => (
                     <div key={msg.id} className={`msg-wrap ${msg.from === 'me' ? 'sent' : 'received'}`}>
                       <div className="msg-sender">
                         <div className="msg-avatar">
@@ -375,7 +375,19 @@ function Chat() {
                       </div>
                       <div className="msg-content">
                         <div className={`msg ${msg.from === 'me' ? 'sent' : 'received'}`}>
-                          <div className="msg-text">{msg.text}</div>
+                          <div className={`msg-text${msgIndex === contactMessages.length - 1 ? ' typing-text' : ''}`}>
+                            {msgIndex === contactMessages.length - 1 ? (
+                              Array.from(msg.text).map((char, charIndex) => (
+                                <span
+                                  key={`${msg.id}-${charIndex}`}
+                                  className="msg-char"
+                                  style={{ '--char-delay': `${charIndex * 0.032}s` } as React.CSSProperties}
+                                >
+                                  {char}
+                                </span>
+                              ))
+                            ) : msg.text}
+                          </div>
                         </div>
                         <div className="msg-time">{msg.time}</div>
                       </div>
@@ -623,13 +635,17 @@ function Chat() {
                             value={commentTexts[post.id] || ''}
                             onChange={e => setCommentTexts(p => ({ ...p, [post.id]: e.target.value }))}
                             onKeyDown={e => { if (e.key === 'Enter') handleCommentSubmit(post.id); }} />
-                          {commentTexts[post.id]?.trim() && (
-                            <button className="comment-submit" onClick={() => handleCommentSubmit(post.id)} title="Send comment" aria-label="Send comment">
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
-                              </svg>
-                            </button>
-                          )}
+                          <button
+                            className="comment-submit"
+                            disabled={!commentTexts[post.id]?.trim()}
+                            onClick={() => handleCommentSubmit(post.id)}
+                            title="Send comment"
+                            aria-label="Send comment"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
                     )}

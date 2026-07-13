@@ -160,11 +160,12 @@ $chat-margin-left: 100px;
 }
 
 .contact-group-label {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: rgba(0, 0, 0, 0.35);
-    padding: 10px 20px 4px;
-    letter-spacing: 0.5px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: rgba(49, 46, 129, 0.58);
+    padding: 12px 20px 6px;
+    text-transform: uppercase;
+    line-height: 1.2;
 }
 
 .contact-divider {
@@ -293,28 +294,30 @@ $chat-margin-left: 100px;
 }
 
 .contact-name {
-    font-size: 1.3rem;
-    font-weight: 600;
-    letter-spacing: 0.7px;
+    font-size: 1.25rem;
+    font-weight: 650;
     color: rgba(0, 0, 0, 0.85);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.25;
+    transition: color 0.3s ease;
 }
 
 .contact-preview {
-    font-size: 1.1rem;
-    letter-spacing: 0.7px;
+    font-size: 1rem;
     color: rgba(0, 0, 0, 0.4);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.25;
+    transition: color 0.3s ease;
 }
 
 .contact-time {
     font-size: 1rem;
     color: rgba(0, 0, 0, 0.3);
-    letter-spacing: 0.7px;
+    letter-spacing: 0;
     flex-shrink: 0;
 }
 
@@ -354,13 +357,14 @@ $chat-margin-left: 100px;
 }
 
 .messages-header-name {
-    font-size: 1.6rem;
-    font-weight: 600;
-    letter-spacing: 0.7px;
+    font-size: 1.5rem;
+    font-weight: 700;
     color: rgba(0, 0, 0, 0.85);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.2;
+    text-shadow: 0 1px 1px rgba(255, 255, 255, 0.45);
 }
 
 .messages-header-status {
@@ -476,19 +480,84 @@ $chat-margin-left: 100px;
 }
 
 .msg-text {
-    // margin-bottom: 3px;
+    margin-bottom: 3px;
     font-size: 14px;
-    letter-spacing: 0.7px;
+    letter-spacing: 0;
     font-family: -apple-system;
+    white-space: pre-wrap;
+}
+
+.typing-text {
+    position: relative;
+}
+
+.typing-text::after {
+    content: '';
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-left: 3px;
+    vertical-align: -0.12em;
+    border-radius: 2px;
+    background: currentColor;
+    opacity: 0.7;
+    animation: typing-caret 0.9s ease-in-out infinite;
+}
+
+.msg-char {
+    display: inline-block;
+    opacity: 0;
+    will-change: opacity, transform;
+    transform: translateX(2px);
+    animation: message-char-in 0.18s ease-out var(--char-delay) both;
 }
 
 .msg-time {
     font-size: 1rem;
     padding: 6px 0;
+    color: rgba(0, 0, 0, 0.3);
+    animation: message-time-in 0.35s ease 1.05s both;
 }
 
 .msg-wrap.sent .msg-time {
-    // color: #fff;
+    color: #fff;
+}
+
+@keyframes message-char-in {
+    from {
+        opacity: 0;
+        transform: translateX(2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes typing-caret {
+    0%, 45% { opacity: 0.7; }
+    55%, 100% { opacity: 0.12; }
+}
+
+@keyframes message-time-in {
+    from {
+        opacity: 0;
+        transform: translateY(-2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .msg-char,
+    .typing-text::after,
+    .msg-time {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
 }
 
 /* ===== Input Bar ===== */
@@ -1300,12 +1369,24 @@ $chat-margin-left: 100px;
     cursor: pointer;
     font-family: inherit;
     flex-shrink: 0;
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+    transition:
+        transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 0.35s ease,
+        opacity 0.35s ease,
+        filter 0.35s ease;
 }
 
 .comment-submit:hover {
     transform: scale(1.08);
     box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+}
+
+.comment-submit:disabled {
+    opacity: 0.32;
+    cursor: default;
+    filter: grayscale(0.35);
+    box-shadow: none;
+    transform: scale(0.94);
 }
 
 .comment-submit:active {
