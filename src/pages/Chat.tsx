@@ -347,10 +347,21 @@ function Chat() {
                 ) : (
                   (messages[activeContact] || []).map(msg => (
                     <div key={msg.id} className={`msg-wrap ${msg.from === 'me' ? 'sent' : 'received'}`}>
-                      <div className={`msg ${msg.from === 'me' ? 'sent' : 'received'}`}>
-                        <div className="msg-text">{msg.text}</div>
+                      <div className="msg-sender">
+                        <div className="msg-avatar">
+                          <img
+                            src={msg.from === 'me' ? landscapeAvatar(0) : activeContactInfo.avatar}
+                            alt=""
+                            className="avatar-img"
+                          />
+                        </div>
                       </div>
-                      <div className="msg-time">{msg.time}</div>
+                      <div className="msg-content">
+                        <div className={`msg ${msg.from === 'me' ? 'sent' : 'received'}`}>
+                          <div className="msg-text">{msg.text}</div>
+                        </div>
+                        <div className="msg-time">{msg.time}</div>
+                      </div>
                     </div>
                   ))
                 )}
