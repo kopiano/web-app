@@ -8,10 +8,10 @@
     background: hsla(0, 0%, 100%, 0.72);
     backdrop-filter: blur(16px) saturate(180%);
     -webkit-backdrop-filter: blur(16px) saturate(180%);
-    padding-left: 6%;
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-    padding-right: 3%;
+    padding-left: 3%;
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+    padding-right: 2%;
 }
 
 // nav
@@ -34,8 +34,8 @@
 
 .nav_logo {
     position: relative;
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     object-fit: cover;
     -webkit-object-fit: cover;
     background: rgb(34,34,34,1);

@@ -74,6 +74,7 @@
   gap: 6px;
   flex-shrink: 0;
   padding: 3px 5px;
+  padding-right: 3px;
   border-radius: 3rem;
   position: relative;
   isolation: isolate;
@@ -103,13 +104,13 @@
 .header-actions-divider {
   width: 1px;
   height: 18px;
-  background: rgba(0,0,0,0.07);
+  background: rgba(50, 47, 47, 0.62);
   margin: 0 5px;
   flex-shrink: 0;
 }
 
 [data-theme='dark'] .header-actions-divider {
-  background: rgba(255,255,255,0.08);
+  background: rgba(50, 47, 47, 0.62);
 }
 
 /* === Center the navbar === */
@@ -141,7 +142,7 @@
 }
 
 .action-btn:hover {
-  background: rgba(129, 140, 248, 0.12);
+  background: rgba(232, 181, 249, 0.53);
   transform: translateY(-2px);
 }
 
