@@ -8,14 +8,28 @@ import Header from '@/pages/Header';
 import BackgroundImg from '@/components/BackgroundImg';
 import { ThemeProvider } from '@/context/ThemeContext';
 import "@/App.scss";
+import { useEffect } from 'react';
+import { authStorage } from '@/lib/auth';
 
-const Layout = () => (
-  <ThemeProvider>
-    <BackgroundImg />
-    <Header />
-    <Outlet />
-  </ThemeProvider>
-);
+const Layout = () => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('auth_token');
+    const refresh = params.get('refresh_token');
+    if (!token) return;
+    authStorage.setToken(token);
+    if (refresh) authStorage.setRefreshToken(refresh);
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }, []);
+
+  return (
+    <ThemeProvider>
+      <BackgroundImg />
+      <Header />
+      <Outlet />
+    </ThemeProvider>
+  );
+};
 
 const router = createBrowserRouter([
   {

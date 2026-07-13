@@ -148,7 +148,7 @@ export default function Header() {
         {/* Profile Dropdown */}
         {profileOpen && createPortal(
           <div className="dropdown-overlay" onClick={() => setProfileOpen(false)}>
-            <div className="user-dropdown-panel glass" style={{ position: 'absolute', top: `56px`, right: `40px` }} onClick={e => e.stopPropagation()}>
+            <div className="user-dropdown-panel glass" style={{ position: 'absolute', top: `${profileDropdownPos.top}px`, right: `${profileDropdownPos.right}px` }} onClick={e => e.stopPropagation()}>
               <button className="dropdown-action-item" onClick={() => { setProfileOpen(false); setAuthMode('login'); setAuthOpen(true); }}
                 style={{ color: '#000', fontWeight: 500 }}>
                 {t('header.signIn')}
