@@ -116,10 +116,12 @@ function Chat() {
   const [showCommentInput, setShowCommentInput] = useState<Record<number, boolean>>({});
   const [viewedPosts] = useState(new Set<number>());
   const [animatingLikes, setAnimatingLikes] = useState<Set<number>>(new Set());
+  const [activeIndicatorTop, setActiveIndicatorTop] = useState(0);
   const imageRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const msgEndRef = useRef<HTMLDivElement>(null);
+  const contactsPanelRef = useRef<HTMLElement>(null);
   const activeContactInfo = contacts.find(c => c.id === activeContact) || contacts[0];
   const momentInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -133,6 +135,12 @@ function Chat() {
     input.style.height = 'auto';
     input.style.height = `${Math.max(input.scrollHeight, 70)}px`;
   }, [momentText]);
+
+  useEffect(() => {
+    const panel = contactsPanelRef.current;
+    const activeItem = panel?.querySelector<HTMLElement>('.contact-item.active');
+    if (activeItem) setActiveIndicatorTop(activeItem.offsetTop);
+  }, [activeContact]);
 
   /* ── Chat ── */
   function handleSend() {
@@ -298,7 +306,8 @@ function Chat() {
         <div className={`chat-view${activeTab === 'chat' ? '' : ' hidden'}`}>
           {/* Contacts + Messages merged */}
           <div className="chat-panel">
-            <aside className="contacts-panel">
+            <aside ref={contactsPanelRef} className="contacts-panel">
+              <div className="contact-active-indicator" style={{ top: activeIndicatorTop }} />
               <div className="contact-group-label">Groups</div>
               {contacts.filter(c => c.type === 'group').map(c => (
                 <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => setActiveContact(c.id)}>
