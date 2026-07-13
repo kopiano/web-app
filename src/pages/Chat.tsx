@@ -114,6 +114,7 @@ function Chat() {
   const [momentMediaType, setMomentMediaType] = useState<'image' | 'video' | null>(null);
   const [commentTexts, setCommentTexts] = useState<Record<number, string>>({});
   const [showCommentInput, setShowCommentInput] = useState<Record<number, boolean>>({});
+  const [commentEmojiPost, setCommentEmojiPost] = useState<number | null>(null);
   const [viewedPosts] = useState(new Set<number>());
   const [animatingLikes, setAnimatingLikes] = useState<Set<number>>(new Set());
   const [activeIndicatorTop, setActiveIndicatorTop] = useState(0);
@@ -270,6 +271,12 @@ function Chat() {
   }
 
   function toggleCommentInput(postId: number) {
+    setShowCommentInput(p => ({ ...p, [postId]: true }));
+  }
+
+  function pickCommentEmoji(postId: number, emoji: string) {
+    setCommentTexts(p => ({ ...p, [postId]: `${p[postId] || ''}${emoji}` }));
+    setCommentEmojiPost(null);
     setShowCommentInput(p => ({ ...p, [postId]: true }));
   }
 
@@ -583,6 +590,33 @@ function Chat() {
                         </div>
                       ))}
                       <div className="comment-input-row">
+                        <div className="comment-emoji-wrap">
+                          <button
+                            className="comment-emoji-btn"
+                            onClick={() => {
+                              setCommentEmojiPost(p => p === post.id ? null : post.id);
+                              setShowCommentInput(p => ({ ...p, [post.id]: true }));
+                            }}
+                            title="Add emoji"
+                            aria-label="Add emoji to comment"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                              <line x1="9" y1="9" x2="9.01" y2="9" />
+                              <line x1="15" y1="9" x2="15.01" y2="9" />
+                            </svg>
+                          </button>
+                          {commentEmojiPost === post.id && (
+                            <div className="emoji-picker comment-emoji-picker">
+                              <div className="emoji-grid">
+                                {EMOJIS.map(e => (
+                                  <button key={e} className="emoji-btn" onClick={() => pickCommentEmoji(post.id, e)}>{e}</button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         <input className="comment-input" type="text"
                           placeholder={showCommentInput[post.id] ? "Write a comment..." : ""}
                           value={commentTexts[post.id] || ''}

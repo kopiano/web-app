@@ -1,3 +1,4 @@
+$contacts-width: 300px;
 $chat-margin-left: 100px;
 
 /* ===== Chat Page ===== */
@@ -90,10 +91,16 @@ $chat-margin-left: 100px;
 .chat-view {
     margin-left: $chat-margin-left;
     width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    box-sizing: border-box;
+    padding: 20px 0;
 }
 .chat-panel {
     flex: 1;
     display: flex;
+    height: 100%;
     background: rgba(255, 255, 255, 0.5);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -101,8 +108,8 @@ $chat-margin-left: 100px;
     border: 1px solid rgba(255, 255, 255, 0.5);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
     overflow: hidden;
-    min-height: 90%;
-    margin: 20px 0;
+    min-height: 0;
+    margin: 0;
 }
 
 .panel-divider {
@@ -113,7 +120,7 @@ $chat-margin-left: 100px;
 
 /* ===== Contacts Panel ===== */
 .contacts-panel {
-    width: 240px;
+    width: $contacts-width;
     flex-shrink: 0;
     position: relative;
     overflow-y: auto;
@@ -138,7 +145,7 @@ $chat-margin-left: 100px;
 }
 
 .contact-group-label {
-    font-size: 1.05rem;
+    font-size: 1.5rem;
     font-weight: 600;
     color: rgba(0, 0, 0, 0.35);
     padding: 10px 20px 4px;
@@ -254,6 +261,7 @@ $chat-margin-left: 100px;
 .contact-name {
     font-size: 1.3rem;
     font-weight: 600;
+    letter-spacing: 0.7px;
     color: rgba(0, 0, 0, 0.85);
     white-space: nowrap;
     overflow: hidden;
@@ -262,6 +270,7 @@ $chat-margin-left: 100px;
 
 .contact-preview {
     font-size: 1.1rem;
+    letter-spacing: 0.7px;
     color: rgba(0, 0, 0, 0.4);
     white-space: nowrap;
     overflow: hidden;
@@ -271,6 +280,7 @@ $chat-margin-left: 100px;
 .contact-time {
     font-size: 1rem;
     color: rgba(0, 0, 0, 0.3);
+    letter-spacing: 0.7px;
     flex-shrink: 0;
 }
 
@@ -312,6 +322,7 @@ $chat-margin-left: 100px;
 .messages-header-name {
     font-size: 1.6rem;
     font-weight: 600;
+    letter-spacing: 0.7px;
     color: rgba(0, 0, 0, 0.85);
     white-space: nowrap;
     overflow: hidden;
@@ -433,7 +444,7 @@ $chat-margin-left: 100px;
 .msg-text {
     // margin-bottom: 3px;
     font-size: 14px;
-    letter-spacing: 1px;
+    letter-spacing: 0.7px;
     font-family: -apple-system;
 }
 
@@ -496,7 +507,7 @@ $chat-margin-left: 100px;
     border: none;
     background: transparent;
     font-size: 1.5rem;
-    letter-spacing: 1px;
+    letter-spacing: 0.7px;
     color: rgba(0, 0, 0, 0.8);
     outline: none;
     font-family: inherit;
@@ -589,6 +600,7 @@ $chat-margin-left: 100px;
 /* ===== Moments View ===== */
 .moments-view {
     flex: 1;
+    height: 100%;
     min-height: 0;
     position: relative;
     z-index: 7;
@@ -596,6 +608,8 @@ $chat-margin-left: 100px;
     flex-direction: column;
     margin-left: 25rem;
     margin-right: 25rem;
+    box-sizing: border-box;
+    padding: 20px 0;
     animation: fade-in 0.35s ease both;
 }
 
@@ -647,14 +661,24 @@ $chat-margin-left: 100px;
     overflow: hidden;
     border: none;
     border-radius: 16px;
-    padding: 10px 14px;
-    background: rgba(255, 255, 255, 0.35);
-    font-size: 1.4rem;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    font-size: 15px;
     color: rgba(0, 0, 0, 0.85);
+    letter-spacing: 0.7px;
     outline: none;
     resize: none;
     font-family: inherit;
     line-height: 1.6;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.moment-post-input:focus {
+    background: rgba(255, 255, 255, 0.48);
+    box-shadow:
+        0 0 0 2px rgba(139, 92, 246, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .moment-post-input::placeholder {
@@ -782,6 +806,7 @@ $chat-margin-left: 100px;
     border-radius: 16px;
     object-fit: cover;
     margin-bottom: 12px;
+    margin-top: 20px;
 }
 
 /* ===== Moment Card ===== */
@@ -840,8 +865,8 @@ $chat-margin-left: 100px;
 }
 
 .card-time {
-    font-size: 1.1rem;
-    color: rgba(0, 0, 0, 0.4);
+    font-size: 15px;
+    color: rgb(83, 100, 113);
 }
 
 .card-menu {
@@ -865,12 +890,13 @@ $chat-margin-left: 100px;
 }
 
 .card-text {
-    font-size: 1.5rem;
+    font-size: 15px;
     line-height: 1.6;
-    color: rgba(0, 0, 0, 0.85);
+    color: rgb(15, 20, 25);
     margin-bottom: 12px;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+    letter-spacing: 0.7px;
 }
 
 .card-media-wrap {
@@ -936,6 +962,11 @@ $chat-margin-left: 100px;
     line-height: 1;
     position: relative;
     transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.heart-icon,
+.action-svg {
+    color: rgb(83, 100, 113);
 }
 
 .heart-btn:hover .heart-icon {
@@ -1085,17 +1116,55 @@ $chat-margin-left: 100px;
     font-weight: 600;
     color: rgba(0, 0, 0, 0.85);
     flex-shrink: 0;
+    font-size: 15px;
 }
 
 .comment-text {
     flex: 1;
     word-break: break-word;
+    color: rgb(83, 100, 113);
+    font-family: TwitterChirp, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-weight: 400;
+    font-size: 15px;
 }
 
 .comment-input-row {
     display: flex;
     gap: 8px;
     margin-top: 4px;
+    align-items: center;
+    position: relative;
+}
+
+.comment-emoji-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.comment-emoji-btn {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.25);
+    color: rgba(0, 0, 0, 0.42);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.comment-emoji-btn:hover {
+    background: rgba(255, 255, 255, 0.5);
+    color: rgba(0, 0, 0, 0.72);
+    transform: scale(1.08);
+}
+
+.comment-emoji-picker {
+    left: 0;
+    bottom: calc(100% + 8px);
+    margin-bottom: 0;
+    z-index: 70;
 }
 
 .comment-input {
@@ -1107,8 +1176,9 @@ $chat-margin-left: 100px;
     margin: 0 10px;
     background: rgba(255, 255, 255, 0.35);
     backdrop-filter: blur(8px);
-    font-size: 1.2rem;
+    font-size: 15px;
     color: rgba(0, 0, 0, 0.8);
+    letter-spacing: 0.7px;
     outline: none;
     font-family: inherit;
     transition: background 0.2s ease, box-shadow 0.2s ease;
@@ -1163,20 +1233,30 @@ $chat-margin-left: 100px;
 
 /* ===== Scrollbar ===== */
 .contacts-panel::-webkit-scrollbar,
-.msg-list::-webkit-scrollbar,
-.moments-feed::-webkit-scrollbar {
+.msg-list::-webkit-scrollbar {
     width: 4px;
 }
 
 .contacts-panel::-webkit-scrollbar-track,
-.msg-list::-webkit-scrollbar-track,
-.moments-feed::-webkit-scrollbar-track {
+.msg-list::-webkit-scrollbar-track {
     background: transparent;
 }
 
 .contacts-panel::-webkit-scrollbar-thumb,
-.msg-list::-webkit-scrollbar-thumb,
-.moments-feed::-webkit-scrollbar-thumb {
+.msg-list::-webkit-scrollbar-thumb {
     background: rgba(0, 0, 0, 0.08);
     border-radius: 2px;
+}
+
+.moments-feed {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.moments-feed::-webkit-scrollbar {
+    display: none;
+}
+
+.media-controls-container {
+    border-radius: 2rem;
 }
