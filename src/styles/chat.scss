@@ -431,7 +431,10 @@ $chat-margin-left: 100px;
 }
 
 .msg-text {
-    margin-bottom: 3px;
+    // margin-bottom: 3px;
+    font-size: 14px;
+    letter-spacing: 1px;
+    font-family: -apple-system;
 }
 
 .msg-time {
@@ -456,8 +459,8 @@ $chat-margin-left: 100px;
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 0 8px;
+    gap: 8px;
+    padding: 0 4px;
     height: 46px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.35);
