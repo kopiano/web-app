@@ -41,9 +41,6 @@ export default function Header() {
 
   const initials = 'G';
 
-  const avatarBoxStyle = {
-    background: 'linear-gradient(135deg, #a78bfa, #818cf8)',
-  };
 
   const updateProfilePos = useCallback(() => {
     if (avatarRef.current) {
@@ -83,17 +80,6 @@ export default function Header() {
     };
   }, [notifOpen, updateNotifPos]);
 
-  const dropdownBg = theme === 'light'
-    ? 'linear-gradient(145deg, rgba(255,255,255,0.97), rgba(250,250,255,0.92))'
-    : 'linear-gradient(145deg, rgba(30,30,45,0.95), rgba(20,20,35,0.9))';
-
-  const dropdownBorder = theme === 'light'
-    ? '0.5px solid rgba(0,0,0,0.06)'
-    : '0.5px solid rgba(255,255,255,0.08)';
-
-  const dropdownShadow = theme === 'light'
-    ? '0 20px 60px rgba(0,0,0,0.10), 0 4px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.7)'
-    : '0 20px 60px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06)';
 
   return (
     <header className="header" id="header">
@@ -123,7 +109,7 @@ export default function Header() {
           {/* Theme Toggle */}
           <button className="action-btn theme-btn" onClick={toggleTheme}>
             {theme === 'light' ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, color: '#f59e0b' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#000' }}>
                 <circle cx="12" cy="12" r="5" />
                 <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
                 <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
@@ -131,7 +117,7 @@ export default function Header() {
                 <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
               </svg>
             ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, color: '#c084fc' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#000' }}>
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
             )}
@@ -139,7 +125,7 @@ export default function Header() {
 
           {/* Notification Bell */}
           <button ref={bellRef} className="action-btn notification-btn" onClick={() => setNotifOpen(o => !o)}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, color: theme === 'light' ? '#6366f1' : '#a5b4fc' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, color: '#000' }}>
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
@@ -148,7 +134,7 @@ export default function Header() {
 
           {/* User Profile Pill */}
           <button ref={avatarRef} className="user-pill" onClick={() => setProfileOpen(o => !o)}>
-            <div className="user-avatar-box" style={avatarBoxStyle}>
+            <div className="user-avatar-box">
               <span className="user-avatar-initials">{initials}</span>
             </div>
             <span className="user-pill-name">{t('header.guest')}</span>
@@ -161,15 +147,14 @@ export default function Header() {
 
         {/* Profile Dropdown */}
         {profileOpen && createPortal(
-          <div className="fixed inset-0 z-[99999]">
-            <div className="absolute inset-0" onClick={() => setProfileOpen(false)} />
-            <div className="user-dropdown-panel" style={{ top: `${profileDropdownPos.top}px`, right: `${profileDropdownPos.right}px`, background: dropdownBg, backdropFilter: 'blur(32px) saturate(160%)', WebkitBackdropFilter: 'blur(32px) saturate(160%)', border: dropdownBorder, boxShadow: dropdownShadow }}>
+          <div className="dropdown-overlay" onClick={() => setProfileOpen(false)}>
+            <div className="user-dropdown-panel glass" style={{ position: 'absolute', top: `56px`, right: `40px` }} onClick={e => e.stopPropagation()}>
               <button className="dropdown-action-item" onClick={() => { setProfileOpen(false); setAuthMode('login'); setAuthOpen(true); }}
-                style={{ color: theme === 'light' ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.9)', fontWeight: 500 }}>
+                style={{ color: '#000', fontWeight: 500 }}>
                 {t('header.signIn')}
               </button>
               <button className="dropdown-action-item" onClick={() => { setProfileOpen(false); setAuthMode('signup'); setAuthOpen(true); }}
-                style={{ color: theme === 'light' ? 'rgba(100,116,139,0.8)' : 'rgba(148,163,184,0.7)' }}>
+                style={{ color: '#000' }}>
                 {t('header.signUp')}
               </button>
             </div>
@@ -179,23 +164,17 @@ export default function Header() {
 
         {/* Notification Panel */}
         {notifOpen && createPortal(
-          <div className="fixed inset-0 z-[99999]">
-            <div className="absolute inset-0" onClick={() => setNotifOpen(false)} />
-            <div className="notif-dropdown-panel" style={{ top: `${dropdownPos.top}px`, right: `${dropdownPos.right}px`, background: dropdownBg, backdropFilter: 'blur(32px) saturate(160%)', WebkitBackdropFilter: 'blur(32px) saturate(160%)', border: dropdownBorder, boxShadow: dropdownShadow }}>
+          <div className="dropdown-overlay" onClick={() => setNotifOpen(false)}>
+            <div className="notif-dropdown-panel glass" style={{ position: 'absolute', top: `${dropdownPos.top}px`, right: `${dropdownPos.right}px` }} onClick={e => e.stopPropagation()}>
               <div className="notif-header-bar" style={{ borderBottom: theme === 'light' ? '1px solid rgba(0,0,0,0.04)' : '1px solid rgba(255,255,255,0.04)' }}>
-                <span className="notif-header-title" style={{ color: theme === 'light' ? 'rgba(100,116,139,0.8)' : 'rgba(148,163,184,0.7)' }}>
-                  {t('header.notifications')}
-                </span>
-                <button className="notif-header-close" onClick={() => setNotifOpen(false)}
-                  style={{ color: theme === 'light' ? 'rgba(100,116,139,0.5)' : 'rgba(148,163,184,0.5)' }}>
+                <span className="notif-header-title">{t('header.notifications')}</span>
+                <button className="notif-header-close" onClick={() => setNotifOpen(false)}>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
                 </button>
               </div>
-              <div className="notif-empty-state" style={{ color: theme === 'light' ? 'rgba(148,163,184,0.6)' : 'rgba(100,116,139,0.6)' }}>
-                {t('header.noNotifications')}
-              </div>
+              <div className="notif-empty-state">{t('header.noNotifications')}</div>
             </div>
           </div>,
           document.body

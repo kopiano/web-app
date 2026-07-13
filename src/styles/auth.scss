@@ -33,8 +33,8 @@
 }
 
 @keyframes auth-in {
-  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .auth-close {
@@ -259,7 +259,7 @@
 }
 
 .auth-submit:active {
-  transform: scale(0.98);
+  // transform: scale(0.98);
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
 }
 

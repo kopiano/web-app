@@ -120,7 +120,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
 
           <button className="auth-submit" type="submit" disabled={loading}>
             {loading && <LoadingSpinner />}
-            {loading ? 'Please wait...' : mode === 'login' ? 'Log in' : 'Create Account'}
+            {loading ? 'Please wait...' : mode === 'login' ? 'Sign in' : 'Create Account'}
           </button>
         </form>
 
@@ -130,7 +130,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
             className="auth-switch-btn"
             onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
           >
-            {mode === 'login' ? 'Sign Up' : 'Log in'}
+            {mode === 'login' ? 'Sign up' : 'Sign in'}
           </button>
         </p>
       </div>
