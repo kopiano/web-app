@@ -3,6 +3,7 @@ import { Link, NavLink } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/context/ThemeContext';
+import AuthModal from '@/components/ui/AuthModal';
 import nav_logo from '@/assets/images/z-logo.png';
 import '@/styles/header.scss';
 import '@/styles/header-extras.scss';
@@ -12,6 +13,9 @@ export default function Header() {
   const { theme, toggleTheme } = useTheme();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authPortal, setAuthPortal] = useState<HTMLElement | null>(null);
   const bellRef = useRef<HTMLButtonElement>(null);
   const avatarRef = useRef<HTMLButtonElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
@@ -30,6 +34,10 @@ export default function Header() {
     i18n.changeLanguage(next);
     localStorage.setItem('lang', next);
   };
+
+  useEffect(() => {
+    setAuthPortal(document.body);
+  }, []);
 
   const initials = 'G';
 
@@ -156,11 +164,11 @@ export default function Header() {
           <div className="fixed inset-0 z-[99999]">
             <div className="absolute inset-0" onClick={() => setProfileOpen(false)} />
             <div className="user-dropdown-panel" style={{ top: `${profileDropdownPos.top}px`, right: `${profileDropdownPos.right}px`, background: dropdownBg, backdropFilter: 'blur(32px) saturate(160%)', WebkitBackdropFilter: 'blur(32px) saturate(160%)', border: dropdownBorder, boxShadow: dropdownShadow }}>
-              <button className="dropdown-action-item" onClick={() => setProfileOpen(false)}
+              <button className="dropdown-action-item" onClick={() => { setProfileOpen(false); setAuthMode('login'); setAuthOpen(true); }}
                 style={{ color: theme === 'light' ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.9)', fontWeight: 500 }}>
                 {t('header.signIn')}
               </button>
-              <button className="dropdown-action-item" onClick={() => setProfileOpen(false)}
+              <button className="dropdown-action-item" onClick={() => { setProfileOpen(false); setAuthMode('signup'); setAuthOpen(true); }}
                 style={{ color: theme === 'light' ? 'rgba(100,116,139,0.8)' : 'rgba(148,163,184,0.7)' }}>
                 {t('header.signUp')}
               </button>
@@ -193,6 +201,10 @@ export default function Header() {
           document.body
         )}
       </nav>
+      {authOpen && authPortal && createPortal(
+        <AuthModal onClose={() => setAuthOpen(false)} initialMode={authMode} />,
+        authPortal
+      )}
     </header>
   );
 }

@@ -1,3 +1,4 @@
+@use '@/styles/global.scss';
 @use '@/styles/fonts.scss';
 @use '@/styles/overview.scss';
 
@@ -52,6 +53,3 @@ button {
     border: none;
 }
 
-section {
-    padding: 6% 9%;
-}

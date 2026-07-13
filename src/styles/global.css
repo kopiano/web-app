@@ -1,0 +1,1 @@
+section{padding:6% 9%}.glass{background:rgba(255,255,255,.5);backdrop-filter:blur(13px);-webkit-backdrop-filter:blur(13px)}.glass-border{border:2px solid rgba(255,254,254,.65);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);transition:border-color .1s cubic-bezier(0.6, 0.04, 0.98, 0.335)}.glass-border:hover{border-color:rgba(56,56,56,.65)}
