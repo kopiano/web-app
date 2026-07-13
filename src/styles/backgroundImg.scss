@@ -59,3 +59,29 @@
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+
+/* ========== Background Progress Bar ========= */
+.bg-progress,
+.bg-progress * {
+    transition: none !important;
+}
+
+.bg-progress {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 1.7px;
+    border-radius: 2px;
+    background: rgba(253, 252, 252, 0.26);
+    overflow: hidden;
+    z-index: 999;
+}
+
+.bg-progress-bar {
+    height: 100%;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.8);
+    will-change: width;
+}
