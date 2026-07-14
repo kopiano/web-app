@@ -31,14 +31,21 @@ const initialState: AuthState = {
   initialized: false,
 };
 
-export const fetchCurrentUser = createAsyncThunk<AuthUser>(
+export const fetchCurrentUser = createAsyncThunk<AuthUser, void, { rejectValue: 'unauthorized' }>(
   'auth/fetchCurrentUser',
-  async () => {
-    const { data } = await request.get<AuthUser>('/users/me');
-    return {
-      ...data,
-      name: data.name || data.username || 'User',
-    };
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await request.get<AuthUser>('/users/me');
+      return {
+        ...data,
+        name: data.name || data.username || 'User',
+      };
+    } catch (error: any) {
+      if (error?.response?.status === 401) {
+        return rejectWithValue('unauthorized');
+      }
+      throw error;
+    }
   },
 );
 
@@ -69,11 +76,13 @@ const authSlice = createSlice({
         state.initialized = true;
         sessionStorage.setItem('auth_user', JSON.stringify(action.payload));
       })
-      .addCase(fetchCurrentUser.rejected, (state) => {
+      .addCase(fetchCurrentUser.rejected, (state, action) => {
         state.loading = false;
         state.initialized = true;
-        // Keep the cached profile during a transient API/network failure.
-        // Explicit logout still clears it through clearUser().
+        if (action.payload === 'unauthorized') {
+          state.user = null;
+          sessionStorage.removeItem('auth_user');
+        }
       });
   },
 });

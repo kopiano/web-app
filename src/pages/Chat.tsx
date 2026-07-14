@@ -1,17 +1,19 @@
-import { useState, useRef, useEffect } from 'react';
-import { useSelector } from 'react-redux';
-import type { RootState } from '@/store/store';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState, AppDispatch } from '@/store/store';
+import { refreshContacts } from '@/store/chatSlice';
 import '@/styles/chat.scss';
 
 /* ── Types ── */
 interface Contact {
-  id: number;
+  id: string;
   name: string;
   type: 'group' | 'user';
   avatar: string;
   lastMsg: string;
   time: string;
   online?: boolean;
+  members?: unknown[];
 }
 
 interface Message {
@@ -57,26 +59,26 @@ function landscapeAvatar(seed: number) {
 
 /* ── Mock Data ── */
 const contacts: Contact[] = [
-  { id: 1, name: 'Project Team', type: 'group', avatar: landscapeAvatar(101), lastMsg: 'See you tomorrow', time: '11:30' },
-  { id: 2, name: 'Alice', type: 'user', avatar: landscapeAvatar(202), lastMsg: 'Got it', time: '10:15', online: true },
-  { id: 3, name: 'Bob', type: 'user', avatar: landscapeAvatar(303), lastMsg: 'I fixed the code last night', time: 'Yesterday', online: false },
-  { id: 4, name: 'Catherine', type: 'user', avatar: landscapeAvatar(404), lastMsg: 'Photo', time: 'Yesterday', online: true },
-  { id: 5, name: 'David', type: 'user', avatar: landscapeAvatar(505), lastMsg: 'Sure', time: 'Monday', online: false },
+  { id: 'mock:group:1', name: 'Project Team', type: 'group', avatar: landscapeAvatar(101), lastMsg: 'See you tomorrow', time: '11:30' },
+  { id: 'mock:user:2', name: 'Alice', type: 'user', avatar: landscapeAvatar(202), lastMsg: 'Got it', time: '10:15', online: true },
+  { id: 'mock:user:3', name: 'Bob', type: 'user', avatar: landscapeAvatar(303), lastMsg: 'I fixed the code last night', time: 'Yesterday', online: false },
+  { id: 'mock:user:4', name: 'Catherine', type: 'user', avatar: landscapeAvatar(404), lastMsg: 'Photo', time: 'Yesterday', online: true },
+  { id: 'mock:user:5', name: 'David', type: 'user', avatar: landscapeAvatar(505), lastMsg: 'Sure', time: 'Monday', online: false },
 ];
 
-const mockMessages: Record<number, Message[]> = {
-  1: [
+const mockMessages: Record<string, Message[]> = {
+  'mock:group:1': [
     { id: 1, text: 'Hey everyone, meeting tomorrow', from: 'them', time: '11:00' },
     { id: 2, text: 'Got it', from: 'me', time: '11:05' },
     { id: 3, text: 'See you tomorrow', from: 'them', time: '11:30' },
   ],
-  2: [
+  'mock:user:2': [
     { id: 1, text: 'Hello!', from: 'them', time: '10:00' },
     { id: 2, text: 'Hi, what\'s up?', from: 'me', time: '10:05' },
     { id: 3, text: 'I sent you the files', from: 'them', time: '10:10' },
     { id: 4, text: 'Got it, thanks!', from: 'me', time: '10:15' },
   ],
-  3: [
+  'mock:user:3': [
     { id: 1, text: 'I fixed the code last night', from: 'them', time: 'Yesterday' },
     { id: 2, text: 'Great, let me check', from: 'me', time: 'Yesterday' },
   ],
@@ -102,7 +104,9 @@ const initialMoments: MomentPost[] = [
 ];
 
 function Chat() {
+  const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  const remoteContacts = useSelector((state: RootState) => state.chat.contacts);
   const currentUserName = currentUser?.name || currentUser?.username || 'You';
   const currentUserAvatar = currentUser?.avatar
     || (currentUser?.github_id
@@ -111,9 +115,9 @@ function Chat() {
   const [activeTab, setActiveTab] = useState<'chat' | 'moments'>(() => {
     return (localStorage.getItem('chat_tab') as 'chat' | 'moments') || 'chat';
   });
-  const [activeContact, setActiveContact] = useState(1);
+  const [activeContact, setActiveContact] = useState('mock:group:1');
   const [inputText, setInputText] = useState('');
-  const [messages, setMessages] = useState<Record<number, Message[]>>(mockMessages);
+  const [messages, setMessages] = useState<Record<string, Message[]>>(mockMessages);
   const [showEmoji, setShowEmoji] = useState(false);
   const [showMomentEmoji, setShowMomentEmoji] = useState(false);
   const [moments, setMoments] = useState<MomentPost[]>(initialMoments);
@@ -131,8 +135,42 @@ function Chat() {
   const fileRef = useRef<HTMLInputElement>(null);
   const msgEndRef = useRef<HTMLDivElement>(null);
   const contactsPanelRef = useRef<HTMLElement>(null);
-  const activeContactInfo = contacts.find(c => c.id === activeContact) || contacts[0];
+  const visibleContacts = useMemo<Contact[]>(
+    () => currentUser ? remoteContacts : contacts,
+    [currentUser?.id, remoteContacts],
+  );
+  const activeContactInfo = useMemo(
+    () => visibleContacts.find(c => c.id === activeContact) || visibleContacts[0] || {
+      id: '', name: '', type: 'user' as const, avatar: landscapeAvatar(0), lastMsg: '', time: '',
+    },
+    [activeContact, visibleContacts],
+  );
   const momentInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    dispatch(refreshContacts({ silent: remoteContacts.length > 0 }));
+  }, [currentUser?.id, dispatch]);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (currentUser && document.visibilityState === 'visible') {
+        dispatch(refreshContacts({ silent: true }));
+      }
+    };
+    window.addEventListener('pageshow', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('pageshow', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [currentUser?.id, dispatch]);
+
+  useEffect(() => {
+    if (activeContactInfo && !visibleContacts.some(c => c.id === activeContact)) {
+      setActiveContact(activeContactInfo.id);
+    }
+  }, [activeContact, activeContactInfo, visibleContacts]);
 
   useEffect(() => {
     msgEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -149,7 +187,7 @@ function Chat() {
     const panel = contactsPanelRef.current;
     const activeItem = panel?.querySelector<HTMLElement>('.contact-item.active');
     if (activeItem) setActiveIndicatorTop(activeItem.offsetTop);
-  }, [activeContact]);
+  }, [activeContact, visibleContacts]);
 
   /* ── Chat ── */
   function handleSend() {
@@ -325,7 +363,7 @@ function Chat() {
             <aside ref={contactsPanelRef} className="contacts-panel">
               <div className="contact-active-indicator" style={{ top: activeIndicatorTop }} />
               <div className="contact-group-label">Groups</div>
-              {contacts.filter(c => c.type === 'group').map(c => (
+              {visibleContacts.filter(c => c.type === 'group').map(c => (
                 <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => setActiveContact(c.id)}>
                   <div className="contact-avatar">
                     <img src={c.avatar} alt="" className="avatar-img" />
@@ -339,7 +377,7 @@ function Chat() {
               ))}
               <div className="contact-divider" />
               <div className="contact-group-label">Contacts</div>
-              {contacts.filter(c => c.type === 'user').map(c => (
+              {visibleContacts.filter(c => c.type === 'user').map(c => (
                 <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => setActiveContact(c.id)}>
                   <div className="contact-avatar">
                     <img src={c.avatar} alt="" className="avatar-img" />

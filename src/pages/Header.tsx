@@ -11,6 +11,7 @@ import { useSelector } from 'react-redux';
 import { useDispatch } from 'react-redux';
 import type { RootState } from '@/store/store';
 import { clearUser } from '@/store/authSlice';
+import { clearContacts } from '@/store/chatSlice';
 import { logout as logoutRequest } from '@/api/auth';
 
 export default function Header() {
@@ -69,6 +70,7 @@ export default function Header() {
       await logoutRequest();
     } finally {
       dispatch(clearUser());
+      dispatch(clearContacts());
       setProfileOpen(false);
       const message = `${currentUser?.name || '用户'} 已退出登录`;
       setNotifications((items) => [{ message, time: new Date() }, ...items].slice(0, 8));
@@ -195,7 +197,7 @@ export default function Header() {
                 <>
                   <button className="dropdown-action-item" onClick={() => setProfileOpen(false)}
                     style={{ color: '#000', fontWeight: 500 }}>
-                    Settings
+                    Setting
                   </button>
                   <button className="dropdown-action-item" onClick={handleLogout}
                     style={{ color: '#000' }}>
