@@ -8,11 +8,15 @@ import nav_logo from '@/assets/images/z-logo.png';
 import '@/styles/header.scss';
 import '@/styles/header-extras.scss';
 import { useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import type { RootState } from '@/store/store';
+import { clearUser } from '@/store/authSlice';
+import { logout as logoutRequest } from '@/api/auth';
 
 export default function Header() {
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
+  const dispatch = useDispatch();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
@@ -43,6 +47,15 @@ export default function Header() {
 
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const initials = currentUser?.name?.trim().charAt(0).toUpperCase() || 'G';
+
+  const handleLogout = async () => {
+    try {
+      await logoutRequest();
+    } finally {
+      dispatch(clearUser());
+      setProfileOpen(false);
+    }
+  };
 
   const updateProfilePos = useCallback(() => {
     if (avatarRef.current) {
@@ -159,14 +172,29 @@ export default function Header() {
         {profileOpen && createPortal(
           <div className="dropdown-overlay" onClick={() => setProfileOpen(false)}>
             <div className="user-dropdown-panel glass" style={{ position: 'absolute', top: `${profileDropdownPos.top}px`, right: `${profileDropdownPos.right}px` }} onClick={e => e.stopPropagation()}>
-              <button className="dropdown-action-item" onClick={() => { setProfileOpen(false); setAuthMode('login'); setAuthOpen(true); }}
-                style={{ color: '#000', fontWeight: 500 }}>
-                {t('header.signIn')}
-              </button>
-              <button className="dropdown-action-item" onClick={() => { setProfileOpen(false); setAuthMode('signup'); setAuthOpen(true); }}
-                style={{ color: '#000' }}>
-                {t('header.signUp')}
-              </button>
+              {currentUser ? (
+                <>
+                  <button className="dropdown-action-item" onClick={() => setProfileOpen(false)}
+                    style={{ color: '#000', fontWeight: 500 }}>
+                    Settings
+                  </button>
+                  <button className="dropdown-action-item" onClick={handleLogout}
+                    style={{ color: '#000' }}>
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="dropdown-action-item" onClick={() => { setProfileOpen(false); setAuthMode('login'); setAuthOpen(true); }}
+                    style={{ color: '#000', fontWeight: 500 }}>
+                    {t('header.signIn')}
+                  </button>
+                  <button className="dropdown-action-item" onClick={() => { setProfileOpen(false); setAuthMode('signup'); setAuthOpen(true); }}
+                    style={{ color: '#000' }}>
+                    {t('header.signUp')}
+                  </button>
+                </>
+              )}
             </div>
           </div>,
           document.body
