@@ -84,7 +84,7 @@ https://app.xxx.com/oauth/success
 React
        │
        ▼
-GET /user/me
+GET /users/me
        │
        ▼
 Redux Toolkit

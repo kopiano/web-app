@@ -4,9 +4,10 @@ import request from '@/api/request';
 export interface AuthUser {
   id: string;
   name: string;
-  email: string;
+  email?: string | null;
   github_id?: string | null;
   avatar?: string | null;
+  username?: string | null;
 }
 
 interface AuthState {
@@ -19,7 +20,13 @@ const initialState: AuthState = { user: null, loading: false, initialized: false
 
 export const fetchCurrentUser = createAsyncThunk<AuthUser>(
   'auth/fetchCurrentUser',
-  async () => (await request.get<AuthUser>('/users/me')).data,
+  async () => {
+    const { data } = await request.get<AuthUser>('/users/me');
+    return {
+      ...data,
+      name: data.name || data.username || 'User',
+    };
+  },
 );
 
 const authSlice = createSlice({

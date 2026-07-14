@@ -150,9 +150,9 @@ export default function Header() {
           {/* User Profile Pill */}
           <button ref={avatarRef} className="user-pill" onClick={() => setProfileOpen(o => !o)}>
             <div className="user-avatar-box">
-              {currentUser?.github_id ? (
+              {currentUser?.avatar || currentUser?.github_id ? (
                 <img
-                  src={`https://avatars.githubusercontent.com/u/${currentUser.github_id}?v=4`}
+                  src={currentUser.avatar || `https://avatars.githubusercontent.com/u/${currentUser.github_id}?v=4`}
                   alt=""
                   className="user-avatar-initials"
                 />

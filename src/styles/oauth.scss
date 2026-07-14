@@ -1,0 +1,22 @@
+.oauth-success-loading {
+  min-height: calc(100vh - 76px);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  color: rgba(0, 0, 0, 0.68);
+  font-size: 14px;
+}
+
+.oauth-success-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(0, 0, 0, 0.14);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: oauth-spin 0.8s linear infinite;
+}
+
+@keyframes oauth-spin {
+  to { transform: rotate(360deg); }
+}
