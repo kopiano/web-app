@@ -46,7 +46,15 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setUser: (state, action: PayloadAction<AuthUser | null>) => { state.user = action.payload; },
+    setUser: (state, action: PayloadAction<AuthUser | null>) => {
+      state.user = action.payload;
+      state.initialized = true;
+      if (action.payload) {
+        sessionStorage.setItem('auth_user', JSON.stringify(action.payload));
+      } else {
+        sessionStorage.removeItem('auth_user');
+      }
+    },
     clearUser: (state) => {
       state.user = null;
       sessionStorage.removeItem('auth_user');

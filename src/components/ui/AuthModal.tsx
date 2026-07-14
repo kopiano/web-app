@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import '@/styles/auth.scss';
 import { startGithubLogin } from '@/lib/auth';
+import { login, register } from '@/api/auth';
+import { fetchCurrentUser, setUser } from '@/store/authSlice';
+import { useDispatch } from 'react-redux';
+import type { AppDispatch } from '@/store/store';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -14,12 +18,89 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [toast, setToast] = useState('');
+  const [toastClosing, setToastClosing] = useState(false);
+  const dispatch = useDispatch<AppDispatch>();
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const closeTimer = window.setTimeout(() => setToastClosing(true), 2150);
+    const removeTimer = window.setTimeout(() => {
+      setToast('');
+      setToastClosing(false);
+    }, 2500);
+    return () => {
+      window.clearTimeout(closeTimer);
+      window.clearTimeout(removeTimer);
+    };
+  }, [toast]);
+
+  const showToast = (message: string) => {
+    setToast('');
+    setToastClosing(false);
+    window.requestAnimationFrame(() => setToast(message));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !password.trim()) return;
+    setError('');
+    setSuccess(false);
+    const trimmedUsername = username.trim();
+    const trimmedEmail = email.trim();
+    if (!password.trim() || !trimmedUsername || (mode === 'signup' && !trimmedEmail)) {
+      const message = mode === 'signup'
+        ? '用户名、邮箱和密码不能为空。'
+        : '用户名和密码不能为空。';
+      setError(message);
+      showToast(message);
+      return;
+    }
+    if (mode === 'signup' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
     setLoading(true);
-    setTimeout(() => { setLoading(false); onClose(); }, 1000);
+    try {
+      if (mode === 'signup') {
+        await register({ name: trimmedUsername, email: trimmedEmail, password });
+        setMode('login');
+        setUsername(trimmedUsername);
+        setEmail('');
+        setError('Account created. Please sign in.');
+        setSuccess(true);
+        showToast('注册成功，请登录！');
+        return;
+      } else {
+        const response = await login({ username: trimmedUsername, password }) as {
+          data?: { user?: Parameters<typeof setUser>[0] };
+        };
+        if (response.data?.user) {
+          dispatch(setUser(response.data.user));
+        } else {
+          await dispatch(fetchCurrentUser()).unwrap();
+        }
+      }
+      onClose();
+    } catch (requestError: any) {
+      const status = requestError?.response?.status;
+      setError(status === 409
+        ? 'This username or email is already registered.'
+        : status === 401
+          ? 'Invalid username or password.'
+          : status === 400
+            ? 'Please check the required fields.'
+          : status === 500
+            ? 'The server could not create the account. Please try again.'
+          : requestError?.code === 'ECONNABORTED'
+            ? 'The request timed out. Please try again.'
+          : !requestError?.response
+            ? 'Unable to connect to the server.'
+          : 'Unable to complete authentication. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -73,6 +154,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                required
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="none"
@@ -81,21 +163,19 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
             </div>
           </div>
 
-          {mode === 'signup' && (
-            <div className="auth-field">
-              <label className="auth-label">
-                Email
-              </label>
-              <div className="auth-input-wrap">
-                <input
-                  className="auth-input"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
+          {mode === 'signup' && <div className="auth-field">
+            <label className="auth-label">Email</label>
+            <div className="auth-input-wrap">
+              <input
+                className="auth-input"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
             </div>
-          )}
+          </div>}
 
           <div className="auth-field">
             <label className="auth-label">Password</label>
@@ -105,6 +185,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               />
               <button
@@ -121,6 +202,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
             {loading && <LoadingSpinner />}
             {loading ? 'Please wait...' : mode === 'login' ? 'Sign in' : 'Create Account'}
           </button>
+          {error && <p className={success ? 'auth-error auth-success' : 'auth-error'} role="alert">{error}</p>}
         </form>
 
         <p className="auth-footer">
@@ -133,6 +215,12 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
           </button>
         </p>
       </div>
+      {toast && (
+        <div className={`auth-toast${toastClosing ? ' is-closing' : ''}`} role="status" aria-live="polite">
+          <span className="auth-toast-icon" aria-hidden="true">✓</span>
+          <span>{toast}</span>
+        </div>
+      )}
     </div>
   );
 }
