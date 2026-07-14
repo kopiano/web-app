@@ -7,6 +7,12 @@ import AuthModal from '@/components/ui/AuthModal';
 import nav_logo from '@/assets/images/z-logo.png';
 import '@/styles/header.scss';
 import '@/styles/header-extras.scss';
+import { AUTH_CHANGED_EVENT, getCurrentUser } from '@/lib/auth';
+
+interface CurrentUser {
+  name: string;
+  github_id?: string | null;
+}
 
 export default function Header() {
   const { t, i18n } = useTranslation();
@@ -39,8 +45,33 @@ export default function Header() {
     setAuthPortal(document.body);
   }, []);
 
-  const initials = 'G';
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const initials = currentUser?.name?.trim().charAt(0).toUpperCase() || 'G';
 
+  const loadCurrentUser = useCallback(() => {
+    if (!localStorage.getItem('token') && !localStorage.getItem('auth_token')) {
+      setCurrentUser(null);
+      return;
+    }
+    let active = true;
+    getCurrentUser()
+      .then(async (response) => {
+        if (!response.ok) return;
+        const user = await response.json() as CurrentUser;
+        if (active) setCurrentUser(user);
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const cleanup = loadCurrentUser();
+    window.addEventListener(AUTH_CHANGED_EVENT, loadCurrentUser);
+    return () => {
+      cleanup?.();
+      window.removeEventListener(AUTH_CHANGED_EVENT, loadCurrentUser);
+    };
+  }, [loadCurrentUser]);
 
   const updateProfilePos = useCallback(() => {
     if (avatarRef.current) {
@@ -135,9 +166,17 @@ export default function Header() {
           {/* User Profile Pill */}
           <button ref={avatarRef} className="user-pill" onClick={() => setProfileOpen(o => !o)}>
             <div className="user-avatar-box">
-              <span className="user-avatar-initials">{initials}</span>
+              {currentUser?.github_id ? (
+                <img
+                  src={`https://avatars.githubusercontent.com/u/${currentUser.github_id}?v=4`}
+                  alt=""
+                  className="user-avatar-initials"
+                />
+              ) : (
+                <span className="user-avatar-initials">{initials}</span>
+              )}
             </div>
-            <span className="user-pill-name">{t('header.guest')}</span>
+            <span className="user-pill-name">{currentUser?.name || t('header.guest')}</span>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="user-pill-chevron"
               style={{ opacity: 0, transition: 'transform 0.3s ease', transform: profileOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
               <polyline points="6 9 12 15 18 9" />

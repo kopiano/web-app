@@ -1,21 +1,32 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8100';
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8100/api/')
+  .replace(/\/?$/, '/');
+
+export const AUTH_CHANGED_EVENT = 'auth:changed';
+
+export function notifyAuthChanged() {
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+}
 
 export const authStorage = {
-  getToken: () => localStorage.getItem('auth_token'),
-  setToken: (token: string) => localStorage.setItem('auth_token', token),
+  getToken: () => localStorage.getItem('token') || localStorage.getItem('auth_token'),
+  setToken: (token: string) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('auth_token', token);
+  },
   getRefreshToken: () => localStorage.getItem('refresh_token'),
   setRefreshToken: (token: string) => localStorage.setItem('refresh_token', token),
   clear: () => {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('token');
     localStorage.removeItem('refresh_token');
   },
 };
 
-export const githubLoginUrl = `${API_BASE}/api/auth/github/login`;
+export const githubLoginUrl = `${API_BASE}auth/github/login`;
 
 export async function logout() {
   const refreshToken = authStorage.getRefreshToken();
-  await fetch(`${API_BASE}/api/auth/logout`, {
+  await fetch(`${API_BASE}auth/logout`, {
     method: 'POST',
     headers: refreshToken ? { 'X-Refresh-Token': refreshToken } : undefined,
   });
@@ -25,7 +36,7 @@ export async function logout() {
 export async function refreshToken() {
   const refresh = authStorage.getRefreshToken();
   if (!refresh) return false;
-  const response = await fetch(`${API_BASE}/api/auth/refresh`, {
+  const response = await fetch(`${API_BASE}auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refresh_token: refresh }),
@@ -41,7 +52,7 @@ export async function refreshToken() {
 
 export async function getCurrentUser() {
   const token = authStorage.getToken();
-  return fetch(`${API_BASE}/api/user/me`, {
+  return fetch(`${API_BASE}user/me`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }

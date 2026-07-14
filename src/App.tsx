@@ -9,7 +9,7 @@ import BackgroundImg from '@/components/BackgroundImg';
 import { ThemeProvider } from '@/context/ThemeContext';
 import "@/App.scss";
 import { useEffect } from 'react';
-import { authStorage } from '@/lib/auth';
+import { authStorage, notifyAuthChanged } from '@/lib/auth';
 
 const Layout = () => {
   useEffect(() => {
@@ -19,7 +19,8 @@ const Layout = () => {
     if (!token) return;
     authStorage.setToken(token);
     if (refresh) authStorage.setRefreshToken(refresh);
-    window.history.replaceState({}, document.title, window.location.pathname);
+    notifyAuthChanged();
+    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.hash}`);
   }, []);
 
   return (

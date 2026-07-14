@@ -49,7 +49,7 @@ GET    /api/user/me
 ```md
 React
     │
-    │ 点击 "Continue with GitHub"
+    │ 点击 "GitHub"按钮
     ▼
 Axum
 /api/auth/github/login
