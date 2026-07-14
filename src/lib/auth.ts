@@ -24,6 +24,11 @@ export const authStorage = {
 
 export const githubLoginUrl = `${API_BASE}auth/github/login`;
 
+// OAuth must use a top-level browser navigation so the backend can redirect to GitHub.
+export function startGithubLogin() {
+  window.location.href = githubLoginUrl;
+}
+
 export async function logout() {
   const refreshToken = authStorage.getRefreshToken();
   await fetch(`${API_BASE}auth/logout`, {
