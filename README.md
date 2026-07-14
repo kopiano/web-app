@@ -137,3 +137,11 @@ UPDATE posts
 SET view_count = view_count + 增量
 WHERE id = {postId}
 ```
+
+
+### 回退到指定commit版本
+```sh
+git log --oneline
+git reset --hard 811b980
+git push --force-with-lease origin main
+```
