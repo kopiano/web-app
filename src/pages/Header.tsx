@@ -7,12 +7,8 @@ import AuthModal from '@/components/ui/AuthModal';
 import nav_logo from '@/assets/images/z-logo.png';
 import '@/styles/header.scss';
 import '@/styles/header-extras.scss';
-import { AUTH_CHANGED_EVENT, getCurrentUser } from '@/lib/auth';
-
-interface CurrentUser {
-  name: string;
-  github_id?: string | null;
-}
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store/store';
 
 export default function Header() {
   const { t, i18n } = useTranslation();
@@ -45,33 +41,8 @@ export default function Header() {
     setAuthPortal(document.body);
   }, []);
 
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const currentUser = useSelector((state: RootState) => state.auth.user);
   const initials = currentUser?.name?.trim().charAt(0).toUpperCase() || 'G';
-
-  const loadCurrentUser = useCallback(() => {
-    if (!localStorage.getItem('token') && !localStorage.getItem('auth_token')) {
-      setCurrentUser(null);
-      return;
-    }
-    let active = true;
-    getCurrentUser()
-      .then(async (response) => {
-        if (!response.ok) return;
-        const user = await response.json() as CurrentUser;
-        if (active) setCurrentUser(user);
-      })
-      .catch(() => undefined);
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    const cleanup = loadCurrentUser();
-    window.addEventListener(AUTH_CHANGED_EVENT, loadCurrentUser);
-    return () => {
-      cleanup?.();
-      window.removeEventListener(AUTH_CHANGED_EVENT, loadCurrentUser);
-    };
-  }, [loadCurrentUser]);
 
   const updateProfilePos = useCallback(() => {
     if (avatarRef.current) {

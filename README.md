@@ -6,7 +6,10 @@
     * React19 + Vite7 + pnpm
     * Typescript + scss
     * react-router
-    * react-i18next
+    * axios
+    * i18n
+    * redux-toolkit (rtk)
+
 
 ### 功能
 * music
@@ -18,7 +21,7 @@
 pnpm create tauri-app web-app --template react-ts # tarui, react, typescript
 pnpm install -D sass                 # scss
 pnpm install react-router-dom@latest # react-router
-
+pnpm add @reduxjs/toolkit react-redux
 ```
 
 ### run a tauri app
@@ -41,39 +44,56 @@ $ pnpm tauri dev
 ### 使用github账号登录
 推荐由后端完成 OAuth 流程，前端只负责跳转和接收登录结果。
 GitHub Access Token 不应该暴露给前端
-GET    /api/auth/github/login
-GET    /api/auth/github/callback
-POST   /api/auth/logout
-POST   /api/auth/refresh
-GET    /api/user/me
+从 Cookie 读取 JWT，前端用 Redux Toolkit 保存用户资料
+GET    /auth/github/login (window.location.href=url)
+POST   /auth/logout
+GET    /user/me
+
+
+* GitHub 登录使用：window.location.href = url, 而不是axios
+* 后端登录成功后设置：Set-Cookie: auth_token=...; HttpOnly; Secure; SameSite=Lax
+    - Cookie 读取 JWT
+* GET /api/users/me
+* Redux Toolkit保存用户资料
+
 ```md
+┌──────────────┐
+│ React 登录页 │
+└──────┬───────┘
+       │
+       │ 点击 GitHub 按钮
+       ▼
+GET /auth/github/login
+       │
+       ▼
+GitHub 授权页面
+       │
+       │ 用户登录 GitHub
+       │ 点击 Authorize
+       ▼
+GET /auth/github/callback
+（后端Axum 处理）
+       │
+       │ 创建/登录用户
+       │ 生成 JWT
+       ▼
+302 跳转
+https://app.xxx.com/oauth/success
+       │
+       ▼
 React
-    │
-    │ 点击 "GitHub"按钮
-    ▼
-Axum
-/api/auth/github/login
-    │
-    │ 重定向
-    ▼
-GitHub OAuth
-    │
-    │ 用户授权
-    ▼
-Axum
-/api/auth/github/callback
-    │
-    │ 获取 Access Token
-    │
-    │ 获取 GitHub 用户信息
-    │
-    │ 创建/登录用户
-    │
-    │ 生成 JWT
-    ▼
-React
-保存 JWT
-登录成功
+       │
+       ▼
+GET /user/me
+       │
+       ▼
+Redux Toolkit
+       │
+       ▼
+Header 更新头像
+Sidebar 更新用户名
+进入首页
+
 ```
 
 ### chat动态浏览量

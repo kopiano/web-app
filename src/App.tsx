@@ -1,5 +1,5 @@
 import '@/i18n';
-import { Outlet, createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { Navigate, Outlet, createBrowserRouter, RouterProvider, useNavigate } from 'react-router-dom';
 import Overview from '@/pages/Overview';
 import Chat from '@/pages/Chat';
 import Music from '@/pages/Music';
@@ -9,19 +9,34 @@ import BackgroundImg from '@/components/BackgroundImg';
 import { ThemeProvider } from '@/context/ThemeContext';
 import "@/App.scss";
 import { useEffect } from 'react';
-import { authStorage, notifyAuthChanged } from '@/lib/auth';
+import { Provider, useDispatch } from 'react-redux';
+import { store } from '@/store/store';
+import { fetchCurrentUser } from '@/store/authSlice';
 
-const Layout = () => {
+const OAuthSuccess = () => {
+  const navigate = useNavigate();
+  const dispatch = useDispatch<typeof store.dispatch>();
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('auth_token');
-    const refresh = params.get('refresh_token');
-    if (!token) return;
-    authStorage.setToken(token);
-    if (refresh) authStorage.setRefreshToken(refresh);
-    notifyAuthChanged();
-    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.hash}`);
-  }, []);
+    if (params.get('auth_error')) {
+      navigate('/?auth_error=github_login_failed', { replace: true });
+      return;
+    }
+    dispatch(fetchCurrentUser()).finally(() => {
+      navigate('/', { replace: true });
+    });
+  }, [dispatch, navigate]);
+
+  return null;
+};
+
+const Layout = () => {
+  const dispatch = useDispatch<typeof store.dispatch>();
+
+  useEffect(() => {
+    dispatch(fetchCurrentUser());
+  }, [dispatch]);
 
   return (
     <ThemeProvider>
@@ -40,13 +55,17 @@ const router = createBrowserRouter([
       { path: '/chat', element: <Chat /> },
       { path: '/music', element: <Music /> },
       { path: '/video', element: <Video /> },
+      { path: '/oauth/success', element: <OAuthSuccess /> },
+      { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
 ]);
 
 function App() {
   return (
-    <RouterProvider router={router} />
+    <Provider store={store}>
+      <RouterProvider router={router} />
+    </Provider>
   );
 }
 
