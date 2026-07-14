@@ -65,13 +65,23 @@ const Layout = () => {
 
 const router = createBrowserRouter([
   {
+    element: (
+      <ThemeProvider>
+        <BackgroundImg />
+        <Outlet />
+      </ThemeProvider>
+    ),
+    children: [
+      { path: '/oauth/success', element: <OAuthSuccess /> },
+    ],
+  },
+  {
     element: <Layout />,
     children: [
       { path: '/', element: <Overview /> },
       { path: '/chat', element: <Chat /> },
       { path: '/music', element: <Music /> },
       { path: '/video', element: <Video /> },
-      { path: '/oauth/success', element: <OAuthSuccess /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

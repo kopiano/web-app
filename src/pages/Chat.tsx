@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store/store';
 import '@/styles/chat.scss';
 
 /* ── Types ── */
@@ -100,6 +102,12 @@ const initialMoments: MomentPost[] = [
 ];
 
 function Chat() {
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+  const currentUserName = currentUser?.name || currentUser?.username || 'You';
+  const currentUserAvatar = currentUser?.avatar
+    || (currentUser?.github_id
+      ? `https://avatars.githubusercontent.com/u/${currentUser.github_id}?v=4`
+      : landscapeAvatar(0));
   const [activeTab, setActiveTab] = useState<'chat' | 'moments'>(() => {
     return (localStorage.getItem('chat_tab') as 'chat' | 'moments') || 'chat';
   });
@@ -216,8 +224,8 @@ function Chat() {
     if (!momentText.trim() && !momentMedia) return;
     setMoments(p => [{
       id: Date.now(),
-      name: 'You',
-      avatar: landscapeAvatar(0),
+      name: currentUserName,
+      avatar: currentUserAvatar,
       text: momentText.trim(),
       media: momentMedia || undefined,
       mediaType: momentMediaType || undefined,
@@ -264,7 +272,7 @@ function Chat() {
     const text = commentTexts[postId]?.trim();
     if (!text) return;
     setMoments(p => p.map(m =>
-      m.id === postId ? { ...m, comments: [...m.comments, { id: Date.now(), author: 'You', text }] } : m
+      m.id === postId ? { ...m, comments: [...m.comments, { id: Date.now(), author: currentUserName, text }] } : m
     ));
     setCommentTexts(p => ({ ...p, [postId]: '' }));
     setCommentEmojiPost(null);
@@ -367,7 +375,7 @@ function Chat() {
                       <div className="msg-sender">
                         <div className="msg-avatar">
                           <img
-                            src={msg.from === 'me' ? landscapeAvatar(0) : activeContactInfo.avatar}
+                            src={msg.from === 'me' ? currentUserAvatar : activeContactInfo.avatar}
                             alt=""
                             className="avatar-img"
                           />
@@ -444,7 +452,7 @@ function Chat() {
             <div className="moment-post">
               <div className="moment-post-top">
                 <div className="moment-post-avatar">
-                  <img src={landscapeAvatar(0)} alt="" className="avatar-img" />
+                  <img src={currentUserAvatar} alt="" className="avatar-img" />
                 </div>
                 <textarea ref={momentInputRef} className="moment-post-input" placeholder="What's happening?" value={momentText}
                   onChange={e => setMomentText(e.target.value)} />
