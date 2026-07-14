@@ -39,7 +39,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
           </p>
         </div>
 
-        <div className="auth-social">
+        {mode === 'login' && <div className="auth-social">
           <button className="auth-social-btn glass-border" type="button" onClick={startGithubLogin}>
             <svg data-component="Octicon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="20" height="20" fill="#000" overflow="visible" style={{ verticalAlign: 'text-bottom' }}><path d="M10.226 17.284c-2.965-.36-5.054-2.493-5.054-5.256 0-1.123.404-2.336 1.078-3.144-.292-.741-.247-2.314.09-2.965.898-.112 2.111.36 2.83 1.01.853-.269 1.752-.404 2.853-.404 1.1 0 1.999.135 2.807.382.696-.629 1.932-1.1 2.83-.988.315.606.36 2.179.067 2.942.72.854 1.101 2 1.101 3.167 0 2.763-2.089 4.852-5.098 5.234.763.494 1.28 1.572 1.28 2.807v2.336c0 .674.561 1.056 1.235.786 4.066-1.55 7.255-5.615 7.255-10.646C23.5 6.188 18.334 1 11.978 1 5.62 1 .5 6.188.5 12.545c0 4.986 3.167 9.12 7.435 10.669.606.225 1.19-.18 1.19-.786V20.63a2.9 2.9 0 0 1-1.078.224c-1.483 0-2.359-.808-2.987-2.313-.247-.607-.517-.966-1.034-1.033-.27-.023-.359-.135-.359-.27 0-.27.45-.471.898-.471.652 0 1.213.404 1.797 1.235.45.651.921.943 1.483.943.561 0 .92-.202 1.437-.719.382-.381.674-.718.944-.943"></path></svg>
           </button>
@@ -56,13 +56,13 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
             </svg>
           </button>
-        </div>
+        </div>}
 
-        <div className="auth-divider">
+        {mode === 'login' && <div className="auth-divider">
           <div className="auth-divider-line" />
           <span className="auth-divider-text">or continue with username</span>
           <div className="auth-divider-line" />
-        </div>
+        </div>}
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-field">

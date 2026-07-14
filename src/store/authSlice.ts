@@ -16,7 +16,20 @@ interface AuthState {
   initialized: boolean;
 }
 
-const initialState: AuthState = { user: null, loading: false, initialized: false };
+function getCachedUser(): AuthUser | null {
+  try {
+    const cached = sessionStorage.getItem('auth_user');
+    return cached ? JSON.parse(cached) as AuthUser : null;
+  } catch {
+    return null;
+  }
+}
+
+const initialState: AuthState = {
+  user: getCachedUser(),
+  loading: false,
+  initialized: false,
+};
 
 export const fetchCurrentUser = createAsyncThunk<AuthUser>(
   'auth/fetchCurrentUser',
@@ -34,7 +47,10 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     setUser: (state, action: PayloadAction<AuthUser | null>) => { state.user = action.payload; },
-    clearUser: (state) => { state.user = null; },
+    clearUser: (state) => {
+      state.user = null;
+      sessionStorage.removeItem('auth_user');
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -43,11 +59,13 @@ const authSlice = createSlice({
         state.user = action.payload;
         state.loading = false;
         state.initialized = true;
+        sessionStorage.setItem('auth_user', JSON.stringify(action.payload));
       })
       .addCase(fetchCurrentUser.rejected, (state) => {
         state.user = null;
         state.loading = false;
         state.initialized = true;
+        sessionStorage.removeItem('auth_user');
       });
   },
 });

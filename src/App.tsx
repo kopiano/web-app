@@ -10,10 +10,9 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import "@/App.scss";
 import "@/styles/oauth.scss";
 import { useEffect } from 'react';
-import { Provider, useDispatch, useSelector } from 'react-redux';
+import { Provider, useDispatch } from 'react-redux';
 import { store } from '@/store/store';
 import { fetchCurrentUser } from '@/store/authSlice';
-import type { RootState } from '@/store/store';
 
 const OAuthSuccess = () => {
   const navigate = useNavigate();
@@ -49,7 +48,6 @@ const OAuthSuccess = () => {
 
 const Layout = () => {
   const dispatch = useDispatch<typeof store.dispatch>();
-  const authInitialized = useSelector((state: RootState) => state.auth.initialized);
   const isOAuthSuccess = window.location.pathname === '/oauth/success';
 
   useEffect(() => {
@@ -59,7 +57,7 @@ const Layout = () => {
   return (
       <ThemeProvider>
       <BackgroundImg />
-      {authInitialized && <Header />}
+      <Header />
       <Outlet />
     </ThemeProvider>
   );
