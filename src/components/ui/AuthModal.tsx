@@ -26,11 +26,11 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
 
   useEffect(() => {
     if (!toast) return undefined;
-    const closeTimer = window.setTimeout(() => setToastClosing(true), 2150);
+    const closeTimer = window.setTimeout(() => setToastClosing(true), 4650);
     const removeTimer = window.setTimeout(() => {
       setToast('');
       setToastClosing(false);
-    }, 2500);
+    }, 5000);
     return () => {
       window.clearTimeout(closeTimer);
       window.clearTimeout(removeTimer);
@@ -65,12 +65,14 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
     try {
       if (mode === 'signup') {
         await register({ name: trimmedUsername, email: trimmedEmail, password });
+        window.dispatchEvent(new CustomEvent('app:notification', {
+          detail: { message: `${trimmedUsername} 注册成功`, type: 'success' },
+        }));
         setMode('login');
         setUsername(trimmedUsername);
         setEmail('');
-        setError('Account created. Please sign in.');
-        setSuccess(true);
-        showToast('注册成功，请登录！');
+        setError('');
+        setSuccess(false);
         return;
       } else {
         const response = await login({ username: trimmedUsername, password }) as {
@@ -81,6 +83,9 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
         } else {
           await dispatch(fetchCurrentUser()).unwrap();
         }
+        window.dispatchEvent(new CustomEvent('app:notification', {
+          detail: { message: `${trimmedUsername} 登录成功`, type: 'success' },
+        }));
       }
       onClose();
     } catch (requestError: any) {

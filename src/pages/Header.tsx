@@ -26,6 +26,8 @@ export default function Header() {
   const avatarRef = useRef<HTMLButtonElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
   const [profileDropdownPos, setProfileDropdownPos] = useState({ top: 0, right: 0 });
+  const [notifications, setNotifications] = useState<Array<{ message: string; time: Date }>>([]);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' | 'error' } | null>(null);
 
   const [currentLang, setCurrentLang] = useState(i18n.language);
 
@@ -45,6 +47,20 @@ export default function Header() {
     setAuthPortal(document.body);
   }, []);
 
+  useEffect(() => {
+    const handleNotification = (event: Event) => {
+      const message = (event as CustomEvent<{ message?: string }>).detail?.message;
+      if (!message) return;
+      setNotifications((items) => [{ message, time: new Date() }, ...items].slice(0, 8));
+      const type = (event as CustomEvent<{ type?: 'success' | 'warning' | 'error' }>).detail?.type || 'success';
+      const nextToast = { message, type };
+      setToast(nextToast);
+      window.setTimeout(() => setToast((current) => current?.message === message ? null : current), 5000);
+    };
+    window.addEventListener('app:notification', handleNotification);
+    return () => window.removeEventListener('app:notification', handleNotification);
+  }, []);
+
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const initials = currentUser?.name?.trim().charAt(0).toUpperCase() || 'G';
 
@@ -54,6 +70,9 @@ export default function Header() {
     } finally {
       dispatch(clearUser());
       setProfileOpen(false);
+      const message = `${currentUser?.name || '用户'} 已退出登录`;
+      setNotifications((items) => [{ message, time: new Date() }, ...items].slice(0, 8));
+      setToast({ message, type: 'warning' });
     }
   };
 
@@ -212,7 +231,26 @@ export default function Header() {
                   </svg>
                 </button>
               </div>
-              <div className="notif-empty-state">{t('header.noNotifications')}</div>
+              {notifications.length ? (
+                <div className="notif-list">
+                  {notifications.map((message, index) => (
+                    <div className="notif-item" key={`${message.message}-${message.time.getTime()}-${index}`}>
+                      <span className="notif-item-dot" />
+                      <div className="notif-item-content">
+                        <span>{message.message}</span>
+                        <time dateTime={message.time.toISOString()}>
+                          {message.time.toLocaleString([], {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </time>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : <div className="notif-empty-state">{t('header.noNotifications')}</div>}
             </div>
           </div>,
           document.body
@@ -220,6 +258,19 @@ export default function Header() {
       </nav>
       {authOpen && authPortal && createPortal(
         <AuthModal onClose={() => setAuthOpen(false)} initialMode={authMode} />,
+        authPortal
+      )}
+      {toast && authPortal && createPortal(
+        <div className={`header-toast header-toast--${toast.type}`} role="status" aria-live="polite">
+          <span className="header-toast-icon" aria-hidden="true">
+            {toast.type === 'success' ? '✓' : toast.type === 'warning' ? '!' : '×'}
+          </span>
+          <span className="header-toast-copy">
+            <strong>{toast.type === 'success' ? 'Success' : toast.type === 'warning' ? 'Notice' : 'Action failed'}</strong>
+            <span>{toast.message}</span>
+          </span>
+          <button className="header-toast-close" onClick={() => setToast(null)} aria-label="Close notification">×</button>
+        </div>,
         authPortal
       )}
     </header>

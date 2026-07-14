@@ -50,14 +50,32 @@ export async function refreshToken() {
     authStorage.clear();
     return false;
   }
-  const data = await response.json() as { token: string };
-  authStorage.setToken(data.token);
+  const body = await response.json() as {
+    code: number;
+    message: string;
+    data: { token: string };
+  };
+  if (body.code !== 200 || !body.data?.token) {
+    authStorage.clear();
+    return false;
+  }
+  const token = body.data.token;
+  authStorage.setToken(token);
   return true;
 }
 
 export async function getCurrentUser() {
   const token = authStorage.getToken();
-  return fetch(`${API_BASE}user/me`, {
+  const response = await fetch(`${API_BASE}users/me`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
+  const body = await response.json() as {
+    code: number;
+    message: string;
+    data: unknown;
+  };
+  if (!response.ok || body.code !== 200) {
+    throw new Error(body.message || 'Unable to load current user');
+  }
+  return body.data;
 }

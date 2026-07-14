@@ -70,10 +70,10 @@ const authSlice = createSlice({
         sessionStorage.setItem('auth_user', JSON.stringify(action.payload));
       })
       .addCase(fetchCurrentUser.rejected, (state) => {
-        state.user = null;
         state.loading = false;
         state.initialized = true;
-        sessionStorage.removeItem('auth_user');
+        // Keep the cached profile during a transient API/network failure.
+        // Explicit logout still clears it through clearUser().
       });
   },
 });
