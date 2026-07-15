@@ -16,6 +16,36 @@ import { logout as logoutRequest } from '@/api/auth';
 import ProfileModal from '@/components/ui/ProfileModal';
 import { resolveAvatarUrl } from '@/lib/avatar';
 
+function padTimePart(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+function formatNotificationTime(value: Date, now: Date) {
+  const elapsedMinutes = Math.max(0, Math.floor((now.getTime() - value.getTime()) / 60_000));
+  if (elapsedMinutes < 1) return 'just now';
+
+  const isSameDay = value.getFullYear() === now.getFullYear()
+    && value.getMonth() === now.getMonth()
+    && value.getDate() === now.getDate();
+
+  if (isSameDay) {
+    if (elapsedMinutes < 60) return `${elapsedMinutes}m`;
+    const hours = Math.floor(elapsedMinutes / 60);
+    const minutes = elapsedMinutes % 60;
+    return `${hours}h${minutes ? `${minutes}m` : ''}`;
+  }
+
+  const time = `${padTimePart(value.getHours())}:${padTimePart(value.getMinutes())}`;
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const isYesterday = value.getFullYear() === yesterday.getFullYear()
+    && value.getMonth() === yesterday.getMonth()
+    && value.getDate() === yesterday.getDate();
+
+  if (isYesterday) return `yesterday ${time}`;
+
+  return `${time} ${padTimePart(value.getMonth() + 1)}-${padTimePart(value.getDate())}-${value.getFullYear()}`;
+}
+
 export default function Header() {
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
@@ -31,6 +61,7 @@ export default function Header() {
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
   const [profileDropdownPos, setProfileDropdownPos] = useState({ top: 0, right: 0 });
   const [notifications, setNotifications] = useState<Array<{ message: string; time: Date }>>([]);
+  const [notificationNow, setNotificationNow] = useState(() => Date.now());
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' | 'error' } | null>(null);
 
   const [currentLang, setCurrentLang] = useState(i18n.language);
@@ -126,6 +157,13 @@ export default function Header() {
     };
   }, [notifOpen, updateNotifPos]);
 
+  useEffect(() => {
+    if (!notifOpen) return;
+    setNotificationNow(Date.now());
+    const timer = window.setInterval(() => setNotificationNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [notifOpen]);
+
 
   return (
     <header className="header" id="header">
@@ -170,12 +208,19 @@ export default function Header() {
           </button>
 
           {/* Notification Bell */}
-          <button ref={bellRef} className="action-btn notification-btn" onClick={() => setNotifOpen(o => !o)}>
+          <button
+            ref={bellRef}
+            className="action-btn notification-btn"
+            onClick={() => setNotifOpen(o => !o)}
+            aria-label={notifications.length
+              ? `${notifications.length} notifications`
+              : 'No notifications'}
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7, color: '#000' }}>
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            <span className="notif-dot" />
+            {notifications.length > 0 && <span className="notif-dot" aria-hidden="true" />}
           </button>
 
           {/* User Profile Pill */}
@@ -263,14 +308,9 @@ export default function Header() {
                     <div className="notif-item" key={`${message.message}-${message.time.getTime()}-${index}`}>
                       <span className="notif-item-dot" />
                       <div className="notif-item-content">
-                        <span>{message.message}</span>
+                        <span className="notif-item-message">{message.message}</span>
                         <time dateTime={message.time.toISOString()}>
-                          {message.time.toLocaleString([], {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                          {formatNotificationTime(message.time, new Date(notificationNow))}
                         </time>
                       </div>
                     </div>
