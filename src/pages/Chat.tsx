@@ -174,7 +174,11 @@ function Chat() {
 
   useEffect(() => {
     const refresh = () => {
-      if (currentUser && document.visibilityState === 'visible') {
+      if (
+        currentUser
+        && !contactsInitialized
+        && document.visibilityState === 'visible'
+      ) {
         dispatch(refreshContacts({ silent: true }));
       }
     };
@@ -184,7 +188,7 @@ function Chat() {
       window.removeEventListener('pageshow', refresh);
       document.removeEventListener('visibilitychange', refresh);
     };
-  }, [currentUser?.id, dispatch]);
+  }, [contactsInitialized, currentUser?.id, dispatch]);
 
   useEffect(() => {
     if (
