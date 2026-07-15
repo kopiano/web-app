@@ -2,6 +2,7 @@ const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8100/api/')
   .replace(/\/?$/, '/');
 
 export const AUTH_CHANGED_EVENT = 'auth:changed';
+export const AUTH_LOGGED_OUT_KEY = 'auth_logged_out';
 
 export function notifyAuthChanged() {
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
@@ -12,9 +13,13 @@ export const authStorage = {
   setToken: (token: string) => {
     localStorage.setItem('token', token);
     localStorage.setItem('auth_token', token);
+    localStorage.removeItem(AUTH_LOGGED_OUT_KEY);
   },
   getRefreshToken: () => localStorage.getItem('refresh_token'),
   setRefreshToken: (token: string) => localStorage.setItem('refresh_token', token),
+  isLoggedOut: () => localStorage.getItem(AUTH_LOGGED_OUT_KEY) === '1',
+  markLoggedOut: () => localStorage.setItem(AUTH_LOGGED_OUT_KEY, '1'),
+  clearLoggedOut: () => localStorage.removeItem(AUTH_LOGGED_OUT_KEY),
   clear: () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('token');
@@ -31,11 +36,17 @@ export function startGithubLogin() {
 
 export async function logout() {
   const refreshToken = authStorage.getRefreshToken();
-  await fetch(`${API_BASE}auth/logout`, {
-    method: 'POST',
-    headers: refreshToken ? { 'X-Refresh-Token': refreshToken } : undefined,
-  });
-  authStorage.clear();
+  try {
+    await fetch(`${API_BASE}auth/logout`, {
+      method: 'POST',
+      headers: refreshToken ? { 'Content-Type': 'application/json' } : undefined,
+      body: refreshToken ? JSON.stringify({ refresh_token: refreshToken }) : undefined,
+    });
+  } finally {
+    authStorage.clear();
+    authStorage.markLoggedOut();
+    sessionStorage.removeItem('auth_user');
+  }
 }
 
 export async function refreshToken() {

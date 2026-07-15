@@ -1,4 +1,5 @@
 import request from './request'
+import { authStorage } from '../lib/auth'
 
 export function register(data) {
   return request.post('/auth/register', data)
@@ -8,8 +9,19 @@ export function login(data) {
   return request.post('/auth/login', data)
 }
 
-export function logout() {
-  return request.post('/auth/logout')
+export async function logout() {
+  const refreshToken = authStorage.getRefreshToken()
+
+  try {
+    return await request.post(
+      '/auth/logout',
+      refreshToken ? { refresh_token: refreshToken } : undefined,
+    )
+  } finally {
+    authStorage.clear()
+    authStorage.markLoggedOut()
+    sessionStorage.removeItem('auth_user')
+  }
 }
 
 export function gitGithubLogin() {

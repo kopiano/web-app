@@ -12,7 +12,8 @@ import "@/styles/oauth.scss";
 import { useEffect } from 'react';
 import { Provider, useDispatch } from 'react-redux';
 import { store } from '@/store/store';
-import { fetchCurrentUser } from '@/store/authSlice';
+import { clearUser, fetchCurrentUser } from '@/store/authSlice';
+import { authStorage } from '@/lib/auth';
 
 const OAuthSuccess = () => {
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ const OAuthSuccess = () => {
       navigate('/?auth_error=github_login_failed', { replace: true });
       return;
     }
+    authStorage.clearLoggedOut();
     dispatch(fetchCurrentUser())
       .unwrap()
       .then(() => {
@@ -51,7 +53,12 @@ const Layout = () => {
   const isOAuthSuccess = window.location.pathname === '/oauth/success';
 
   useEffect(() => {
-    if (!isOAuthSuccess) dispatch(fetchCurrentUser());
+    if (isOAuthSuccess) return;
+    if (authStorage.isLoggedOut()) {
+      dispatch(clearUser());
+      return;
+    }
+    dispatch(fetchCurrentUser());
   }, [dispatch, isOAuthSuccess]);
 
   return (

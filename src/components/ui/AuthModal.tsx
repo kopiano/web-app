@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import '@/styles/auth.scss';
-import { startGithubLogin } from '@/lib/auth';
+import { authStorage, startGithubLogin } from '@/lib/auth';
 import { login, register } from '@/api/auth';
 import { fetchCurrentUser, setUser } from '@/store/authSlice';
 import { useDispatch } from 'react-redux';
@@ -78,6 +78,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
         const response = await login({ username: trimmedUsername, password }) as {
           data?: { user?: Parameters<typeof setUser>[0] };
         };
+        authStorage.clearLoggedOut();
         if (response.data?.user) {
           dispatch(setUser(response.data.user));
         } else {

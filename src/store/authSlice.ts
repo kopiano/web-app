@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import request from '@/api/request';
 import { updateProfile } from '@/api/user';
 import type { UpdateProfileInput } from '@/api/user';
+import { authStorage } from '@/lib/auth';
 
 export interface AuthUser {
   id: string;
@@ -70,6 +71,7 @@ const authSlice = createSlice({
       state.user = action.payload;
       state.initialized = true;
       if (action.payload) {
+        authStorage.clearLoggedOut();
         sessionStorage.setItem('auth_user', JSON.stringify(action.payload));
       } else {
         sessionStorage.removeItem('auth_user');
@@ -77,6 +79,9 @@ const authSlice = createSlice({
     },
     clearUser: (state) => {
       state.user = null;
+      state.loading = false;
+      state.initialized = true;
+      authStorage.markLoggedOut();
       sessionStorage.removeItem('auth_user');
     },
   },
@@ -84,9 +89,17 @@ const authSlice = createSlice({
     builder
       .addCase(fetchCurrentUser.pending, (state) => { state.loading = true; })
       .addCase(fetchCurrentUser.fulfilled, (state, action) => {
+        if (authStorage.isLoggedOut()) {
+          state.user = null;
+          state.loading = false;
+          state.initialized = true;
+          sessionStorage.removeItem('auth_user');
+          return;
+        }
         state.user = action.payload;
         state.loading = false;
         state.initialized = true;
+        authStorage.clearLoggedOut();
         sessionStorage.setItem('auth_user', JSON.stringify(action.payload));
       })
       .addCase(fetchCurrentUser.rejected, (state, action) => {
@@ -102,6 +115,7 @@ const authSlice = createSlice({
       .addCase(updateCurrentUserProfile.fulfilled, (state, action) => {
         state.user = action.payload;
         state.initialized = true;
+        authStorage.clearLoggedOut();
         sessionStorage.setItem('auth_user', JSON.stringify(action.payload));
       });
   },
