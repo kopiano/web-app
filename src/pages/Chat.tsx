@@ -400,22 +400,15 @@ function Chat() {
   }, [currentUser?.id, dispatch]);
 
   useEffect(() => {
-    const refresh = () => {
-      if (
-        currentUser
-        && document.visibilityState === 'visible'
-      ) {
+    if (!currentUser) return;
+
+    const refreshTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
         dispatch(refreshContacts({ silent: true }));
       }
-    };
-    const refreshTimer = window.setInterval(refresh, CONTACT_PRESENCE_REFRESH_INTERVAL_MS);
-    window.addEventListener('pageshow', refresh);
-    document.addEventListener('visibilitychange', refresh);
-    return () => {
-      window.clearInterval(refreshTimer);
-      window.removeEventListener('pageshow', refresh);
-      document.removeEventListener('visibilitychange', refresh);
-    };
+    }, CONTACT_PRESENCE_REFRESH_INTERVAL_MS);
+
+    return () => window.clearInterval(refreshTimer);
   }, [currentUser?.id, dispatch]);
 
   useEffect(() => {
