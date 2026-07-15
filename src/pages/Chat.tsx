@@ -55,6 +55,8 @@ const EMOJIS = [
   '🌩️','🌨️','🌧️','🌦️','🌥️','🌤️','⛈️','⛅',
 ];
 
+const ACTIVE_CONTACT_KEY = 'chat_active_contact';
+
 function landscapeAvatar(seed: number) {
   return `https://picsum.photos/seed/${seed}/100/100`;
 }
@@ -113,6 +115,7 @@ function Chat() {
   const contactsLoading = useSelector((state: RootState) => state.chat.loading);
   const contactsInitialized = useSelector((state: RootState) => state.chat.initialized);
   const contactsError = useSelector((state: RootState) => state.chat.error);
+  const contactsLastFetchedAt = useSelector((state: RootState) => state.chat.lastFetchedAt);
   const currentUserName = currentUser?.name || currentUser?.username || 'You';
   const currentUserAvatar = resolveAvatarUrl(currentUser?.avatar)
     || (currentUser?.github_id
@@ -157,7 +160,7 @@ function Chat() {
   useEffect(() => {
     if (currentUser) {
       setActiveTab('chat');
-      setActiveContact('');
+      setActiveContact(localStorage.getItem(`${ACTIVE_CONTACT_KEY}:${currentUser.id}`) || '');
       localStorage.setItem('chat_tab', 'chat');
     } else {
       setActiveContact('mock:group:1');
@@ -184,10 +187,40 @@ function Chat() {
   }, [currentUser?.id, dispatch]);
 
   useEffect(() => {
-    if (activeContactInfo && !visibleContacts.some(c => c.id === activeContact)) {
-      setActiveContact(activeContactInfo.id);
+    if (
+      !currentUser
+      || !contactsInitialized
+      || contactsLoading
+      || !contactsLastFetchedAt
+      || visibleContacts.some(contact => contact.id === activeContact)
+    ) {
+      return;
     }
-  }, [activeContact, activeContactInfo, visibleContacts]);
+
+    const savedContactId = localStorage.getItem(`${ACTIVE_CONTACT_KEY}:${currentUser.id}`);
+    const nextContactId = visibleContacts.some(contact => contact.id === savedContactId)
+      ? savedContactId
+      : visibleContacts[0]?.id;
+
+    if (!nextContactId) return;
+
+    setActiveContact(nextContactId);
+    localStorage.setItem(`${ACTIVE_CONTACT_KEY}:${currentUser.id}`, nextContactId);
+  }, [
+    activeContact,
+    contactsInitialized,
+    contactsLastFetchedAt,
+    contactsLoading,
+    currentUser?.id,
+    visibleContacts,
+  ]);
+
+  function selectContact(contactId: string) {
+    setActiveContact(contactId);
+    if (currentUser) {
+      localStorage.setItem(`${ACTIVE_CONTACT_KEY}:${currentUser.id}`, contactId);
+    }
+  }
 
   useEffect(() => {
     msgEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -382,7 +415,7 @@ function Chat() {
               <div className="contact-active-indicator" style={{ top: activeIndicatorTop }} />
               <div className="contact-group-label">Groups</div>
               {visibleContacts.filter(c => c.type === 'group').map(c => (
-                <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => setActiveContact(c.id)}>
+                <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => selectContact(c.id)}>
                   <div className="contact-avatar">
                     <img src={c.avatar} alt="" className="avatar-img" />
                   </div>
@@ -396,7 +429,7 @@ function Chat() {
               <div className="contact-divider" />
               <div className="contact-group-label">Contacts</div>
               {visibleContacts.filter(c => c.type === 'user').map(c => (
-                <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => setActiveContact(c.id)}>
+                <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => selectContact(c.id)}>
                   <div className="contact-avatar">
                     <img src={c.avatar} alt="" className="avatar-img" />
                     {c.online && <div className="contact-online" />}
