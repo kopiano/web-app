@@ -805,8 +805,8 @@ $chat-margin-left: 100px;
     font-weight: 550;
     letter-spacing: 0.015em;
     line-height: 1;
-    opacity: 0;
-    animation: message-time-in 0.35s ease 1.05s forwards;
+    opacity: 1;
+    animation: message-time-in 0.18s ease-out both;
     transition: color 0.2s ease, opacity 0.2s ease;
 }
 
