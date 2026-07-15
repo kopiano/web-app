@@ -13,6 +13,8 @@ import type { RootState } from '@/store/store';
 import { clearUser } from '@/store/authSlice';
 import { clearContacts } from '@/store/chatSlice';
 import { logout as logoutRequest } from '@/api/auth';
+import ProfileModal from '@/components/ui/ProfileModal';
+import { resolveAvatarUrl } from '@/lib/avatar';
 
 export default function Header() {
   const { t, i18n } = useTranslation();
@@ -20,6 +22,7 @@ export default function Header() {
   const dispatch = useDispatch();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authPortal, setAuthPortal] = useState<HTMLElement | null>(null);
@@ -63,7 +66,14 @@ export default function Header() {
   }, []);
 
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  const isExternalAccount = currentUser?.github_id !== null && currentUser?.github_id !== undefined;
   const initials = currentUser?.name?.trim().charAt(0).toUpperCase() || 'G';
+
+  const handleProfile = () => {
+    if (isExternalAccount) return;
+    setProfileOpen(false);
+    setProfileModalOpen(true);
+  };
 
   const handleLogout = async () => {
     try {
@@ -173,7 +183,7 @@ export default function Header() {
             <div className="user-avatar-box">
               {currentUser?.avatar || currentUser?.github_id ? (
                 <img
-                  src={currentUser.avatar || `https://avatars.githubusercontent.com/u/${currentUser.github_id}?v=4`}
+                  src={resolveAvatarUrl(currentUser.avatar) || `https://avatars.githubusercontent.com/u/${currentUser.github_id}?v=4`}
                   alt=""
                   className="user-avatar-initials"
                 />
@@ -195,12 +205,26 @@ export default function Header() {
             <div className="user-dropdown-panel glass" style={{ position: 'absolute', top: `${profileDropdownPos.top}px`, right: `${profileDropdownPos.right}px` }} onClick={e => e.stopPropagation()}>
               {currentUser ? (
                 <>
-                  <button className="dropdown-action-item" onClick={() => setProfileOpen(false)}
-                    style={{ color: '#000', fontWeight: 500 }}>
-                    Setting
+                  <button
+                    className="dropdown-action-item"
+                    onClick={handleProfile}
+                    disabled={isExternalAccount}
+                    title={isExternalAccount ? 'GitHub accounts cannot be edited here.' : 'Profile'}
+                  >
+                    <ProfileIcon />
+                    Profile
                   </button>
-                  <button className="dropdown-action-item" onClick={handleLogout}
-                    style={{ color: '#000' }}>
+                  <button
+                    className="dropdown-action-item"
+                    onClick={() => setProfileOpen(false)}
+                    disabled={isExternalAccount}
+                    title={isExternalAccount ? 'GitHub accounts cannot be edited here.' : 'Settings'}
+                  >
+                    <SettingsIcon />
+                    Settings
+                  </button>
+                  <button className="dropdown-action-item" onClick={handleLogout}>
+                    <LogoutIcon />
                     Logout
                   </button>
                 </>
@@ -262,6 +286,19 @@ export default function Header() {
         <AuthModal onClose={() => setAuthOpen(false)} initialMode={authMode} />,
         authPortal
       )}
+      {profileModalOpen && currentUser && !isExternalAccount && authPortal && createPortal(
+        <ProfileModal
+          user={currentUser}
+          onClose={() => setProfileModalOpen(false)}
+          onSaved={() => {
+            setProfileModalOpen(false);
+            window.dispatchEvent(new CustomEvent('app:notification', {
+              detail: { message: 'Profile updated', type: 'success' },
+            }));
+          }}
+        />,
+        authPortal
+      )}
       {toast && authPortal && createPortal(
         <div className={`header-toast header-toast--${toast.type}`} role="status" aria-live="polite">
           <span className="header-toast-icon" aria-hidden="true">
@@ -276,5 +313,37 @@ export default function Header() {
         authPortal
       )}
     </header>
+  );
+}
+
+function ProfileIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </svg>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="18" x2="20" y2="18" />
+      <circle cx="9" cy="6" r="2" />
+      <circle cx="15" cy="12" r="2" />
+      <circle cx="11" cy="18" r="2" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 17l5-5-5-5" />
+      <path d="M15 12H3" />
+      <path d="M21 19V5a2 2 0 0 0-2-2h-6" />
+    </svg>
   );
 }

@@ -298,7 +298,7 @@
 }
 
 .user-dropdown-panel {
-  width: 120px;
+  width: 150px;
   border-radius: 1.5rem;
   padding: 5px;
 }
@@ -325,8 +325,9 @@
 .dropdown-action-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 10px;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
   font-size: 14px;
   letter-spacing: 1px;
   border-radius: 12px;
@@ -344,6 +345,11 @@
 
 .dropdown-action-item:hover {
   background: rgba(80, 80, 82, 0.39);
+}
+
+.dropdown-action-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 /* ===== Notifications ===== */

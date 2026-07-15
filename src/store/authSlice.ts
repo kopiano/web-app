@@ -1,5 +1,7 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import request from '@/api/request';
+import { updateProfile } from '@/api/user';
+import type { UpdateProfileInput } from '@/api/user';
 
 export interface AuthUser {
   id: string;
@@ -49,6 +51,17 @@ export const fetchCurrentUser = createAsyncThunk<AuthUser, void, { rejectValue: 
   },
 );
 
+export const updateCurrentUserProfile = createAsyncThunk<AuthUser, UpdateProfileInput>(
+  'auth/updateCurrentUserProfile',
+  async (profile) => {
+    const { data } = await updateProfile(profile);
+    return {
+      ...data,
+      name: data.name || data.username || 'User',
+    };
+  },
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -85,6 +98,11 @@ const authSlice = createSlice({
           state.user = null;
           sessionStorage.removeItem('auth_user');
         }
+      })
+      .addCase(updateCurrentUserProfile.fulfilled, (state, action) => {
+        state.user = action.payload;
+        state.initialized = true;
+        sessionStorage.setItem('auth_user', JSON.stringify(action.payload));
       });
   },
 });

@@ -281,6 +281,80 @@
   padding-right: 36px;
 }
 
+.profile-panel {
+  max-width: 420px;
+}
+
+.profile-avatar-field {
+  display: flex;
+  justify-content: center;
+  margin: -2px 0 8px;
+}
+
+.profile-avatar-button {
+  position: relative;
+  display: grid;
+  width: 92px;
+  height: 92px;
+  place-items: center;
+  overflow: hidden;
+  border: 0;
+  border-radius: 50%;
+  color: #1f2937;
+  background: #e8eaf0;
+  cursor: pointer;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.profile-avatar-button img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-avatar-edit {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  background: #6366f1;
+}
+
+.profile-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.profile-actions .auth-submit {
+  margin-top: 0;
+  font-size: 1rem;
+}
+
+.profile-cancel {
+  height: 44px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 2rem;
+  color: #334155;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.profile-cancel:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .auth-pw-toggle {
   position: absolute;
   right: 10px;

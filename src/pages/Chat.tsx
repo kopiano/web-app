@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { resolveAvatarUrl } from '@/lib/avatar';
 import type { RootState, AppDispatch } from '@/store/store';
 import { refreshContacts } from '@/store/chatSlice';
 import '@/styles/chat.scss';
@@ -31,6 +32,7 @@ interface Comment {
 
 interface MomentPost {
   id: number;
+  authorId?: string;
   name: string;
   avatar: string;
   text: string;
@@ -109,9 +111,10 @@ function Chat() {
   const authInitialized = useSelector((state: RootState) => state.auth.initialized);
   const remoteContacts = useSelector((state: RootState) => state.chat.contacts);
   const contactsLoading = useSelector((state: RootState) => state.chat.loading);
+  const contactsInitialized = useSelector((state: RootState) => state.chat.initialized);
   const contactsError = useSelector((state: RootState) => state.chat.error);
   const currentUserName = currentUser?.name || currentUser?.username || 'You';
-  const currentUserAvatar = currentUser?.avatar
+  const currentUserAvatar = resolveAvatarUrl(currentUser?.avatar)
     || (currentUser?.github_id
       ? `https://avatars.githubusercontent.com/u/${currentUser.github_id}?v=4`
       : landscapeAvatar(0));
@@ -139,8 +142,8 @@ function Chat() {
   const msgEndRef = useRef<HTMLDivElement>(null);
   const contactsPanelRef = useRef<HTMLElement>(null);
   const visibleContacts = useMemo<Contact[]>(
-    () => remoteContacts.length > 0 ? remoteContacts : (currentUser ? [] : contacts),
-    [currentUser?.id, remoteContacts],
+    () => currentUser ? remoteContacts : contacts,
+    [currentUser, remoteContacts],
   );
   const activeContactInfo = useMemo(
     () => visibleContacts.find(c => c.id === activeContact) || visibleContacts[0] || {
@@ -148,7 +151,18 @@ function Chat() {
     },
     [activeContact, visibleContacts],
   );
+  const activeConversationId = activeContactInfo.id;
   const momentInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (currentUser) {
+      setActiveTab('chat');
+      setActiveContact('');
+      localStorage.setItem('chat_tab', 'chat');
+    } else {
+      setActiveContact('mock:group:1');
+    }
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (!authInitialized || !currentUser) return;
@@ -177,7 +191,7 @@ function Chat() {
 
   useEffect(() => {
     msgEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, activeContact]);
+  }, [messages, activeConversationId]);
 
   useEffect(() => {
     const input = momentInputRef.current;
@@ -194,14 +208,14 @@ function Chat() {
 
   /* ── Chat ── */
   function handleSend() {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !activeConversationId) return;
     const newMsg: Message = {
       id: Date.now(),
       text: inputText.trim(),
       from: 'me',
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     };
-    setMessages(p => ({ ...p, [activeContact]: [...(p[activeContact] || []), newMsg] }));
+    setMessages(p => ({ ...p, [activeConversationId]: [...(p[activeConversationId] || []), newMsg] }));
     setInputText('');
   }
 
@@ -224,27 +238,27 @@ function Chat() {
 
   function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
-    if (!f) return;
+    if (!f || !activeConversationId) return;
     const newMsg: Message = {
       id: Date.now(),
       text: `📎 ${f.name}`,
       from: 'me',
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     };
-    setMessages(p => ({ ...p, [activeContact]: [...(p[activeContact] || []), newMsg] }));
+    setMessages(p => ({ ...p, [activeConversationId]: [...(p[activeConversationId] || []), newMsg] }));
     e.target.value = '';
   }
 
   function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
-    if (!f) return;
+    if (!f || !activeConversationId) return;
     const newMsg: Message = {
       id: Date.now(),
       text: `📷 ${f.name}`,
       from: 'me',
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     };
-    setMessages(p => ({ ...p, [activeContact]: [...(p[activeContact] || []), newMsg] }));
+    setMessages(p => ({ ...p, [activeConversationId]: [...(p[activeConversationId] || []), newMsg] }));
     e.target.value = '';
   }
 
@@ -265,6 +279,7 @@ function Chat() {
     if (!momentText.trim() && !momentMedia) return;
     setMoments(p => [{
       id: Date.now(),
+      authorId: currentUser?.id,
       name: currentUserName,
       avatar: currentUserAvatar,
       text: momentText.trim(),
@@ -396,7 +411,7 @@ function Chat() {
               {currentUser && visibleContacts.length === 0 && (
                 <div className="contacts-state" role={contactsError ? 'alert' : 'status'}>
                   <span>
-                    {contactsLoading
+                    {contactsLoading || !contactsInitialized
                       ? 'Loading contacts...'
                       : contactsError
                         ? 'Unable to load contacts.'
@@ -428,10 +443,10 @@ function Chat() {
                 </div>
               </div>
               <div className="msg-list">
-                {(messages[activeContact] || []).length === 0 ? (
+                {(messages[activeConversationId] || []).length === 0 ? (
                   <div className="msg-empty">No messages yet</div>
                 ) : (
-                  (messages[activeContact] || []).map((msg, msgIndex, contactMessages) => (
+                  (messages[activeConversationId] || []).map((msg, msgIndex, contactMessages) => (
                     <div key={msg.id} className={`msg-wrap ${msg.from === 'me' ? 'sent' : 'received'}`}>
                       <div className="msg-sender">
                         <div className="msg-avatar">
@@ -564,14 +579,15 @@ function Chat() {
             ) : (
               moments.map((post, idx) => {
                 trackView(post.id);
+                const isCurrentUserPost = post.authorId === currentUser?.id;
                 return (
                   <div key={post.id} className="moment-card" style={{ animationDelay: `${idx * 0.06}s` }}>
                     <div className="card-header">
                       <div className="card-avatar">
-                        <img src={post.avatar} alt="" className="avatar-img" />
+                        <img src={isCurrentUserPost ? currentUserAvatar : post.avatar} alt="" className="avatar-img" />
                       </div>
                       <div className="card-author">
-                        <div className="card-name">{post.name}</div>
+                        <div className="card-name">{isCurrentUserPost ? currentUserName : post.name}</div>
                         <div className="card-time">{post.time}</div>
                       </div>
                       <button className="card-menu" title="More">

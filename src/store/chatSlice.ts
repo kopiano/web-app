@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { getMessageUserInfo } from '@/api/chat'
+import { resolveAvatarUrl } from '@/lib/avatar'
 
 export interface ChatContact {
   id: string
@@ -73,7 +74,7 @@ function formatContact(contact: ApiContact): ChatContact | null {
     id,
     name: contact.username,
     type: contact.chat_type === 'public' ? 'group' : 'user',
-    avatar: contact.avatar || fallbackAvatar(contact),
+    avatar: resolveAvatarUrl(contact.avatar) || fallbackAvatar(contact),
     lastMsg: contact.content || 'No messages yet',
     time: contact.last_message_time
       ? new Date(contact.last_message_time).toLocaleString(undefined, {
