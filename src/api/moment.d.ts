@@ -14,6 +14,7 @@ export interface MomentApiItem {
   content?: string | null;
   media: MomentMedia[];
   processing_status: 'processing' | 'ready' | 'failed';
+  processing_progress: number;
   processing_error?: string | null;
   created_at: string;
   updated_at: string;

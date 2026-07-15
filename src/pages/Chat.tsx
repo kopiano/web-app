@@ -59,6 +59,7 @@ interface MomentPost {
   mediaWidth?: number;
   mediaHeight?: number;
   processingStatus: 'processing' | 'ready' | 'failed';
+  processingProgress: number;
   processingError?: string;
   time: string;
   likes: number;
@@ -255,6 +256,7 @@ function toMomentPost(item: MomentApiItem): MomentPost {
     mediaWidth: media?.width,
     mediaHeight: media?.height,
     processingStatus: item.processing_status || 'ready',
+    processingProgress: Math.min(100, Math.max(0, item.processing_progress ?? 100)),
     processingError: item.processing_error || undefined,
     time: momentTimeLabel(item.created_at),
     likes: 0,
@@ -299,6 +301,9 @@ function Chat() {
   const [momentsError, setMomentsError] = useState('');
   const [momentPublishing, setMomentPublishing] = useState(false);
   const [momentUploadProgress, setMomentUploadProgress] = useState<MomentUploadProgress | null>(null);
+  const [completedProcessingMoments, setCompletedProcessingMoments] = useState<Set<string>>(
+    new Set(),
+  );
   const [momentText, setMomentText] = useState('');
   const [momentMedia, setMomentMedia] = useState<string | null>(null);
   const [momentMediaType, setMomentMediaType] = useState<'image' | 'video' | null>(null);
@@ -323,6 +328,7 @@ function Chat() {
   const momentEmojiPickerRef = useRef<HTMLDivElement>(null);
   const commentEmojiPickerRef = useRef<HTMLDivElement>(null);
   const processingFailureNotifiedRef = useRef(new Set<string>());
+  const processingCompletionTimersRef = useRef(new Map<string, number>());
   const visibleContacts = useMemo<Contact[]>(
     () => currentUser ? remoteContacts : contacts,
     [currentUser, remoteContacts],
@@ -430,6 +436,14 @@ function Chat() {
   }, [momentMedia]);
 
   useEffect(() => {
+    const timers = processingCompletionTimersRef.current;
+    return () => {
+      timers.forEach(timerId => window.clearTimeout(timerId));
+      timers.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!currentUser || !processingMomentKey) return;
 
     const momentIds = processingMomentKey.split(',');
@@ -450,6 +464,21 @@ function Chat() {
         if (result.status !== 'fulfilled') return;
         const post = toMomentPost(result.value);
         updates.set(post.id, post);
+        if (
+          post.processingStatus === 'ready'
+          && !processingCompletionTimersRef.current.has(post.id)
+        ) {
+          setCompletedProcessingMoments(previous => new Set(previous).add(post.id));
+          const timerId = window.setTimeout(() => {
+            setCompletedProcessingMoments(previous => {
+              const next = new Set(previous);
+              next.delete(post.id);
+              return next;
+            });
+            processingCompletionTimersRef.current.delete(post.id);
+          }, 900);
+          processingCompletionTimersRef.current.set(post.id, timerId);
+        }
         if (
           post.processingStatus === 'failed'
           && !processingFailureNotifiedRef.current.has(post.id)
@@ -474,7 +503,7 @@ function Chat() {
     };
 
     initialTimerId = window.setTimeout(() => void refreshProcessingMoments(), 1500);
-    intervalId = window.setInterval(() => void refreshProcessingMoments(), 5000);
+    intervalId = window.setInterval(() => void refreshProcessingMoments(), 2000);
     return () => {
       disposed = true;
       window.clearTimeout(initialTimerId);
@@ -906,13 +935,18 @@ function Chat() {
     e.target.value = '';
     if (!file) return;
     const expectedType = type === 'image' ? 'image/' : 'video/';
-    const maxBytes = type === 'image' ? 10 * 1024 * 1024 : 300 * 1024 * 1024;
+    const maxBytes = type === 'image' ? 10 * 1024 * 1024 : 2 * 1024 * 1024 * 1024;
     if (!file.type.startsWith(expectedType)) {
       notify(`Please select a valid ${type} file.`, 'warning');
       return;
     }
     if (file.size > maxBytes) {
-      notify(`${type === 'image' ? 'Image' : 'Video'} exceeds the upload limit.`, 'warning');
+      notify(
+        type === 'image'
+          ? 'Image exceeds the 10 MB upload limit.'
+          : 'Video exceeds the 2 GB upload limit.',
+        'warning',
+      );
       return;
     }
     setMomentMedia(URL.createObjectURL(file));
@@ -1459,9 +1493,14 @@ function Chat() {
                         <img src={post.media} alt="" className="card-media" />
                       </div>
                     )}
-                    {post.mediaType === 'video' && post.processingStatus === 'processing' && (
+                    {post.mediaType === 'video' && (
+                      post.processingStatus === 'processing'
+                      || completedProcessingMoments.has(post.id)
+                    ) && (
                       <div
-                        className="moment-video-status video-layout"
+                        className={`moment-video-status video-layout${
+                          completedProcessingMoments.has(post.id) ? ' complete' : ''
+                        }`}
                         style={{
                           aspectRatio: post.mediaWidth && post.mediaHeight
                             ? `${post.mediaWidth} / ${post.mediaHeight}`
@@ -1469,10 +1508,56 @@ function Chat() {
                         }}
                         role="status"
                       >
-                        <span className="moment-video-status-spinner" aria-hidden="true" />
-                        <div>
-                          <strong>Processing video</strong>
-                          <span>The moment is published. Video playback will appear automatically.</span>
+                        <div
+                          className={`moment-video-progress-ring${
+                            !completedProcessingMoments.has(post.id)
+                              && post.processingProgress === 0 ? ' idle' : ''
+                          }`}
+                          style={{
+                            '--moment-processing-progress': completedProcessingMoments.has(post.id)
+                              ? 100
+                              : post.processingProgress,
+                          } as React.CSSProperties}
+                          role="progressbar"
+                          aria-label="Video transcoding progress"
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={
+                            completedProcessingMoments.has(post.id)
+                              ? 100
+                              : post.processingProgress
+                          }
+                        >
+                          <i className="moment-video-progress-orbit" aria-hidden="true" />
+                          <span
+                            className="moment-video-progress-value"
+                            key={completedProcessingMoments.has(post.id)
+                              ? 100
+                              : post.processingProgress}
+                          >
+                            <b>
+                              {completedProcessingMoments.has(post.id)
+                                ? 100
+                                : post.processingProgress}
+                            </b>
+                            <small>%</small>
+                          </span>
+                        </div>
+                        <div className="moment-video-processing-content">
+                          <strong>
+                            {completedProcessingMoments.has(post.id)
+                              ? 'Processing complete'
+                              : post.processingProgress > 0
+                                ? 'Transcoding video'
+                                : 'Waiting to process'}
+                          </strong>
+                          <span>
+                            {completedProcessingMoments.has(post.id)
+                              ? 'The video is ready to play.'
+                              : post.processingProgress > 0
+                              ? 'Preparing the video for playback.'
+                              : 'The video is queued and will start shortly.'}
+                          </span>
                         </div>
                       </div>
                     )}
@@ -1484,7 +1569,10 @@ function Chat() {
                         </div>
                       </div>
                     )}
-                    {post.media && post.mediaType === 'video' && post.processingStatus === 'ready' && (
+                    {post.media
+                      && post.mediaType === 'video'
+                      && post.processingStatus === 'ready'
+                      && !completedProcessingMoments.has(post.id) && (
                       <div className="card-media-wrap video-media-wrap">
                         <HlsVideo
                           src={post.media}
