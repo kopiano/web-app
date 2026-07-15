@@ -655,11 +655,10 @@ function Chat() {
               className={`chat-nav-btn${activeTab === 'moments' ? ' active' : ''}`}
               onClick={() => { setActiveTab('moments'); localStorage.setItem('chat_tab', 'moments'); }}
               title="Moments"
+              aria-label="Moments"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
+                <path d="M3 12h4l2.5-7 5 14 2.5-7h4" />
               </svg>
             </button>
           </div>
