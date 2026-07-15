@@ -256,19 +256,21 @@ function Chat() {
     if (!currentUser) return;
 
     let socket: WebSocket | null = null;
+    let connectTimer: number | undefined;
     let reconnectTimer: number | undefined;
     let disposed = false;
     let reconnectDelay = 1000;
 
     const connect = () => {
       if (disposed) return;
-      socket = new WebSocket(messageWebSocketUrl());
+      const currentSocket = new WebSocket(messageWebSocketUrl());
+      socket = currentSocket;
 
-      socket.onopen = () => {
+      currentSocket.onopen = () => {
         reconnectDelay = 1000;
       };
 
-      socket.onmessage = event => {
+      currentSocket.onmessage = event => {
         let payload: unknown;
         try {
           payload = JSON.parse(event.data);
@@ -301,22 +303,39 @@ function Chat() {
         }
       };
 
-      socket.onclose = () => {
+      currentSocket.onclose = () => {
+        if (socket === currentSocket) socket = null;
         if (disposed) return;
         reconnectTimer = window.setTimeout(connect, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, 10000);
       };
 
-      socket.onerror = () => {
-        socket?.close();
-      };
+      currentSocket.onerror = () => {};
     };
 
-    connect();
+    // StrictMode cleans up the first effect immediately in development.
+    // Deferring avoids creating a socket that would be closed while connecting.
+    connectTimer = window.setTimeout(connect, 0);
     return () => {
       disposed = true;
+      if (connectTimer !== undefined) window.clearTimeout(connectTimer);
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
-      socket?.close();
+
+      const currentSocket = socket;
+      socket = null;
+      if (!currentSocket) return;
+
+      currentSocket.onmessage = null;
+      currentSocket.onerror = null;
+      currentSocket.onclose = null;
+      if (currentSocket.readyState === WebSocket.CONNECTING) {
+        currentSocket.onopen = () => currentSocket.close(1000, 'Chat closed');
+      } else {
+        currentSocket.onopen = null;
+        if (currentSocket.readyState === WebSocket.OPEN) {
+          currentSocket.close(1000, 'Chat closed');
+        }
+      }
     };
   }, [currentUser?.id, dispatch]);
 

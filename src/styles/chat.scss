@@ -160,7 +160,8 @@ $chat-margin-left: 100px;
 }
 
 .contact-group-label {
-    font-size: 0.95rem;
+    // font-size: 0.95rem;
+    font-size: 1.3rem;
     font-weight: 700;
     color: rgba(49, 46, 129, 0.58);
     padding: 12px 20px 6px;
@@ -315,9 +316,11 @@ $chat-margin-left: 100px;
 }
 
 .contact-name {
-    font-size: 1.25rem;
+    // font-size: 1.25rem;
+    font-size: 15px;
     font-weight: 650;
     color: rgba(0, 0, 0, 0.85);
+    letter-spacing: 0.7px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -326,8 +329,10 @@ $chat-margin-left: 100px;
 }
 
 .contact-preview {
-    font-size: 1rem;
-    color: rgba(0, 0, 0, 0.4);
+    // font-size: 1rem;
+    font-size: 14px;
+    color: rgb(82, 99, 111);
+    letter-spacing: 0.3px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -336,10 +341,12 @@ $chat-margin-left: 100px;
 }
 
 .contact-time {
-    font-size: 1rem;
-    color: rgba(0, 0, 0, 0.3);
-    letter-spacing: 0;
+    font-size: 13px;
+    // color: rgba(0, 0, 0, 0.3);
+    color: rgb(82, 99, 111);
+    letter-spacing: 0.3px;
     flex-shrink: 0;
+    top: -10px;
 }
 
 /* ===== Messages Panel ===== */
