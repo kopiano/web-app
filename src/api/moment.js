@@ -78,3 +78,7 @@ export function createMoment(input) {
     throw new Error('Invalid create moment response')
   })
 }
+
+export function deleteMoment(id) {
+  return request.delete(`/moment/${encodeURIComponent(id)}`).then(() => undefined)
+}

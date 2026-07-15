@@ -2,7 +2,7 @@ import { Fragment, useState, useRef, useEffect, useLayoutEffect, useMemo } from 
 import { useDispatch, useSelector } from 'react-redux';
 import { resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar';
 import { getMessageHistory, sendImageMessage, sendMessage } from '@/api/chat';
-import { createMoment, getMoment, getMoments } from '@/api/moment';
+import { createMoment, deleteMoment, getMoment, getMoments } from '@/api/moment';
 import HlsVideo from '@/components/HlsVideo';
 import type {
   ChatApiMessage,
@@ -319,6 +319,9 @@ function Chat() {
   const [momentsError, setMomentsError] = useState('');
   const [momentPublishing, setMomentPublishing] = useState(false);
   const [momentUploadProgress, setMomentUploadProgress] = useState<MomentUploadProgress | null>(null);
+  const [openMomentMenuId, setOpenMomentMenuId] = useState<string | null>(null);
+  const [deleteMomentId, setDeleteMomentId] = useState<string | null>(null);
+  const [deletingMomentId, setDeletingMomentId] = useState<string | null>(null);
   const [completedProcessingMoments, setCompletedProcessingMoments] = useState<Set<string>>(
     new Set(),
   );
@@ -345,6 +348,7 @@ function Chat() {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const momentEmojiPickerRef = useRef<HTMLDivElement>(null);
   const commentEmojiPickerRef = useRef<HTMLDivElement>(null);
+  const momentMenuRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const commentInputRefs = useRef(new Map<string, HTMLInputElement>());
   const processingFailureNotifiedRef = useRef(new Set<string>());
@@ -408,6 +412,33 @@ function Chat() {
     document.addEventListener('pointerdown', closeEmojiPickersOutside);
     return () => document.removeEventListener('pointerdown', closeEmojiPickersOutside);
   }, [showEmoji, showMomentEmoji, commentEmojiPost]);
+
+  useEffect(() => {
+    if (openMomentMenuId === null) return;
+
+    const closeMomentMenuOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && !momentMenuRef.current?.contains(target)) {
+        setOpenMomentMenuId(null);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeMomentMenuOutside);
+    return () => document.removeEventListener('pointerdown', closeMomentMenuOutside);
+  }, [openMomentMenuId]);
+
+  useEffect(() => {
+    if (openMomentMenuId === null && deleteMomentId === null) return;
+
+    const closeMomentOverlays = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || deletingMomentId !== null) return;
+      setOpenMomentMenuId(null);
+      setDeleteMomentId(null);
+    };
+
+    document.addEventListener('keydown', closeMomentOverlays);
+    return () => document.removeEventListener('keydown', closeMomentOverlays);
+  }, [openMomentMenuId, deleteMomentId, deletingMomentId]);
 
   useEffect(() => {
     if (currentUser) {
@@ -1011,6 +1042,34 @@ function Chat() {
     }
   }
 
+  async function handleMomentDelete() {
+    if (!deleteMomentId || deletingMomentId) return;
+    const momentId = deleteMomentId;
+    setDeletingMomentId(momentId);
+
+    try {
+      await deleteMoment(momentId);
+      const completionTimer = processingCompletionTimersRef.current.get(momentId);
+      if (completionTimer !== undefined) {
+        window.clearTimeout(completionTimer);
+        processingCompletionTimersRef.current.delete(momentId);
+      }
+      processingFailureNotifiedRef.current.delete(momentId);
+      setCompletedProcessingMoments(previous => {
+        const next = new Set(previous);
+        next.delete(momentId);
+        return next;
+      });
+      setMoments(previous => previous.filter(moment => moment.id !== momentId));
+      setDeleteMomentId(null);
+      notify('Moment deleted successfully.', 'success');
+    } catch {
+      notify('Unable to delete moment. Please try again.', 'error');
+    } finally {
+      setDeletingMomentId(null);
+    }
+  }
+
   function toggleLike(postId: string) {
     const current = moments.find(m => m.id === postId);
     if (!current || current.liked) {
@@ -1537,11 +1596,48 @@ function Chat() {
                         <div className="card-name">{isCurrentUserPost ? currentUserName : post.name}</div>
                         <div className="card-time">{post.time}</div>
                       </div>
-                      <button className="card-menu" aria-label="More">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" />
-                        </svg>
-                      </button>
+                      {isCurrentUserPost && (
+                        <div
+                          className="moment-card-menu-wrap"
+                          ref={openMomentMenuId === post.id ? momentMenuRef : undefined}
+                        >
+                          <button
+                            type="button"
+                            className={`card-menu${openMomentMenuId === post.id ? ' active' : ''}`}
+                            aria-label="More actions"
+                            aria-haspopup="menu"
+                            aria-expanded={openMomentMenuId === post.id}
+                            onClick={() => setOpenMomentMenuId(current => (
+                              current === post.id ? null : post.id
+                            ))}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" />
+                            </svg>
+                          </button>
+                          {openMomentMenuId === post.id && (
+                            <div className="moment-card-menu-popover" role="menu">
+                              <button
+                                type="button"
+                                className="moment-delete-action"
+                                role="menuitem"
+                                onClick={() => {
+                                  setOpenMomentMenuId(null);
+                                  setDeleteMomentId(post.id);
+                                }}
+                              >
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M3 6h18" />
+                                  <path d="M8 6V4h8v2" />
+                                  <path d="M19 6l-1 14H6L5 6" />
+                                  <path d="M10 11v5M14 11v5" />
+                                </svg>
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {post.text && <div className="card-text">{post.text}</div>}
                     {post.media && post.mediaType === 'image' && (
@@ -1841,6 +1937,57 @@ function Chat() {
           </div>
         </div>
       </div>
+      {deleteMomentId && (
+        <div className="moment-delete-overlay" role="presentation">
+          <button
+            type="button"
+            className="moment-delete-backdrop"
+            aria-label="Cancel deletion"
+            disabled={deletingMomentId !== null}
+            onClick={() => setDeleteMomentId(null)}
+          />
+          <div
+            className="moment-delete-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="moment-delete-title"
+            aria-describedby="moment-delete-description"
+          >
+            <div className="moment-delete-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+              </svg>
+            </div>
+            <h3 id="moment-delete-title">Delete this moment?</h3>
+            <p id="moment-delete-description">
+              This post and its uploaded media will be permanently removed.
+            </p>
+            <div className="moment-delete-actions">
+              <button
+                type="button"
+                className="moment-delete-cancel"
+                disabled={deletingMomentId !== null}
+                onClick={() => setDeleteMomentId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="moment-delete-confirm"
+                disabled={deletingMomentId !== null}
+                onClick={() => void handleMomentDelete()}
+              >
+                {deletingMomentId !== null && (
+                  <span className="moment-delete-spinner" aria-hidden="true" />
+                )}
+                {deletingMomentId !== null ? 'Deleting' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
