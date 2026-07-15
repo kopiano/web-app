@@ -1569,11 +1569,6 @@ function Chat() {
                             !completedProcessingMoments.has(post.id)
                               && post.processingProgress === 0 ? ' idle' : ''
                           }`}
-                          style={{
-                            '--moment-processing-progress': completedProcessingMoments.has(post.id)
-                              ? 100
-                              : post.processingProgress,
-                          } as React.CSSProperties}
                           role="progressbar"
                           aria-label="Video transcoding progress"
                           aria-valuemin={0}
@@ -1584,19 +1579,78 @@ function Chat() {
                               : post.processingProgress
                           }
                         >
-                          <i className="moment-video-progress-orbit" aria-hidden="true" />
-                          <span
-                            className="moment-video-progress-value"
-                            key={completedProcessingMoments.has(post.id)
-                              ? 100
-                              : post.processingProgress}
+                          <svg
+                            className="moment-video-progress-svg"
+                            viewBox="0 0 112 112"
+                            aria-hidden="true"
                           >
-                            <b>
-                              {completedProcessingMoments.has(post.id)
-                                ? 100
-                                : post.processingProgress}
-                            </b>
-                            <small>%</small>
+                            <defs>
+                              <linearGradient
+                                id={`moment-progress-gradient-${post.id}`}
+                                x1="16"
+                                y1="18"
+                                x2="96"
+                                y2="94"
+                                gradientUnits="userSpaceOnUse"
+                              >
+                                <stop offset="0" stopColor="#635bff" />
+                                <stop offset="1" stopColor="#14b8a6" />
+                              </linearGradient>
+                            </defs>
+                            <circle
+                              className="moment-video-progress-track"
+                              cx="56"
+                              cy="56"
+                              r="47"
+                              pathLength="100"
+                            />
+                            <circle
+                              className="moment-video-progress-indicator"
+                              cx="56"
+                              cy="56"
+                              r="47"
+                              pathLength="100"
+                              stroke={`url(#moment-progress-gradient-${post.id})`}
+                              strokeDasharray="100"
+                              strokeDashoffset={
+                                100 - (
+                                  completedProcessingMoments.has(post.id)
+                                    ? 100
+                                    : post.processingProgress
+                                )
+                              }
+                            />
+                          </svg>
+                          <span className="moment-video-progress-value">
+                            {completedProcessingMoments.has(post.id) ? (
+                              <>
+                                <svg
+                                  className="moment-video-progress-check"
+                                  width="26"
+                                  height="26"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.4"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="m5 12 4 4L19 6" />
+                                </svg>
+                                <small className="moment-video-progress-label">Ready</small>
+                              </>
+                            ) : (
+                              <>
+                                <span className="moment-video-progress-number">
+                                  <b>{post.processingProgress}</b>
+                                  <small>%</small>
+                                </span>
+                                <small className="moment-video-progress-label">
+                                  {post.processingProgress > 0 ? 'Encoding' : 'Queued'}
+                                </small>
+                              </>
+                            )}
                           </span>
                         </div>
                         <div className="moment-video-processing-content">
