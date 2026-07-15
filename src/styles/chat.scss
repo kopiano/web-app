@@ -1223,7 +1223,8 @@ $chat-margin-left: 100px;
     border: none;
     display: grid;
     place-items: center;
-    background: rgba(255, 255, 255, 0.25);
+    // background: rgba(255, 255, 255, 0.25);
+    background: transparent;
     cursor: pointer;
     color: rgba(0, 0, 0, 0.45);
     transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
@@ -1233,6 +1234,28 @@ $chat-margin-left: 100px;
     background: rgba(255, 255, 255, 0.5);
     color: rgba(0, 0, 0, 0.75);
     transform: scale(1.12);
+}
+
+.moment-tool-btn.media-image:hover {
+    color: #087f8c;
+    background: rgba(8, 127, 140, 0.1);
+}
+
+.moment-tool-btn.media-video:hover {
+    color: #c2415d;
+    background: rgba(194, 65, 93, 0.1);
+}
+
+.moment-tool-btn svg {
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.moment-tool-btn.media-image:hover svg {
+    transform: rotate(-3deg) scale(1.06);
+}
+
+.moment-tool-btn.media-video:hover svg {
+    transform: translateY(-1px) scale(1.06);
 }
 
 .moment-submit {
@@ -1246,16 +1269,37 @@ $chat-margin-left: 100px;
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 112px;
     transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
 }
 
-.moment-submit:hover {
+.moment-submit:hover:not(:disabled) {
     transform: translateY(-1px) scale(1.03);
     box-shadow: 0 6px 24px rgba(139, 92, 246, 0.3);
 }
 
 .moment-submit:active {
     transform: scale(0.95);
+}
+
+.moment-submit:disabled {
+    cursor: default;
+    opacity: 0.48;
+    box-shadow: none;
+    transform: none;
+}
+
+.moment-submit-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: chat-loading-spin 0.7s linear infinite;
 }
 
 .moment-preview {
@@ -1265,6 +1309,176 @@ $chat-margin-left: 100px;
     object-fit: cover;
     margin-bottom: 12px;
     margin-top: 20px;
+}
+
+.moment-upload-progress {
+    position: relative;
+    margin: 16px 2px 6px;
+    padding: 14px 16px 13px;
+    overflow: hidden;
+    border: 1px solid rgba(15, 20, 25, 0.09);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.38);
+    box-shadow: 0 10px 26px rgba(15, 20, 25, 0.055);
+    animation: moment-upload-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+}
+
+.moment-upload-progress.complete {
+    border-color: rgba(34, 160, 107, 0.24);
+    background: rgba(34, 160, 107, 0.055);
+    box-shadow: 0 10px 28px rgba(34, 160, 107, 0.08);
+}
+
+.moment-upload-heading,
+.moment-upload-size,
+.moment-upload-meta {
+    display: flex;
+    align-items: center;
+}
+
+.moment-upload-heading {
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 7px;
+    color: rgb(15, 20, 25);
+}
+
+.moment-upload-title {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 650;
+}
+
+.moment-upload-heading strong {
+    flex: 0 0 auto;
+    color: #167a54;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.moment-upload-icon {
+    width: 26px;
+    height: 26px;
+    flex: 0 0 26px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: #167a54;
+    background: rgba(34, 160, 107, 0.11);
+}
+
+.moment-upload-progress:not(.complete) .moment-upload-icon svg {
+    animation: moment-upload-icon 1.15s ease-in-out infinite;
+}
+
+.moment-upload-size {
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 9px;
+    color: rgb(83, 100, 113);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.moment-upload-size span:last-child {
+    min-width: 0;
+    max-width: 52%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.moment-upload-track {
+    position: relative;
+    width: 100%;
+    height: 7px;
+    overflow: hidden;
+    border-radius: 4px;
+    background: rgba(15, 20, 25, 0.1);
+    box-shadow: inset 0 1px 2px rgba(15, 20, 25, 0.09);
+}
+
+.moment-upload-fill {
+    position: relative;
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #22a06b;
+    box-shadow: 0 0 12px rgba(34, 160, 107, 0.3);
+    transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.moment-upload-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 42%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.48), transparent);
+    animation: moment-upload-shimmer 1.45s ease-in-out infinite;
+}
+
+.moment-upload-fill i {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    width: 9px;
+    height: 9px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    background: #22a06b;
+    box-shadow: 0 0 0 3px rgba(34, 160, 107, 0.17);
+    transform: translate(35%, -50%);
+    animation: moment-upload-pulse 1.35s ease-out infinite;
+}
+
+.moment-upload-progress.complete .moment-upload-fill::after,
+.moment-upload-progress.complete .moment-upload-fill i {
+    animation: none;
+}
+
+.moment-upload-meta {
+    min-height: 17px;
+    gap: 7px;
+    margin-top: 8px;
+    color: rgba(15, 20, 25, 0.58);
+    font-size: 11px;
+    font-weight: 550;
+    font-variant-numeric: tabular-nums;
+}
+
+.moment-upload-meta i {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: rgba(15, 20, 25, 0.3);
+}
+
+.moment-upload-progress.complete .moment-upload-meta {
+    color: #167a54;
+}
+
+@keyframes moment-upload-enter {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes moment-upload-icon {
+    0%, 100% { transform: translateY(1px); }
+    50% { transform: translateY(-2px); }
+}
+
+@keyframes moment-upload-shimmer {
+    from { transform: translateX(-110%); }
+    to { transform: translateX(260%); }
+}
+
+@keyframes moment-upload-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(34, 160, 107, 0.36); }
+    75%, 100% { box-shadow: 0 0 0 7px rgba(34, 160, 107, 0); }
 }
 
 /* ===== Moment Card ===== */
@@ -1364,12 +1578,109 @@ $chat-margin-left: 100px;
     position: relative;
 }
 
+.video-media-wrap,
+.moment-video-status.video-layout {
+    width: 680px;
+    max-width: 100%;
+    max-height: 680px;
+}
+
+.moment-video-status.video-layout {
+    min-height: 0;
+}
+
+.moment-video-status {
+    min-height: 148px;
+    margin-bottom: 4px;
+    padding: 24px;
+    border: 1px solid rgba(15, 20, 25, 0.1);
+    border-radius: 20px;
+    background: rgba(15, 20, 25, 0.045);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    color: rgb(15, 20, 25);
+}
+
+.moment-video-status > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.moment-video-status strong {
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.moment-video-status span {
+    color: rgb(83, 100, 113);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.moment-video-status-spinner {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    border: 2px solid rgba(15, 20, 25, 0.15);
+    border-top-color: #22a06b;
+    border-radius: 50%;
+    animation: chat-loading-spin 0.75s linear infinite;
+}
+
+.moment-video-status.failed {
+    justify-content: flex-start;
+    min-height: 96px;
+    border-color: rgba(210, 45, 45, 0.2);
+    background: rgba(210, 45, 45, 0.06);
+}
+
+.moment-video-status.failed strong {
+    color: #b42318;
+}
+
+.hls-video {
+    position: relative;
+    width: 100%;
+    max-height: 680px;
+    background: #050505;
+}
+
+.hls-video video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-height: 680px;
+    object-fit: contain;
+}
+
+.hls-video-error {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    color: rgba(255, 255, 255, 0.82);
+    background: rgba(0, 0, 0, 0.78);
+    font-size: 13px;
+    font-weight: 600;
+}
+
 .card-media {
     width: 100%;
     max-height: 300px;
     border-radius: 20px;
     object-fit: cover;
     display: block;
+}
+
+.video-media-wrap .card-media {
+    height: 100%;
+    max-height: 680px;
+    border-radius: 0;
+    object-fit: contain;
 }
 
 /* ===== Card Actions (all left) ===== */
@@ -1755,6 +2066,26 @@ $chat-margin-left: 100px;
     color: rgba(0, 0, 0, 0.3);
     font-size: 1.4rem;
     font-weight: 500;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+
+.moments-loading {
+    min-height: 180px;
+    display: grid;
+    place-items: center;
+}
+
+.moments-retry {
+    border: 0;
+    border-radius: 6px;
+    padding: 8px 18px;
+    background: rgba(15, 20, 25, 0.9);
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
 }
 
 .hidden {

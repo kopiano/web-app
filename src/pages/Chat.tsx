@@ -2,12 +2,15 @@ import { Fragment, useState, useRef, useEffect, useLayoutEffect, useMemo } from 
 import { useDispatch, useSelector } from 'react-redux';
 import { resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar';
 import { getMessageHistory, sendImageMessage, sendMessage } from '@/api/chat';
+import { createMoment, getMoment, getMoments } from '@/api/moment';
+import HlsVideo from '@/components/HlsVideo';
 import type {
   ChatApiMessage,
   ChatMessageEvent,
   SendImageMessageInput,
   SendMessageInput,
 } from '@/api/chat';
+import type { MomentApiItem, MomentUploadProgress } from '@/api/moment';
 import type { RootState, AppDispatch } from '@/store/store';
 import { refreshContacts, updateContactPreview } from '@/store/chatSlice';
 import '@/styles/chat.scss';
@@ -45,19 +48,26 @@ interface Comment {
 }
 
 interface MomentPost {
-  id: number;
+  id: string;
   authorId?: string;
   name: string;
   avatar: string;
   text: string;
   media?: string;
   mediaType?: 'image' | 'video';
+  poster?: string;
+  mediaWidth?: number;
+  mediaHeight?: number;
+  processingStatus: 'processing' | 'ready' | 'failed';
+  processingError?: string;
   time: string;
   likes: number;
   liked: boolean;
   views: number;
   comments: Comment[];
 }
+
+type NotificationType = 'success' | 'warning' | 'error';
 
 const EMOJIS = [
   '😀','😃','😄','😁','😆','😅','😂','🤣',
@@ -70,6 +80,7 @@ const EMOJIS = [
 ];
 
 const ACTIVE_CONTACT_KEY = 'chat_active_contact';
+const ACTIVE_TAB_KEY = 'chat_tab';
 const WEBSOCKET_HEARTBEAT_INTERVAL_MS = 25_000;
 const CONTACT_PRESENCE_REFRESH_INTERVAL_MS = 30_000;
 
@@ -176,24 +187,88 @@ const mockMessages: Record<string, Message[]> = {
   ],
 };
 
-const initialMoments: MomentPost[] = [
-  {
-    id: 1, name: 'Alice', avatar: landscapeAvatar(202),
-    text: 'Golden hour never disappoints 🌇✨',
-    media: 'https://picsum.photos/seed/moment1/600/400',
-    mediaType: 'image',
-    time: '2h', likes: 5, liked: false, views: 128,
-    comments: [{ id: 1, author: 'Bob', text: 'Absolutely stunning!' }],
-  },
-  {
-    id: 2, name: 'Bob', avatar: landscapeAvatar(303),
-    text: 'Weekend hiking. The view was worth every step.',
-    media: 'https://picsum.photos/seed/moment2/600/400',
-    mediaType: 'image',
-    time: 'Yesterday', likes: 3, liked: true, views: 64,
+function momentTimeLabel(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  const elapsed = Math.max(0, now.getTime() - date.getTime());
+  const minutes = Math.floor(elapsed / 60_000);
+  const startOfDay = (input: Date) => new Date(
+    input.getFullYear(),
+    input.getMonth(),
+    input.getDate(),
+  ).getTime();
+  const dayDifference = Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000);
+
+  if (minutes < 1) return 'just now';
+  if (dayDifference === 0 && minutes < 60) return `${minutes}m`;
+  if (dayDifference === 0) return `${Math.floor(minutes / 60)}h`;
+  if (dayDifference === 1) return 'Yesterday';
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+  });
+}
+
+function momentFallbackAvatar(seed: string) {
+  const value = Array.from(seed).reduce((total, character) => total + character.charCodeAt(0), 0);
+  return landscapeAvatar(value || 1);
+}
+
+function formatUploadBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
+  const megabytes = bytes / (1024 * 1024);
+  if (megabytes >= 100) return `${Math.round(megabytes)} MB`;
+  if (megabytes >= 10) return `${megabytes.toFixed(1)} MB`;
+  return `${megabytes.toFixed(2)} MB`;
+}
+
+function formatUploadSpeed(bytesPerSecond: number) {
+  if (!Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) return 'Calculating speed';
+  if (bytesPerSecond >= 1024 * 1024) {
+    return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`;
+  }
+  return `${Math.max(1, Math.round(bytesPerSecond / 1024))} KB/s`;
+}
+
+function formatRemainingTime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '即将完成';
+  if (seconds < 60) return `剩余 ${Math.max(1, Math.ceil(seconds))} 秒`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.ceil(seconds % 60);
+  return remainingSeconds > 0
+    ? `剩余 ${minutes} 分 ${remainingSeconds} 秒`
+    : `剩余 ${minutes} 分钟`;
+}
+
+function toMomentPost(item: MomentApiItem): MomentPost {
+  const media = item.media[0];
+  return {
+    id: item.id,
+    authorId: item.user_id,
+    name: item.username,
+    avatar: resolveAvatarUrl(item.avatar) || momentFallbackAvatar(item.user_id),
+    text: item.content || '',
+    media: media ? resolveAssetUrl(media.url) : undefined,
+    mediaType: media?.type,
+    poster: media?.poster_url ? resolveAssetUrl(media.poster_url) : undefined,
+    mediaWidth: media?.width,
+    mediaHeight: media?.height,
+    processingStatus: item.processing_status || 'ready',
+    processingError: item.processing_error || undefined,
+    time: momentTimeLabel(item.created_at),
+    likes: 0,
+    liked: false,
+    views: 0,
     comments: [],
-  },
-];
+  };
+}
+
+function notify(message: string, type: NotificationType) {
+  window.dispatchEvent(new CustomEvent('app:notification', {
+    detail: { message, type },
+  }));
+}
 
 function Chat() {
   const dispatch = useDispatch<AppDispatch>();
@@ -210,7 +285,7 @@ function Chat() {
       ? `https://avatars.githubusercontent.com/u/${currentUser.github_id}?v=4`
       : landscapeAvatar(0));
   const [activeTab, setActiveTab] = useState<'chat' | 'moments'>(() => {
-    return (localStorage.getItem('chat_tab') as 'chat' | 'moments') || 'chat';
+    return localStorage.getItem(ACTIVE_TAB_KEY) === 'moments' ? 'moments' : 'chat';
   });
   const [activeContact, setActiveContact] = useState('mock:group:1');
   const [inputText, setInputText] = useState('');
@@ -218,15 +293,21 @@ function Chat() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [showMomentEmoji, setShowMomentEmoji] = useState(false);
-  const [moments, setMoments] = useState<MomentPost[]>(initialMoments);
+  const [moments, setMoments] = useState<MomentPost[]>([]);
+  const [momentsLoading, setMomentsLoading] = useState(false);
+  const [momentsInitialized, setMomentsInitialized] = useState(false);
+  const [momentsError, setMomentsError] = useState('');
+  const [momentPublishing, setMomentPublishing] = useState(false);
+  const [momentUploadProgress, setMomentUploadProgress] = useState<MomentUploadProgress | null>(null);
   const [momentText, setMomentText] = useState('');
   const [momentMedia, setMomentMedia] = useState<string | null>(null);
   const [momentMediaType, setMomentMediaType] = useState<'image' | 'video' | null>(null);
-  const [commentTexts, setCommentTexts] = useState<Record<number, string>>({});
-  const [showCommentInput, setShowCommentInput] = useState<Record<number, boolean>>({});
-  const [commentEmojiPost, setCommentEmojiPost] = useState<number | null>(null);
-  const [viewedPosts] = useState(new Set<number>());
-  const [animatingLikes, setAnimatingLikes] = useState<Set<number>>(new Set());
+  const [momentFile, setMomentFile] = useState<File | null>(null);
+  const [commentTexts, setCommentTexts] = useState<Record<string, string>>({});
+  const [showCommentInput, setShowCommentInput] = useState<Record<string, boolean>>({});
+  const [commentEmojiPost, setCommentEmojiPost] = useState<string | null>(null);
+  const [viewedPosts] = useState(new Set<string>());
+  const [animatingLikes, setAnimatingLikes] = useState<Set<string>>(new Set());
   const [activeIndicatorTop, setActiveIndicatorTop] = useState(0);
   const chatImageRef = useRef<HTMLInputElement>(null);
   const momentImageRef = useRef<HTMLInputElement>(null);
@@ -241,6 +322,7 @@ function Chat() {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const momentEmojiPickerRef = useRef<HTMLDivElement>(null);
   const commentEmojiPickerRef = useRef<HTMLDivElement>(null);
+  const processingFailureNotifiedRef = useRef(new Set<string>());
   const visibleContacts = useMemo<Contact[]>(
     () => currentUser ? remoteContacts : contacts,
     [currentUser, remoteContacts],
@@ -256,6 +338,28 @@ function Chat() {
       && !(contactsInitialized && visibleContacts.length === 0),
   );
   const momentInputRef = useRef<HTMLTextAreaElement>(null);
+  const processingMomentKey = useMemo(
+    () => moments
+      .filter(moment => moment.processingStatus === 'processing')
+      .map(moment => moment.id)
+      .sort()
+      .join(','),
+    [moments],
+  );
+
+  const loadMoments = async () => {
+    setMomentsLoading(true);
+    setMomentsError('');
+    try {
+      const data = await getMoments();
+      setMoments(data.map(toMomentPost));
+      setMomentsInitialized(true);
+    } catch {
+      setMomentsError('Unable to load moments.');
+    } finally {
+      setMomentsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!showEmoji && !showMomentEmoji && commentEmojiPost === null) return;
@@ -281,18 +385,102 @@ function Chat() {
 
   useEffect(() => {
     if (currentUser) {
-      setActiveTab('chat');
+      const savedTab = localStorage.getItem(`${ACTIVE_TAB_KEY}:${currentUser.id}`)
+        || localStorage.getItem(ACTIVE_TAB_KEY);
+      const restoredTab = savedTab === 'moments' ? 'moments' : 'chat';
+      setActiveTab(restoredTab);
       setActiveContact(localStorage.getItem(`${ACTIVE_CONTACT_KEY}:${currentUser.id}`) || '');
-      localStorage.setItem('chat_tab', 'chat');
+      localStorage.setItem(ACTIVE_TAB_KEY, restoredTab);
     } else {
       setActiveContact('mock:group:1');
     }
   }, [currentUser?.id]);
 
+  function selectTab(tab: 'chat' | 'moments') {
+    setActiveTab(tab);
+    localStorage.setItem(ACTIVE_TAB_KEY, tab);
+    if (currentUser) {
+      localStorage.setItem(`${ACTIVE_TAB_KEY}:${currentUser.id}`, tab);
+    }
+  }
+
   useEffect(() => {
     if (!authInitialized || !currentUser) return;
     dispatch(refreshContacts({ silent: remoteContacts.length > 0 }));
   }, [authInitialized, currentUser?.id, dispatch]);
+
+  useEffect(() => {
+    if (
+      !authInitialized
+      || !currentUser
+      || activeTab !== 'moments'
+      || momentsInitialized
+      || momentsLoading
+      || momentsError
+    ) {
+      return;
+    }
+    void loadMoments();
+  }, [activeTab, authInitialized, currentUser?.id, momentsInitialized, momentsLoading, momentsError]);
+
+  useEffect(() => {
+    return () => {
+      if (momentMedia?.startsWith('blob:')) URL.revokeObjectURL(momentMedia);
+    };
+  }, [momentMedia]);
+
+  useEffect(() => {
+    if (!currentUser || !processingMomentKey) return;
+
+    const momentIds = processingMomentKey.split(',');
+    let disposed = false;
+    let polling = false;
+    let intervalId: number | undefined;
+    let initialTimerId: number | undefined;
+
+    const refreshProcessingMoments = async () => {
+      if (disposed || polling) return;
+      polling = true;
+      const results = await Promise.allSettled(momentIds.map(id => getMoment(id)));
+      polling = false;
+      if (disposed) return;
+
+      const updates = new Map<string, MomentPost>();
+      results.forEach(result => {
+        if (result.status !== 'fulfilled') return;
+        const post = toMomentPost(result.value);
+        updates.set(post.id, post);
+        if (
+          post.processingStatus === 'failed'
+          && !processingFailureNotifiedRef.current.has(post.id)
+        ) {
+          processingFailureNotifiedRef.current.add(post.id);
+          notify('Video processing failed. Please publish the video again.', 'error');
+        }
+      });
+      if (updates.size > 0) {
+        setMoments(previous => previous.map(moment => {
+          const update = updates.get(moment.id);
+          if (!update) return moment;
+          return {
+            ...update,
+            likes: moment.likes,
+            liked: moment.liked,
+            views: moment.views,
+            comments: moment.comments,
+          };
+        }));
+      }
+    };
+
+    initialTimerId = window.setTimeout(() => void refreshProcessingMoments(), 1500);
+    intervalId = window.setInterval(() => void refreshProcessingMoments(), 5000);
+    return () => {
+      disposed = true;
+      window.clearTimeout(initialTimerId);
+      window.clearInterval(intervalId);
+    };
+  }, [currentUser?.id, processingMomentKey]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -715,30 +903,61 @@ function Chat() {
 
   function handleMomentFile(e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+    const expectedType = type === 'image' ? 'image/' : 'video/';
+    const maxBytes = type === 'image' ? 10 * 1024 * 1024 : 300 * 1024 * 1024;
+    if (!file.type.startsWith(expectedType)) {
+      notify(`Please select a valid ${type} file.`, 'warning');
+      return;
+    }
+    if (file.size > maxBytes) {
+      notify(`${type === 'image' ? 'Image' : 'Video'} exceeds the upload limit.`, 'warning');
+      return;
+    }
     setMomentMedia(URL.createObjectURL(file));
     setMomentMediaType(type);
+    setMomentFile(file);
   }
 
-  function handleMomentPublish() {
-    if (!momentText.trim() && !momentMedia) return;
-    setMoments(p => [{
-      id: Date.now(),
-      authorId: currentUser?.id,
-      name: currentUserName,
-      avatar: currentUserAvatar,
-      text: momentText.trim(),
-      media: momentMedia || undefined,
-      mediaType: momentMediaType || undefined,
-      time: 'just now',
-      likes: 0, liked: false, views: 0, comments: [],
-    }, ...p]);
-    setMomentText('');
-    setMomentMedia(null);
-    setMomentMediaType(null);
+  async function handleMomentPublish() {
+    if ((!momentText.trim() && !momentFile) || momentPublishing || !currentUser) return;
+    setMomentPublishing(true);
+    setMomentUploadProgress(momentFile ? {
+      percent: 0,
+      loaded: 0,
+      total: momentFile.size,
+      bytesPerSecond: 0,
+      remainingSeconds: 0,
+    } : null);
+    try {
+      const created = await createMoment({
+        content: momentText,
+        media: momentFile || undefined,
+        mediaType: momentMediaType || undefined,
+        onUploadProgress: setMomentUploadProgress,
+      });
+      setMoments(previous => [toMomentPost(created), ...previous.filter(item => item.id !== created.id)]);
+      setMomentsInitialized(true);
+      setMomentText('');
+      setMomentMedia(null);
+      setMomentMediaType(null);
+      setMomentFile(null);
+      notify(
+        created.processing_status === 'processing'
+          ? 'Video uploaded. Processing will continue in the background.'
+          : 'Moment published successfully.',
+        'success',
+      );
+    } catch {
+      notify('Unable to publish moment. Please try again.', 'error');
+    } finally {
+      setMomentPublishing(false);
+      setMomentUploadProgress(null);
+    }
   }
 
-  function toggleLike(postId: number) {
+  function toggleLike(postId: string) {
     const current = moments.find(m => m.id === postId);
     if (!current || current.liked) {
       // unlike: no animation
@@ -761,7 +980,7 @@ function Chat() {
     }, 650);
   }
 
-  function trackView(postId: number) {
+  function trackView(postId: string) {
     if (viewedPosts.has(postId)) return;
     viewedPosts.add(postId);
     setMoments(p => p.map(m =>
@@ -769,7 +988,7 @@ function Chat() {
     ));
   }
 
-  function handleCommentSubmit(postId: number) {
+  function handleCommentSubmit(postId: string) {
     const text = commentTexts[postId]?.trim();
     if (!text) return;
     setMoments(p => p.map(m =>
@@ -779,12 +998,12 @@ function Chat() {
     setCommentEmojiPost(null);
   }
 
-  function toggleCommentInput(postId: number) {
+  function toggleCommentInput(postId: string) {
     setShowCommentInput(p => ({ ...p, [postId]: !p[postId] }));
     setCommentEmojiPost(null);
   }
 
-  function pickCommentEmoji(postId: number, emoji: string) {
+  function pickCommentEmoji(postId: string, emoji: string) {
     setCommentTexts(p => ({ ...p, [postId]: `${p[postId] || ''}${emoji}` }));
     setCommentEmojiPost(null);
     setShowCommentInput(p => ({ ...p, [postId]: true }));
@@ -798,7 +1017,7 @@ function Chat() {
           <div className="chat-nav-inner">
             <button
               className={`chat-nav-btn${activeTab === 'chat' ? ' active' : ''}`}
-              onClick={() => { setActiveTab('chat'); localStorage.setItem('chat_tab', 'chat'); }}
+              onClick={() => selectTab('chat')}
               aria-label="Chat"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -807,7 +1026,7 @@ function Chat() {
             </button>
             <button
               className={`chat-nav-btn${activeTab === 'moments' ? ' active' : ''}`}
-              onClick={() => { setActiveTab('moments'); localStorage.setItem('chat_tab', 'moments'); }}
+              onClick={() => selectTab('moments')}
               aria-label="Moments"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -1093,6 +1312,64 @@ function Chat() {
                   ? <img src={momentMedia} alt="" className="moment-preview" />
                   : <video src={momentMedia} controls className="moment-preview" />
               )}
+              {momentPublishing && momentFile && momentUploadProgress !== null && (
+                <div
+                  className={`moment-upload-progress${momentUploadProgress.percent >= 100 ? ' complete' : ''}`}
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={momentUploadProgress.percent}
+                >
+                  <div className="moment-upload-heading">
+                    <div className="moment-upload-title">
+                      <span className="moment-upload-icon" aria-hidden="true">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 16V4" />
+                          <path d="m7 9 5-5 5 5" />
+                          <path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4" />
+                        </svg>
+                      </span>
+                      <span>
+                        {momentUploadProgress.percent >= 100
+                          ? 'Upload complete'
+                          : `Uploading ${momentMediaType === 'video' ? 'video' : 'image'}`}
+                      </span>
+                    </div>
+                    <strong>{momentUploadProgress.percent}%</strong>
+                  </div>
+                  <div className="moment-upload-size">
+                    <span>{formatUploadBytes(momentUploadProgress.loaded)} / {formatUploadBytes(momentUploadProgress.total)}</span>
+                    <span>{momentFile.name}</span>
+                  </div>
+                  <div className="moment-upload-track">
+                    <span
+                      className="moment-upload-fill"
+                      style={{ width: `${momentUploadProgress.percent}%` }}
+                    >
+                      <i aria-hidden="true" />
+                    </span>
+                  </div>
+                  <div className="moment-upload-meta">
+                    {momentUploadProgress.percent >= 100 ? (
+                      <span>
+                        {momentMediaType === 'video'
+                          ? '正在创建动态，视频将在后台转码'
+                          : '正在创建动态'}
+                      </span>
+                    ) : (
+                      <>
+                        <span>{formatUploadSpeed(momentUploadProgress.bytesPerSecond)}</span>
+                        <i aria-hidden="true" />
+                        <span>
+                          {momentUploadProgress.bytesPerSecond > 0
+                            ? formatRemainingTime(momentUploadProgress.remainingSeconds)
+                            : '正在计算剩余时间'}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="moment-post-bottom">
                 <div className="moment-post-tools">
                   <button className="moment-tool-btn" onClick={() => setShowMomentEmoji(p => !p)} aria-label="Add emoji">
@@ -1112,24 +1389,49 @@ function Chat() {
                       </div>
                     </div>
                   )}
-                  <button className="moment-tool-btn" onClick={() => handleMomentUpload('image')} aria-label="Image">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+                  <button className="moment-tool-btn media-image" onClick={() => handleMomentUpload('image')} aria-label="Image">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="3" />
+                      <circle cx="9" cy="9" r="2" />
+                      <path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21" />
+                      <path d="m14 14 1.1-1.1" />
                     </svg>
                   </button>
-                  <button className="moment-tool-btn" onClick={() => handleMomentUpload('video')} aria-label="Video">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                  <button className="moment-tool-btn media-video" onClick={() => handleMomentUpload('video')} aria-label="Video">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 7h18" />
+                      <path d="m7 3 3 4" />
+                      <path d="m14 3 3 4" />
+                      <rect x="3" y="3" width="18" height="18" rx="3" />
+                      <path d="m10 12 5 3-5 3Z" />
                     </svg>
                   </button>
                   <input ref={momentImageRef} type="file" accept="image/*" hidden onChange={e => handleMomentFile(e, 'image')} />
                   <input ref={videoRef} type="file" accept="video/*" hidden onChange={e => handleMomentFile(e, 'video')} />
                 </div>
-                <button className="moment-submit" onClick={handleMomentPublish}>Post</button>
+                <button
+                  className="moment-submit"
+                  disabled={momentPublishing || (!momentText.trim() && !momentFile)}
+                  onClick={handleMomentPublish}
+                >
+                  {momentPublishing && <span className="moment-submit-spinner" aria-hidden="true" />}
+                  {momentPublishing ? 'Posting' : 'Post'}
+                </button>
               </div>
             </div>
 
-            {moments.length === 0 ? (
+            {momentsLoading && !momentsInitialized ? (
+              <div className="moments-loading" role="status" aria-label="Loading moments">
+                <span className="chat-loading-spinner" aria-hidden="true" />
+              </div>
+            ) : momentsError ? (
+              <div className="moment-empty" role="alert">
+                <span>{momentsError}</span>
+                <button type="button" className="moments-retry" onClick={() => void loadMoments()}>
+                  Retry
+                </button>
+              </div>
+            ) : moments.length === 0 ? (
               <div className="moment-empty">No moments yet</div>
             ) : (
               moments.map((post, idx) => {
@@ -1157,9 +1459,40 @@ function Chat() {
                         <img src={post.media} alt="" className="card-media" />
                       </div>
                     )}
-                    {post.media && post.mediaType === 'video' && (
-                      <div className="card-media-wrap">
-                        <video src={post.media} controls className="card-media" />
+                    {post.mediaType === 'video' && post.processingStatus === 'processing' && (
+                      <div
+                        className="moment-video-status video-layout"
+                        style={{
+                          aspectRatio: post.mediaWidth && post.mediaHeight
+                            ? `${post.mediaWidth} / ${post.mediaHeight}`
+                            : '16 / 9',
+                        }}
+                        role="status"
+                      >
+                        <span className="moment-video-status-spinner" aria-hidden="true" />
+                        <div>
+                          <strong>Processing video</strong>
+                          <span>The moment is published. Video playback will appear automatically.</span>
+                        </div>
+                      </div>
+                    )}
+                    {post.mediaType === 'video' && post.processingStatus === 'failed' && (
+                      <div className="moment-video-status failed" role="alert">
+                        <div>
+                          <strong>Video processing failed</strong>
+                          <span>{post.processingError || 'Please publish the video again.'}</span>
+                        </div>
+                      </div>
+                    )}
+                    {post.media && post.mediaType === 'video' && post.processingStatus === 'ready' && (
+                      <div className="card-media-wrap video-media-wrap">
+                        <HlsVideo
+                          src={post.media}
+                          poster={post.poster}
+                          width={post.mediaWidth}
+                          height={post.mediaHeight}
+                          className="card-media"
+                        />
                       </div>
                     )}
                     <div className="card-actions">
