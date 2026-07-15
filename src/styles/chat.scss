@@ -573,6 +573,7 @@ $chat-margin-left: 100px;
 
 .msg-status-label {
     white-space: nowrap;
+    color: rgba(30, 41, 59, 0.9);
 }
 
 .msg-retry-btn {
@@ -705,6 +706,42 @@ $chat-margin-left: 100px;
     border-radius: 2rem;
 }
 
+.msg.image-message {
+    padding: 0;
+    overflow: hidden;
+    border-radius: 12px;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.msg-wrap:hover .msg.image-message {
+    box-shadow: none;
+}
+
+.chat-message-image-link {
+    display: block;
+    border-radius: 9px;
+    overflow: hidden;
+    line-height: 0;
+}
+
+.chat-message-image {
+    display: block;
+    width: 300px;
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+    background: transparent;
+    transition: transform 0.25s ease, filter 0.25s ease;
+}
+
+.chat-message-image-link:hover .chat-message-image {
+//     transform: scale(1.015);
+//     filter: saturate(1.04);
+}
+
 .msg-text {
     margin-bottom: 3px;
     font-size: 14px;
@@ -756,16 +793,13 @@ $chat-margin-left: 100px;
 }
 
 .msg-wrap.sent .msg-time {
-    color: rgba(255, 255, 255, 0.72);
+    color: rgba(30, 41, 59, 0.9);
 }
 
 .msg-wrap:hover .msg-time {
     color: rgba(30, 41, 59, 0.9);
 }
 
-.msg-wrap.sent:hover .msg-time {
-    color: rgba(255, 255, 255, 0.92);
-}
 
 @keyframes message-char-in {
     from {

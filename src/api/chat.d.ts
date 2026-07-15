@@ -26,6 +26,14 @@ export interface SendMessageInput {
   client_message_id: string;
 }
 
+export interface SendImageMessageInput {
+  chat_type: 'private' | 'public';
+  receiver_id?: string;
+  group_id?: string;
+  client_message_id: string;
+  image: File;
+}
+
 export interface ChatApiMessage {
   id: number;
   conversation_id: string;
@@ -57,4 +65,5 @@ export interface MessageHistoryQuery {
 
 export function getMessageUserInfo(): Promise<ChatApiContact[]>;
 export function sendMessage(input: SendMessageInput): Promise<ChatApiMessage>;
+export function sendImageMessage(input: SendImageMessageInput): Promise<ChatApiMessage>;
 export function getMessageHistory(query: MessageHistoryQuery): Promise<ChatApiMessage[]>;

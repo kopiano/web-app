@@ -1,8 +1,13 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { resolveAvatarUrl } from '@/lib/avatar';
-import { getMessageHistory, sendMessage } from '@/api/chat';
-import type { ChatApiMessage, ChatMessageEvent, SendMessageInput } from '@/api/chat';
+import { resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar';
+import { getMessageHistory, sendImageMessage, sendMessage } from '@/api/chat';
+import type {
+  ChatApiMessage,
+  ChatMessageEvent,
+  SendImageMessageInput,
+  SendMessageInput,
+} from '@/api/chat';
 import type { RootState, AppDispatch } from '@/store/store';
 import { refreshContacts, updateContactPreview } from '@/store/chatSlice';
 import '@/styles/chat.scss';
@@ -27,6 +32,9 @@ interface Message {
   status?: 'sending' | 'sent' | 'failed';
   clientMessageId?: string;
   sendRequest?: SendMessageInput;
+  sendImageRequest?: SendImageMessageInput;
+  imageUrl?: string;
+  imageName?: string;
   createdAt?: string;
 }
 
@@ -89,10 +97,13 @@ function contactIdFromConversation(conversationId: string) {
 }
 
 function toUiMessage(message: ChatApiMessage, userId: string): Message | null {
-  if (!message.content) return null;
+  const imageUrl = message.message_type === 2
+    ? resolveAssetUrl(message.file_url)
+    : '';
+  if (!message.content && !imageUrl) return null;
   return {
     id: message.id,
-    text: message.content,
+    text: message.content || message.file_name || 'Photo',
     from: message.send_id === userId ? 'me' : 'them',
     time: new Date(message.created_at).toLocaleTimeString('en-US', {
       hour: '2-digit',
@@ -100,6 +111,8 @@ function toUiMessage(message: ChatApiMessage, userId: string): Message | null {
     }),
     status: message.status === 'sent' ? 'sent' : undefined,
     clientMessageId: message.client_message_id || undefined,
+    imageUrl: imageUrl || undefined,
+    imageName: message.file_name || undefined,
     createdAt: message.created_at,
   };
 }
@@ -213,13 +226,15 @@ function Chat() {
   const [viewedPosts] = useState(new Set<number>());
   const [animatingLikes, setAnimatingLikes] = useState<Set<number>>(new Set());
   const [activeIndicatorTop, setActiveIndicatorTop] = useState(0);
-  const imageRef = useRef<HTMLInputElement>(null);
+  const chatImageRef = useRef<HTMLInputElement>(null);
+  const momentImageRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const msgListRef = useRef<HTMLDivElement>(null);
   const msgEndRef = useRef<HTMLDivElement>(null);
   const lastScrolledConversationRef = useRef('');
   const wasHistoryLoadingRef = useRef(false);
+  const imagePreviewUrlsRef = useRef(new Set<string>());
   const contactsPanelRef = useRef<HTMLElement>(null);
   const visibleContacts = useMemo<Contact[]>(
     () => currentUser ? remoteContacts : contacts,
@@ -473,6 +488,13 @@ function Chat() {
   }, [momentText]);
 
   useEffect(() => {
+    return () => {
+      imagePreviewUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      imagePreviewUrlsRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     const panel = contactsPanelRef.current;
     const activeItem = panel?.querySelector<HTMLElement>('.contact-item.active');
     if (activeItem) setActiveIndicatorTop(activeItem.offsetTop);
@@ -497,6 +519,39 @@ function Chat() {
             : message
         ),
       }));
+    } catch {
+      setMessages(previous => ({
+        ...previous,
+        [conversationId]: (previous[conversationId] || []).map(message =>
+          message.id === temporaryId ? { ...message, status: 'failed' } : message
+        ),
+      }));
+    }
+  }
+
+  async function persistImageMessage(
+    conversationId: string,
+    temporaryId: string,
+    request: SendImageMessageInput,
+    previewUrl: string,
+    userId: string,
+  ) {
+    try {
+      const persisted = await sendImageMessage(request);
+      const persistedMessage = toUiMessage(persisted, userId);
+      if (!persistedMessage?.imageUrl) throw new Error('Image message response has no image');
+      setMessages(previous => ({
+        ...previous,
+        [conversationId]: (previous[conversationId] || []).map(message =>
+          message.id === temporaryId || message.clientMessageId === request.client_message_id
+            ? { ...persistedMessage, id: persisted.id, status: 'sent' }
+            : message
+        ),
+      }));
+      window.setTimeout(() => {
+        URL.revokeObjectURL(previewUrl);
+        imagePreviewUrlsRef.current.delete(previewUrl);
+      }, 0);
     } catch {
       setMessages(previous => ({
         ...previous,
@@ -534,14 +589,24 @@ function Chat() {
   }
 
   async function retryMessage(message: Message) {
-    if (!message.sendRequest || message.status !== 'failed' || !activeConversationId || !currentUser) return;
+    if (message.status !== 'failed' || !activeConversationId || !currentUser) return;
     setMessages(previous => ({
       ...previous,
       [activeConversationId]: (previous[activeConversationId] || []).map(item =>
         item.id === message.id ? { ...item, status: 'sending' } : item
       ),
     }));
-    await persistMessage(activeConversationId, String(message.id), message.sendRequest, currentUser.id);
+    if (message.sendImageRequest && message.imageUrl) {
+      await persistImageMessage(
+        activeConversationId,
+        String(message.id),
+        message.sendImageRequest,
+        message.imageUrl,
+        currentUser.id,
+      );
+    } else if (message.sendRequest) {
+      await persistMessage(activeConversationId, String(message.id), message.sendRequest, currentUser.id);
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -574,22 +639,38 @@ function Chat() {
     e.target.value = '';
   }
 
-  function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
+  async function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
-    if (!f || !activeConversationId) return;
+    e.target.value = '';
+    if (!f || !f.type.startsWith('image/') || !activeConversationId || !activeContactInfo || !currentUser) return;
+    const temporaryId = `local:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    const conversationId = activeConversationId;
+    const contactId = contactIdFromConversation(conversationId);
+    const clientMessageId = crypto.randomUUID();
+    const previewUrl = URL.createObjectURL(f);
+    imagePreviewUrlsRef.current.add(previewUrl);
+    const request: SendImageMessageInput = activeContactInfo.type === 'group'
+      ? { chat_type: 'public', group_id: contactId, client_message_id: clientMessageId, image: f }
+      : { chat_type: 'private', receiver_id: contactId, client_message_id: clientMessageId, image: f };
     const newMsg: Message = {
-      id: Date.now(),
-      text: `📷 ${f.name}`,
+      id: temporaryId,
+      text: f.name,
       from: 'me',
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      status: 'sending',
+      clientMessageId,
+      sendImageRequest: request,
+      imageUrl: previewUrl,
+      imageName: f.name,
     };
-    setMessages(p => ({ ...p, [activeConversationId]: [...(p[activeConversationId] || []), newMsg] }));
-    e.target.value = '';
+    setMessages(p => ({ ...p, [conversationId]: [...(p[conversationId] || []), newMsg] }));
+
+    await persistImageMessage(conversationId, temporaryId, request, previewUrl, currentUser.id);
   }
 
   /* ── Moments ── */
   function handleMomentUpload(type: 'image' | 'video') {
-    if (type === 'image') imageRef.current?.click();
+    if (type === 'image') momentImageRef.current?.click();
     else videoRef.current?.click();
   }
 
@@ -814,7 +895,23 @@ function Chat() {
                         </div>
                       </div>
                       <div className="msg-content">
-                        <div className={`msg ${msg.from === 'me' ? 'sent' : 'received'}`}>
+                        <div className={`msg ${msg.from === 'me' ? 'sent' : 'received'}${msg.imageUrl ? ' image-message' : ''}`}>
+                          {msg.imageUrl && (
+                            <a
+                              className="chat-message-image-link"
+                              href={msg.imageUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={`Open image ${msg.imageName || ''}`.trim()}
+                            >
+                              <img
+                                className="chat-message-image"
+                                src={msg.imageUrl}
+                                alt={msg.imageName || 'Shared image'}
+                              />
+                            </a>
+                          )}
+                          {!msg.imageUrl && (
                           <div className={`msg-text${msgIndex === contactMessages.length - 1 ? ' typing-text' : ''}`}>
                             {msgIndex === contactMessages.length - 1 ? (
                               Array.from(msg.text).map((char, charIndex) => (
@@ -828,6 +925,7 @@ function Chat() {
                               ))
                             ) : msg.text}
                           </div>
+                          )}
                         </div>
                         <div className="msg-time">
                           {msg.time}
@@ -872,7 +970,7 @@ function Chat() {
                                       : 'Failed'}
                                 </span>
                               </span>
-                              {msg.status === 'failed' && msg.sendRequest && (
+                              {msg.status === 'failed' && (msg.sendRequest || msg.sendImageRequest) && (
                                 <button
                                   type="button"
                                   className="msg-retry-btn"
@@ -909,12 +1007,12 @@ function Chat() {
                       </div>
                     )}
                   </div>
-                  <button className="input-tool-btn" onClick={() => imageRef.current?.click()} title="Image">
+                  <button className="input-tool-btn" onClick={() => chatImageRef.current?.click()} title="Image">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
                     </svg>
                   </button>
-                  <input ref={imageRef} type="file" accept="image/*" hidden onChange={pickImage} />
+                  <input ref={chatImageRef} type="file" accept="image/*" hidden onChange={pickImage} />
                   <button className="input-tool-btn" onClick={() => fileRef.current?.click()} title="File">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
@@ -979,7 +1077,7 @@ function Chat() {
                       <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                     </svg>
                   </button>
-                  <input ref={imageRef} type="file" accept="image/*" hidden onChange={e => handleMomentFile(e, 'image')} />
+                  <input ref={momentImageRef} type="file" accept="image/*" hidden onChange={e => handleMomentFile(e, 'image')} />
                   <input ref={videoRef} type="file" accept="video/*" hidden onChange={e => handleMomentFile(e, 'video')} />
                 </div>
                 <button className="moment-submit" onClick={handleMomentPublish}>Post</button>
