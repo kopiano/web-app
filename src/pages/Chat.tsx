@@ -272,6 +272,24 @@ function notify(message: string, type: NotificationType) {
   }));
 }
 
+function insertAtSelection(
+  input: HTMLInputElement | HTMLTextAreaElement | null,
+  currentValue: string,
+  value: string,
+  updateValue: (nextValue: string) => void,
+) {
+  const selectionStart = input?.selectionStart ?? currentValue.length;
+  const selectionEnd = input?.selectionEnd ?? selectionStart;
+  const nextValue = `${currentValue.slice(0, selectionStart)}${value}${currentValue.slice(selectionEnd)}`;
+  const nextCursorPosition = selectionStart + value.length;
+
+  updateValue(nextValue);
+  window.requestAnimationFrame(() => {
+    input?.focus();
+    input?.setSelectionRange(nextCursorPosition, nextCursorPosition);
+  });
+}
+
 function Chat() {
   const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((state: RootState) => state.auth.user);
@@ -327,6 +345,8 @@ function Chat() {
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const momentEmojiPickerRef = useRef<HTMLDivElement>(null);
   const commentEmojiPickerRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  const commentInputRefs = useRef(new Map<string, HTMLInputElement>());
   const processingFailureNotifiedRef = useRef(new Set<string>());
   const processingCompletionTimersRef = useRef(new Map<string, number>());
   const visibleContacts = useMemo<Contact[]>(
@@ -873,12 +893,12 @@ function Chat() {
   }
 
   function pickEmoji(emoji: string) {
-    setInputText(p => p + emoji);
+    insertAtSelection(chatInputRef.current, inputText, emoji, setInputText);
     setShowEmoji(false);
   }
 
   function pickMomentEmoji(emoji: string) {
-    setMomentText(p => p + emoji);
+    insertAtSelection(momentInputRef.current, momentText, emoji, setMomentText);
     setShowMomentEmoji(false);
   }
 
@@ -1038,7 +1058,13 @@ function Chat() {
   }
 
   function pickCommentEmoji(postId: string, emoji: string) {
-    setCommentTexts(p => ({ ...p, [postId]: `${p[postId] || ''}${emoji}` }));
+    const currentText = commentTexts[postId] || '';
+    insertAtSelection(
+      commentInputRefs.current.get(postId) || null,
+      currentText,
+      emoji,
+      nextText => setCommentTexts(p => ({ ...p, [postId]: nextText })),
+    );
     setCommentEmojiPost(null);
     setShowCommentInput(p => ({ ...p, [postId]: true }));
   }
@@ -1292,7 +1318,13 @@ function Chat() {
               <div className="msg-input-bar">
                 <div className="msg-input-inner">
                   <div className="relative">
-                    <button className="input-tool-btn" onClick={() => setShowEmoji(!showEmoji)} aria-label="Emoji">
+                    <button
+                      type="button"
+                      className="input-tool-btn"
+                      onPointerDown={event => event.preventDefault()}
+                      onClick={() => setShowEmoji(!showEmoji)}
+                      aria-label="Emoji"
+                    >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" />
                       </svg>
@@ -1300,7 +1332,17 @@ function Chat() {
                     {showEmoji && (
                       <div ref={emojiPickerRef} className="emoji-picker">
                         <div className="emoji-grid">
-                          {EMOJIS.map(e => (<button key={e} className="emoji-btn" onClick={() => pickEmoji(e)}>{e}</button>))}
+                          {EMOJIS.map(e => (
+                            <button
+                              key={e}
+                              type="button"
+                              className="emoji-btn"
+                              onPointerDown={event => event.preventDefault()}
+                              onClick={() => pickEmoji(e)}
+                            >
+                              {e}
+                            </button>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -1317,7 +1359,7 @@ function Chat() {
                     </svg>
                   </button>
                   <input ref={fileRef} type="file" hidden onChange={pickFile} />
-                  <input className="msg-text-input" type="text" placeholder="Message..." value={inputText}
+                  <input ref={chatInputRef} className="msg-text-input" type="text" placeholder="Message..." value={inputText}
                     onChange={e => setInputText(e.target.value)} onKeyDown={handleKeyDown} />
                   <button className="msg-send-btn" disabled={!inputText.trim()} onClick={handleSend}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1406,7 +1448,13 @@ function Chat() {
               )}
               <div className="moment-post-bottom">
                 <div className="moment-post-tools">
-                  <button className="moment-tool-btn" onClick={() => setShowMomentEmoji(p => !p)} aria-label="Add emoji">
+                  <button
+                    type="button"
+                    className="moment-tool-btn"
+                    onPointerDown={event => event.preventDefault()}
+                    onClick={() => setShowMomentEmoji(p => !p)}
+                    aria-label="Add emoji"
+                  >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10" />
                       <path d="M8 14s1.5 2 4 2 4-2 4-2" />
@@ -1418,7 +1466,15 @@ function Chat() {
                     <div ref={momentEmojiPickerRef} className="emoji-picker moment-emoji-picker">
                       <div className="emoji-grid">
                         {EMOJIS.map(e => (
-                          <button key={e} className="emoji-btn" onClick={() => pickMomentEmoji(e)}>{e}</button>
+                          <button
+                            key={e}
+                            type="button"
+                            className="emoji-btn"
+                            onPointerDown={event => event.preventDefault()}
+                            onClick={() => pickMomentEmoji(e)}
+                          >
+                            {e}
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -1666,7 +1722,9 @@ function Chat() {
                         <div className="comment-input-row">
                           <div className="comment-emoji-wrap">
                             <button
+                              type="button"
                               className="comment-emoji-btn"
+                              onPointerDown={event => event.preventDefault()}
                               onClick={() => {
                                 setCommentEmojiPost(p => p === post.id ? null : post.id);
                                 setShowCommentInput(p => ({ ...p, [post.id]: true }));
@@ -1684,13 +1742,27 @@ function Chat() {
                               <div ref={commentEmojiPickerRef} className="emoji-picker comment-emoji-picker">
                                 <div className="emoji-grid">
                                   {EMOJIS.map(e => (
-                                    <button key={e} className="emoji-btn" onClick={() => pickCommentEmoji(post.id, e)}>{e}</button>
+                                    <button
+                                      key={e}
+                                      type="button"
+                                      className="emoji-btn"
+                                      onPointerDown={event => event.preventDefault()}
+                                      onClick={() => pickCommentEmoji(post.id, e)}
+                                    >
+                                      {e}
+                                    </button>
                                   ))}
                                 </div>
                               </div>
                             )}
                           </div>
-                          <input className="comment-input" type="text"
+                          <input
+                            ref={node => {
+                              if (node) commentInputRefs.current.set(post.id, node);
+                              else commentInputRefs.current.delete(post.id);
+                            }}
+                            className="comment-input"
+                            type="text"
                             placeholder="Write a comment..."
                             value={commentTexts[post.id] || ''}
                             onChange={e => setCommentTexts(p => ({ ...p, [post.id]: e.target.value }))}
