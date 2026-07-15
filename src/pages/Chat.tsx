@@ -106,7 +106,10 @@ const initialMoments: MomentPost[] = [
 function Chat() {
   const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  const authInitialized = useSelector((state: RootState) => state.auth.initialized);
   const remoteContacts = useSelector((state: RootState) => state.chat.contacts);
+  const contactsLoading = useSelector((state: RootState) => state.chat.loading);
+  const contactsError = useSelector((state: RootState) => state.chat.error);
   const currentUserName = currentUser?.name || currentUser?.username || 'You';
   const currentUserAvatar = currentUser?.avatar
     || (currentUser?.github_id
@@ -136,7 +139,7 @@ function Chat() {
   const msgEndRef = useRef<HTMLDivElement>(null);
   const contactsPanelRef = useRef<HTMLElement>(null);
   const visibleContacts = useMemo<Contact[]>(
-    () => currentUser ? remoteContacts : contacts,
+    () => remoteContacts.length > 0 ? remoteContacts : (currentUser ? [] : contacts),
     [currentUser?.id, remoteContacts],
   );
   const activeContactInfo = useMemo(
@@ -148,9 +151,9 @@ function Chat() {
   const momentInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!authInitialized || !currentUser) return;
     dispatch(refreshContacts({ silent: remoteContacts.length > 0 }));
-  }, [currentUser?.id, dispatch]);
+  }, [authInitialized, currentUser?.id, dispatch]);
 
   useEffect(() => {
     const refresh = () => {
@@ -390,6 +393,26 @@ function Chat() {
                   <div className="contact-time">{c.time}</div>
                 </div>
               ))}
+              {currentUser && visibleContacts.length === 0 && (
+                <div className="contacts-state" role={contactsError ? 'alert' : 'status'}>
+                  <span>
+                    {contactsLoading
+                      ? 'Loading contacts...'
+                      : contactsError
+                        ? 'Unable to load contacts.'
+                        : 'No contacts yet.'}
+                  </span>
+                  {contactsError && (
+                    <button
+                      type="button"
+                      className="contacts-retry"
+                      onClick={() => dispatch(refreshContacts())}
+                    >
+                      Retry
+                    </button>
+                  )}
+                </div>
+              )}
             </aside>
 
             <div className="panel-divider" />

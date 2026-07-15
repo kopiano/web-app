@@ -80,6 +80,8 @@ const authSlice = createSlice({
         state.loading = false;
         state.initialized = true;
         if (action.payload === 'unauthorized') {
+          // The HttpOnly Cookie is the source of truth. Do not keep a stale
+          // cached profile after the server rejects the session.
           state.user = null;
           sessionStorage.removeItem('auth_user');
         }

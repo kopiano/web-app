@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit'
-import { getMessageUserInfo } from '@/api/message'
+import { getMessageUserInfo } from '@/api/chat'
 
 export interface ChatContact {
   id: string
@@ -56,9 +56,8 @@ function readCache(): ChatContact[] {
 const cachedContacts = readCache()
 
 function conversationId(contact: ApiContact) {
-  return contact.chat_type === 'public'
-    ? `group:${contact.group_id}`
-    : `user:${contact.user_id}`
+  const contactId = contact.chat_type === 'public' ? contact.group_id : contact.user_id
+  return contactId ? `${contact.chat_type === 'public' ? 'group' : 'user'}:${contactId}` : null
 }
 
 function fallbackAvatar(contact: ApiContact) {
@@ -66,9 +65,12 @@ function fallbackAvatar(contact: ApiContact) {
   return `https://picsum.photos/seed/contact-${encodeURIComponent(seed)}/100/100`
 }
 
-function formatContact(contact: ApiContact): ChatContact {
+function formatContact(contact: ApiContact): ChatContact | null {
+  const id = conversationId(contact)
+  if (!id || !contact.username.trim()) return null
+
   return {
-    id: conversationId(contact),
+    id,
     name: contact.username,
     type: contact.chat_type === 'public' ? 'group' : 'user',
     avatar: contact.avatar || fallbackAvatar(contact),
@@ -106,17 +108,18 @@ const initialState: ChatState = {
 export const refreshContacts = createAsyncThunk<
   ChatContact[],
   { silent?: boolean } | undefined,
-  { state: { auth: { user: unknown }; chat: ChatState } }
+  { state: { chat: ChatState } }
 >(
   'chat/refreshContacts',
   async () => {
-    const response = await getMessageUserInfo()
-    return (response.data as ApiContact[]).map(formatContact)
+    const apiContacts = await getMessageUserInfo()
+    return apiContacts
+      .map(formatContact)
+      .filter((contact): contact is ChatContact => contact !== null)
   },
   {
     condition: ({ silent = false } = {}, { getState }) => {
       const state = getState()
-      if (!state.auth.user) return false
       if (state.chat.refreshing) return false
       if (silent && state.chat.lastFetchedAt && Date.now() - state.chat.lastFetchedAt < REFRESH_THROTTLE_MS) {
         return false
@@ -153,7 +156,7 @@ const chatSlice = createSlice({
         state.error = null
       })
       .addCase(refreshContacts.fulfilled, (state, action) => {
-        state.contacts = mergeContacts(state.contacts, action.payload)
+        state.contacts = mergeContacts([], action.payload)
         state.loading = false
         state.refreshing = false
         state.initialized = true
