@@ -1,17 +1,23 @@
 import request from './request'
 
-let listRequest = null
+const listRequests = new Map()
 
-export function getMoments() {
-  if (listRequest) return listRequest
+export function getMoments(cursor) {
+  const params = cursor
+    ? { before_created_at: cursor.createdAt, before_id: cursor.id }
+    : {}
+  const requestKey = cursor ? `${cursor.createdAt}:${cursor.id}` : 'initial'
+  const activeRequest = listRequests.get(requestKey)
+  if (activeRequest) return activeRequest
 
-  listRequest = request.get('/moment').then(response => {
+  const listRequest = request.get('/moment', { params }).then(response => {
     if (Array.isArray(response.data)) return response.data
     throw new Error('Invalid moments response')
   }).finally(() => {
-    listRequest = null
+    listRequests.delete(requestKey)
   })
 
+  listRequests.set(requestKey, listRequest)
   return listRequest
 }
 

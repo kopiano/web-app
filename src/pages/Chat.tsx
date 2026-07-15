@@ -68,6 +68,8 @@ interface MomentPost {
   comments: Comment[];
 }
 
+const MOMENTS_PAGE_SIZE = 10;
+
 type NotificationType = 'success' | 'warning' | 'error';
 
 const EMOJIS = [
@@ -317,6 +319,8 @@ function Chat() {
   const [momentsLoading, setMomentsLoading] = useState(false);
   const [momentsInitialized, setMomentsInitialized] = useState(false);
   const [momentsError, setMomentsError] = useState('');
+  const [momentsLoadMoreError, setMomentsLoadMoreError] = useState('');
+  const [momentsHasMore, setMomentsHasMore] = useState(true);
   const [momentPublishing, setMomentPublishing] = useState(false);
   const [momentUploadProgress, setMomentUploadProgress] = useState<MomentUploadProgress | null>(null);
   const [openMomentMenuId, setOpenMomentMenuId] = useState<string | null>(null);
@@ -349,6 +353,8 @@ function Chat() {
   const momentEmojiPickerRef = useRef<HTMLDivElement>(null);
   const commentEmojiPickerRef = useRef<HTMLDivElement>(null);
   const momentMenuRef = useRef<HTMLDivElement>(null);
+  const momentsLoadingRef = useRef(false);
+  const momentsCursorRef = useRef<{ createdAt: string; id: string } | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const commentInputRefs = useRef(new Map<string, HTMLInputElement>());
   const processingFailureNotifiedRef = useRef(new Set<string>());
@@ -377,19 +383,59 @@ function Chat() {
     [moments],
   );
 
-  const loadMoments = async () => {
+  const loadMoments = async (reset = false) => {
+    if (momentsLoadingRef.current || (!reset && !momentsHasMore)) return;
+    momentsLoadingRef.current = true;
     setMomentsLoading(true);
-    setMomentsError('');
+    if (reset) {
+      setMomentsError('');
+      setMomentsLoadMoreError('');
+    } else {
+      setMomentsLoadMoreError('');
+    }
+
     try {
-      const data = await getMoments();
-      setMoments(data.map(toMomentPost));
+      const cursor = reset ? null : momentsCursorRef.current;
+      const data = await getMoments(cursor || undefined);
+      const nextMoments = data.map(toMomentPost);
+      setMoments(previous => {
+        if (reset) return nextMoments;
+        const existingIds = new Set(previous.map(moment => moment.id));
+        return [
+          ...previous,
+          ...nextMoments.filter(moment => !existingIds.has(moment.id)),
+        ];
+      });
+      const lastMoment = data[data.length - 1];
+      if (lastMoment) {
+        momentsCursorRef.current = {
+          createdAt: lastMoment.created_at,
+          id: lastMoment.id,
+        };
+      } else if (reset) {
+        momentsCursorRef.current = null;
+      }
+      setMomentsHasMore(data.length === MOMENTS_PAGE_SIZE);
       setMomentsInitialized(true);
     } catch {
-      setMomentsError('Unable to load moments.');
+      if (reset || !momentsInitialized) {
+        setMomentsError('Unable to load moments.');
+      } else {
+        setMomentsLoadMoreError('Unable to load more moments.');
+      }
     } finally {
+      momentsLoadingRef.current = false;
       setMomentsLoading(false);
     }
   };
+
+  function handleMomentsScroll(event: React.UIEvent<HTMLDivElement>) {
+    const feed = event.currentTarget;
+    const distanceToBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight;
+    if (distanceToBottom <= 320) {
+      void loadMoments();
+    }
+  }
 
   useEffect(() => {
     if (!showEmoji && !showMomentEmoji && commentEmojiPost === null) return;
@@ -453,6 +499,15 @@ function Chat() {
     }
   }, [currentUser?.id]);
 
+  useEffect(() => {
+    setMoments([]);
+    setMomentsInitialized(false);
+    setMomentsError('');
+    setMomentsLoadMoreError('');
+    setMomentsHasMore(true);
+    momentsCursorRef.current = null;
+  }, [currentUser?.id]);
+
   function selectTab(tab: 'chat' | 'moments') {
     setActiveTab(tab);
     localStorage.setItem(ACTIVE_TAB_KEY, tab);
@@ -477,7 +532,7 @@ function Chat() {
     ) {
       return;
     }
-    void loadMoments();
+    void loadMoments(true);
   }, [activeTab, authInitialized, currentUser?.id, momentsInitialized, momentsLoading, momentsError]);
 
   useEffect(() => {
@@ -1433,7 +1488,7 @@ function Chat() {
 
         {/* ── Moments View ── */}
         <div className={`moments-view${activeTab === 'moments' ? '' : ' hidden'}`}>
-          <div className="moments-feed">
+          <div className="moments-feed" onScroll={handleMomentsScroll}>
             <div className="moment-post">
               <div className="moment-post-top">
                 <div className="moment-post-avatar">
@@ -1576,17 +1631,18 @@ function Chat() {
             ) : momentsError ? (
               <div className="moment-empty" role="alert">
                 <span>{momentsError}</span>
-                <button type="button" className="moments-retry" onClick={() => void loadMoments()}>
+                <button type="button" className="moments-retry" onClick={() => void loadMoments(true)}>
                   Retry
                 </button>
               </div>
             ) : moments.length === 0 ? (
               <div className="moment-empty">No moments yet</div>
             ) : (
-              moments.map((post, idx) => {
-                trackView(post.id);
-                const isCurrentUserPost = post.authorId === currentUser?.id;
-                return (
+              <>
+                {moments.map((post, idx) => {
+                  trackView(post.id);
+                  const isCurrentUserPost = post.authorId === currentUser?.id;
+                  return (
                   <div key={post.id} className="moment-card" style={{ animationDelay: `${idx * 0.06}s` }}>
                     <div className="card-header">
                       <div className="card-avatar">
@@ -1931,8 +1987,22 @@ function Chat() {
                       </div>
                     )}
                   </div>
-                );
-              })
+                  );
+                })}
+                {momentsLoading && momentsInitialized && (
+                  <div className="moments-loading-more" role="status" aria-label="Loading more moments">
+                    <span className="chat-loading-spinner" aria-hidden="true" />
+                  </div>
+                )}
+                {momentsLoadMoreError && !momentsLoading && (
+                  <div className="moments-load-more-error" role="alert">
+                    <span>{momentsLoadMoreError}</span>
+                    <button type="button" className="moments-retry" onClick={() => void loadMoments()}>
+                      Retry
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

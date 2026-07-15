@@ -35,7 +35,12 @@ export interface MomentUploadProgress {
   remainingSeconds: number;
 }
 
-export function getMoments(): Promise<MomentApiItem[]>;
+export interface MomentPageCursor {
+  createdAt: string;
+  id: string;
+}
+
+export function getMoments(cursor?: MomentPageCursor): Promise<MomentApiItem[]>;
 export function getMoment(id: string): Promise<MomentApiItem>;
 export function createMoment(input: CreateMomentInput): Promise<MomentApiItem>;
 export function deleteMoment(id: string): Promise<void>;

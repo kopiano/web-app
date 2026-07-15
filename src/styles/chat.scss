@@ -2448,6 +2448,30 @@ $chat-margin-left: 100px;
     place-items: center;
 }
 
+.moments-loading-more {
+    min-height: 76px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+.moments-loading-more .chat-loading-spinner {
+    width: 22px;
+    height: 22px;
+    border-width: 2px;
+}
+
+.moments-load-more-error {
+    min-height: 76px;
+    padding: 12px 20px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: rgba(15, 20, 25, 0.58);
+    font-size: 13px;
+}
+
 .moments-retry {
     border: 0;
     border-radius: 6px;
