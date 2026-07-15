@@ -17,4 +17,44 @@ export interface ChatApiContact {
   members?: ChatApiMember[];
 }
 
+export interface SendMessageInput {
+  chat_type: 'private' | 'public';
+  receiver_id?: string;
+  group_id?: string;
+  content: string;
+  message_type?: number;
+  client_message_id: string;
+}
+
+export interface ChatApiMessage {
+  id: number;
+  conversation_id: string;
+  chat_type: 'private' | 'public';
+  send_id: string;
+  client_message_id?: string | null;
+  receiver_id?: string | null;
+  group_id?: string | null;
+  content?: string | null;
+  message_type: number;
+  status: string;
+  created_at: string;
+  update_at: string;
+  deleted_at?: string | null;
+  file_name?: string | null;
+  file_url?: string | null;
+}
+
+export interface ChatMessageEvent {
+  event: 'message';
+  message: ChatApiMessage;
+}
+
+export interface MessageHistoryQuery {
+  chat_type: 'private' | 'public';
+  contact_id: string;
+  limit?: number;
+}
+
 export function getMessageUserInfo(): Promise<ChatApiContact[]>;
+export function sendMessage(input: SendMessageInput): Promise<ChatApiMessage>;
+export function getMessageHistory(query: MessageHistoryQuery): Promise<ChatApiMessage[]>;

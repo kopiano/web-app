@@ -147,6 +147,28 @@ const chatSlice = createSlice({
       state.contacts = action.payload
       state.initialized = action.payload.length > 0
     },
+    updateContactPreview: (
+      state,
+      action: PayloadAction<{ id: string; content: string; lastMessageTime: string }>,
+    ) => {
+      const contact = state.contacts.find(item => item.id === action.payload.id)
+      if (!contact) return
+
+      contact.lastMsg = action.payload.content
+      contact.lastMessageTime = action.payload.lastMessageTime
+      contact.time = new Date(action.payload.lastMessageTime).toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+      state.contacts.sort((a, b) => {
+        if (!a.lastMessageTime) return 1
+        if (!b.lastMessageTime) return -1
+        return b.lastMessageTime.localeCompare(a.lastMessageTime)
+      })
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify(state.contacts))
+    },
   },
   extraReducers: builder => {
     builder
@@ -172,5 +194,5 @@ const chatSlice = createSlice({
   },
 })
 
-export const { clearContacts, hydrateContacts } = chatSlice.actions
+export const { clearContacts, hydrateContacts, updateContactPreview } = chatSlice.actions
 export default chatSlice.reducer

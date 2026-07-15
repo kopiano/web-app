@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { resolveAvatarUrl } from '@/lib/avatar';
+import { getMessageHistory, sendMessage } from '@/api/chat';
+import type { ChatApiMessage, ChatMessageEvent, SendMessageInput } from '@/api/chat';
 import type { RootState, AppDispatch } from '@/store/store';
-import { refreshContacts } from '@/store/chatSlice';
+import { refreshContacts, updateContactPreview } from '@/store/chatSlice';
 import '@/styles/chat.scss';
 
 /* ── Types ── */
@@ -18,10 +20,13 @@ interface Contact {
 }
 
 interface Message {
-  id: number;
+  id: number | string;
   text: string;
   from: 'me' | 'them';
   time: string;
+  status?: 'sending' | 'sent' | 'failed';
+  clientMessageId?: string;
+  sendRequest?: SendMessageInput;
 }
 
 interface Comment {
@@ -59,6 +64,55 @@ const ACTIVE_CONTACT_KEY = 'chat_active_contact';
 
 function landscapeAvatar(seed: number) {
   return `https://picsum.photos/seed/${seed}/100/100`;
+}
+
+function messageWebSocketUrl() {
+  const apiUrl = new URL(import.meta.env.VITE_API_URL || 'http://localhost:8100/api');
+  apiUrl.protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+  apiUrl.pathname = `${apiUrl.pathname.replace(/\/$/, '')}/message/ws`;
+  apiUrl.search = '';
+  return apiUrl.toString();
+}
+
+function messageConversationId(message: ChatApiMessage, userId: string) {
+  if (message.chat_type === 'public') {
+    return message.group_id ? `group:${message.group_id}` : null;
+  }
+
+  const contactId = message.send_id === userId ? message.receiver_id : message.send_id;
+  return contactId ? `user:${contactId}` : null;
+}
+
+function contactIdFromConversation(conversationId: string) {
+  return conversationId.slice(conversationId.indexOf(':') + 1);
+}
+
+function toUiMessage(message: ChatApiMessage, userId: string): Message | null {
+  if (!message.content) return null;
+  return {
+    id: message.id,
+    text: message.content,
+    from: message.send_id === userId ? 'me' : 'them',
+    time: new Date(message.created_at).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+    status: message.status === 'sent' ? 'sent' : undefined,
+    clientMessageId: message.client_message_id || undefined,
+  };
+}
+
+function isChatMessageEvent(value: unknown): value is ChatMessageEvent {
+  if (!value || typeof value !== 'object') return false;
+  const payload = value as Record<string, unknown>;
+  if (payload.event !== 'message' || !payload.message || typeof payload.message !== 'object') return false;
+  const message = payload.message as Record<string, unknown>;
+  return (
+    typeof message.id === 'number'
+    && typeof message.chat_type === 'string'
+    && typeof message.send_id === 'string'
+    && typeof message.created_at === 'string'
+  );
 }
 
 /* ── Mock Data ── */
@@ -127,6 +181,7 @@ function Chat() {
   const [activeContact, setActiveContact] = useState('mock:group:1');
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<Record<string, Message[]>>(mockMessages);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [showMomentEmoji, setShowMomentEmoji] = useState(false);
   const [moments, setMoments] = useState<MomentPost[]>(initialMoments);
@@ -149,12 +204,15 @@ function Chat() {
     [currentUser, remoteContacts],
   );
   const activeContactInfo = useMemo(
-    () => visibleContacts.find(c => c.id === activeContact) || visibleContacts[0] || {
-      id: '', name: '', type: 'user' as const, avatar: landscapeAvatar(0), lastMsg: '', time: '',
-    },
+    () => visibleContacts.find(contact => contact.id === activeContact) || null,
     [activeContact, visibleContacts],
   );
-  const activeConversationId = activeContactInfo.id;
+  const activeConversationId = activeContactInfo?.id || '';
+  const isConversationLoading = Boolean(
+    currentUser
+      && !activeContactInfo
+      && !(contactsInitialized && visibleContacts.length === 0),
+  );
   const momentInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -171,6 +229,74 @@ function Chat() {
     if (!authInitialized || !currentUser) return;
     dispatch(refreshContacts({ silent: remoteContacts.length > 0 }));
   }, [authInitialized, currentUser?.id, dispatch]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | undefined;
+    let disposed = false;
+    let reconnectDelay = 1000;
+
+    const connect = () => {
+      if (disposed) return;
+      socket = new WebSocket(messageWebSocketUrl());
+
+      socket.onopen = () => {
+        reconnectDelay = 1000;
+      };
+
+      socket.onmessage = event => {
+        let payload: unknown;
+        try {
+          payload = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        if (!isChatMessageEvent(payload)) return;
+        if (payload.event !== 'message' || payload.message.send_id === currentUser.id) return;
+
+        const conversationId = messageConversationId(payload.message, currentUser.id);
+        const incoming = toUiMessage(payload.message, currentUser.id);
+        if (!conversationId || !incoming) return;
+
+        setMessages(previous => {
+          const conversationMessages = previous[conversationId] || [];
+          if (conversationMessages.some(message => message.id === incoming.id)) {
+            return previous;
+          }
+          return {
+            ...previous,
+            [conversationId]: [...conversationMessages, incoming],
+          };
+        });
+        if (payload.message.content) {
+          dispatch(updateContactPreview({
+            id: conversationId,
+            content: payload.message.content,
+            lastMessageTime: payload.message.created_at,
+          }));
+        }
+      };
+
+      socket.onclose = () => {
+        if (disposed) return;
+        reconnectTimer = window.setTimeout(connect, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 10000);
+      };
+
+      socket.onerror = () => {
+        socket?.close();
+      };
+    };
+
+    connect();
+    return () => {
+      disposed = true;
+      if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
+      socket?.close();
+    };
+  }, [currentUser?.id, dispatch]);
 
   useEffect(() => {
     const refresh = () => {
@@ -219,6 +345,62 @@ function Chat() {
     visibleContacts,
   ]);
 
+  useEffect(() => {
+    if (!currentUser || !activeContactInfo || activeContactInfo.id.startsWith('mock:')) return;
+
+    const conversationId = activeContactInfo.id;
+    const chatType = activeContactInfo.type === 'group' ? 'public' : 'private';
+    const contactId = contactIdFromConversation(conversationId);
+    let disposed = false;
+
+    setHistoryLoading(true);
+    getMessageHistory({ chat_type: chatType, contact_id: contactId })
+      .then(history => {
+        if (disposed) return;
+        const loadedMessages = history
+          .map(message => toUiMessage(message, currentUser.id))
+          .filter((message): message is Message => message !== null);
+        setMessages(previous => {
+          const localMessages = previous[conversationId] || [];
+          const byClientId = new Map(
+            localMessages
+              .filter(message => message.clientMessageId)
+              .map(message => [message.clientMessageId, message]),
+          );
+          const merged = loadedMessages.map(message => {
+            const local = message.clientMessageId ? byClientId.get(message.clientMessageId) : undefined;
+            return local ? { ...local, ...message, status: 'sent' as const } : message;
+          });
+          const loadedIds = new Set(merged.map(message => message.id));
+          const loadedClientIds = new Set(
+            merged
+              .map(message => message.clientMessageId)
+              .filter((id): id is string => Boolean(id)),
+          );
+          return {
+            ...previous,
+            [conversationId]: [
+              ...merged,
+              ...localMessages.filter(message =>
+                !loadedIds.has(message.id)
+                && (!message.clientMessageId || !loadedClientIds.has(message.clientMessageId)),
+              ),
+            ],
+          };
+        });
+      })
+      .catch(() => {
+        if (!disposed) setMessages(previous => ({ ...previous, [conversationId]: previous[conversationId] || [] }));
+      })
+      .finally(() => {
+        if (!disposed) setHistoryLoading(false);
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [activeConversationId, activeContactInfo?.type, currentUser?.id]);
+
   function selectContact(contactId: string) {
     setActiveContact(contactId);
     if (currentUser) {
@@ -244,16 +426,76 @@ function Chat() {
   }, [activeContact, visibleContacts]);
 
   /* ── Chat ── */
-  function handleSend() {
-    if (!inputText.trim() || !activeConversationId) return;
+  async function persistMessage(
+    conversationId: string,
+    temporaryId: string,
+    request: SendMessageInput,
+    userId: string,
+  ) {
+    try {
+      const persisted = await sendMessage(request);
+      const persistedMessage = toUiMessage(persisted, userId);
+      if (!persistedMessage) throw new Error('Message response has no content');
+      setMessages(previous => ({
+        ...previous,
+        [conversationId]: (previous[conversationId] || []).map(message =>
+          message.id === temporaryId || message.clientMessageId === request.client_message_id
+            ? { ...persistedMessage, id: persisted.id, status: 'sent' }
+            : message
+        ),
+      }));
+      if (persisted.content) {
+        dispatch(updateContactPreview({
+          id: conversationId,
+          content: persisted.content,
+          lastMessageTime: persisted.created_at,
+        }));
+      }
+    } catch {
+      setMessages(previous => ({
+        ...previous,
+        [conversationId]: (previous[conversationId] || []).map(message =>
+          message.id === temporaryId ? { ...message, status: 'failed' } : message
+        ),
+      }));
+    }
+  }
+
+  async function handleSend() {
+    const content = inputText.trim();
+    if (!content || !activeConversationId || !activeContactInfo || !currentUser) return;
+
+    const temporaryId = `local:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    const conversationId = activeConversationId;
+    const contactId = contactIdFromConversation(conversationId);
+    const clientMessageId = crypto.randomUUID();
+    const request: SendMessageInput = activeContactInfo.type === 'group'
+      ? { chat_type: 'public', group_id: contactId, content, client_message_id: clientMessageId }
+      : { chat_type: 'private', receiver_id: contactId, content, client_message_id: clientMessageId };
     const newMsg: Message = {
-      id: Date.now(),
-      text: inputText.trim(),
+      id: temporaryId,
+      text: content,
       from: 'me',
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      status: 'sending',
+      clientMessageId,
+      sendRequest: request,
     };
-    setMessages(p => ({ ...p, [activeConversationId]: [...(p[activeConversationId] || []), newMsg] }));
+    setMessages(p => ({ ...p, [conversationId]: [...(p[conversationId] || []), newMsg] }));
     setInputText('');
+
+    await persistMessage(conversationId, temporaryId, request, currentUser.id);
+  }
+
+  async function retryMessage(message: Message) {
+    if (!message.sendRequest || message.status !== 'failed' || !activeConversationId || !currentUser) return;
+    setMessages(previous => ({
+      ...previous,
+      [activeConversationId]: (previous[activeConversationId] || []).map(item =>
+        item.id === message.id ? { ...item, status: 'sending' } : item
+      ),
+    }));
+    await persistMessage(activeConversationId, String(message.id), message.sendRequest, currentUser.id);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -471,16 +713,34 @@ function Chat() {
 
             <main className="messages-panel">
               <div className="messages-header">
-                <div className="messages-header-avatar">
-                  <img src={activeContactInfo.avatar} alt="" className="avatar-img" />
-                </div>
-                <div className="messages-header-info">
-                  <div className="messages-header-name">{activeContactInfo.name}</div>
-                  <div className="messages-header-status">Active now</div>
-                </div>
+                {activeContactInfo ? (
+                  <>
+                    <div className="messages-header-avatar">
+                      <img src={activeContactInfo.avatar} alt="" className="avatar-img" />
+                    </div>
+                    <div className="messages-header-info">
+                      <div className="messages-header-name">{activeContactInfo.name}</div>
+                      <div className="messages-header-status">Active now</div>
+                    </div>
+                  </>
+                ) : (
+                  isConversationLoading ? (
+                    <div className="messages-header-loading" role="status" aria-label="Loading conversation">
+                      <span className="chat-loading-spinner" aria-hidden="true" />
+                    </div>
+                  ) : (
+                    <div className="messages-header-info">
+                      <div className="messages-header-name">No contacts yet</div>
+                    </div>
+                  )
+                )}
               </div>
               <div className="msg-list">
-                {(messages[activeConversationId] || []).length === 0 ? (
+                {isConversationLoading || historyLoading ? (
+                  <div className="messages-loading" role="status" aria-label="Loading conversation">
+                    <span className="chat-loading-spinner" aria-hidden="true" />
+                  </div>
+                ) : (messages[activeConversationId] || []).length === 0 ? (
                   <div className="msg-empty">No messages yet</div>
                 ) : (
                   (messages[activeConversationId] || []).map((msg, msgIndex, contactMessages) => (
@@ -488,7 +748,7 @@ function Chat() {
                       <div className="msg-sender">
                         <div className="msg-avatar">
                           <img
-                            src={msg.from === 'me' ? currentUserAvatar : activeContactInfo.avatar}
+                            src={msg.from === 'me' ? currentUserAvatar : activeContactInfo?.avatar || landscapeAvatar(0)}
                             alt=""
                             className="avatar-img"
                           />
@@ -510,7 +770,45 @@ function Chat() {
                             ) : msg.text}
                           </div>
                         </div>
-                        <div className="msg-time">{msg.time}</div>
+                        <div className="msg-time">
+                          {msg.time}
+                          {msg.from === 'me' && msg.status && (
+                            <>
+                              <span
+                                className={`msg-status ${msg.status}`}
+                                aria-label={msg.status === 'sent' ? 'Delivered' : msg.status}
+                                title={msg.status === 'sent' ? 'Delivered' : msg.status}
+                              >
+                                {msg.status === 'sending' && (
+                                  <span className="msg-status-icon sending-icon" aria-hidden="true" />
+                                )}
+                                {msg.status === 'sent' && (
+                                  <span className="msg-status-icon delivered-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 16 16" focusable="false">
+                                      <circle cx="8" cy="8" r="7" />
+                                      <path d="m4.5 8.2 2.1 2.1 4.8-5" />
+                                    </svg>
+                                  </span>
+                                )}
+                                {msg.status === 'failed' && (
+                                  <span className="msg-status-icon failed-icon" aria-hidden="true">!</span>
+                                )}
+                                <span className="msg-status-label">
+                                  {msg.status === 'sent' ? 'Delivered' : msg.status}
+                                </span>
+                              </span>
+                              {msg.status === 'failed' && msg.sendRequest && (
+                                <button
+                                  type="button"
+                                  className="msg-retry-btn"
+                                  onClick={() => retryMessage(msg)}
+                                >
+                                  Retry
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))
