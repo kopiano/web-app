@@ -802,8 +802,20 @@ function Chat() {
                             <>
                               <span
                                 className={`msg-status ${msg.status}`}
-                                aria-label={msg.status === 'sent' ? 'Delivered' : msg.status}
-                                title={msg.status === 'sent' ? 'Delivered' : msg.status}
+                                aria-label={
+                                  msg.status === 'sent'
+                                    ? 'Delivered'
+                                    : msg.status === 'sending'
+                                      ? 'Sending...'
+                                      : 'Message failed'
+                                }
+                                title={
+                                  msg.status === 'sent'
+                                    ? 'Delivered'
+                                    : msg.status === 'sending'
+                                      ? 'Sending...'
+                                      : 'Message failed'
+                                }
                               >
                                 {msg.status === 'sending' && (
                                   <span className="msg-status-icon sending-icon" aria-hidden="true" />
@@ -820,7 +832,11 @@ function Chat() {
                                   <span className="msg-status-icon failed-icon" aria-hidden="true">!</span>
                                 )}
                                 <span className="msg-status-label">
-                                  {msg.status === 'sent' ? 'Delivered' : msg.status}
+                                  {msg.status === 'sent'
+                                    ? 'Delivered'
+                                    : msg.status === 'sending'
+                                      ? 'Sending...'
+                                      : 'Failed'}
                                 </span>
                               </span>
                               {msg.status === 'failed' && msg.sendRequest && (

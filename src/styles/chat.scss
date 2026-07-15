@@ -499,11 +499,27 @@ $chat-margin-left: 100px;
 }
 
 .sending-icon {
-    border: 1.5px solid rgba(67, 56, 202, 0.22);
+    position: relative;
+    border: 1.5px solid rgba(67, 56, 202, 0.2);
     border-top-color: #4f46e5;
     border-right-color: #818cf8;
     border-radius: 50%;
-    animation: message-status-spin 0.8s linear infinite;
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.18);
+    will-change: transform, box-shadow;
+    animation: message-status-spin 0.7s linear infinite,
+        sending-pulse 1.15s ease-in-out infinite;
+}
+
+.sending-icon::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: #4f46e5;
+    box-shadow: 0 0 4px rgba(79, 70, 229, 0.55);
 }
 
 .delivered-icon {
@@ -772,6 +788,11 @@ $chat-margin-left: 100px;
     to { transform: rotate(360deg); }
 }
 
+@keyframes sending-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+    50% { box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.16); }
+}
+
 @keyframes delivered-pop {
     from { opacity: 0; transform: scale(0.55); }
     70% { opacity: 1; transform: scale(1.12); }
@@ -792,6 +813,7 @@ $chat-margin-left: 100px;
     .typing-text::after,
     .msg-time,
     .sending-icon,
+    .sending-icon::after,
     .delivered-icon,
     .delivered-icon path,
     .msg-wrap .msg {
