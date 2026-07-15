@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { Fragment, useState, useRef, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { getMessageHistory, sendMessage } from '@/api/chat';
@@ -27,6 +27,7 @@ interface Message {
   status?: 'sending' | 'sent' | 'failed';
   clientMessageId?: string;
   sendRequest?: SendMessageInput;
+  createdAt?: string;
 }
 
 interface Comment {
@@ -99,7 +100,25 @@ function toUiMessage(message: ChatApiMessage, userId: string): Message | null {
     }),
     status: message.status === 'sent' ? 'sent' : undefined,
     clientMessageId: message.client_message_id || undefined,
+    createdAt: message.created_at,
   };
+}
+
+function historyDateLabel(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  const startOfDay = (input: Date) => new Date(
+    input.getFullYear(),
+    input.getMonth(),
+    input.getDate(),
+  ).getTime();
+  const dayDifference = Math.round(
+    (startOfDay(now) - startOfDay(date)) / 86_400_000,
+  );
+
+  if (dayDifference === 0) return 'Today';
+  if (dayDifference === 1) return 'Yesterday';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function isChatMessageEvent(value: unknown): value is ChatMessageEvent {
@@ -444,13 +463,6 @@ function Chat() {
             : message
         ),
       }));
-      if (persisted.content) {
-        dispatch(updateContactPreview({
-          id: conversationId,
-          content: persisted.content,
-          lastMessageTime: persisted.created_at,
-        }));
-      }
     } catch {
       setMessages(previous => ({
         ...previous,
@@ -743,8 +755,22 @@ function Chat() {
                 ) : (messages[activeConversationId] || []).length === 0 ? (
                   <div className="msg-empty">No messages yet</div>
                 ) : (
-                  (messages[activeConversationId] || []).map((msg, msgIndex, contactMessages) => (
-                    <div key={msg.id} className={`msg-wrap ${msg.from === 'me' ? 'sent' : 'received'}`}>
+                  (messages[activeConversationId] || []).map((msg, msgIndex, contactMessages) => {
+                    const previousMessage = contactMessages[msgIndex - 1];
+                    const showDateDivider = Boolean(
+                      msg.createdAt
+                      && (!previousMessage?.createdAt
+                        || historyDateLabel(previousMessage.createdAt) !== historyDateLabel(msg.createdAt)),
+                    );
+
+                    return (
+                    <Fragment key={msg.id}>
+                      {showDateDivider && msg.createdAt && (
+                        <div className="message-date-divider" role="separator">
+                          <span>{historyDateLabel(msg.createdAt)}</span>
+                        </div>
+                      )}
+                    <div className={`msg-wrap ${msg.from === 'me' ? 'sent' : 'received'}`}>
                       <div className="msg-sender">
                         <div className="msg-avatar">
                           <img
@@ -811,7 +837,9 @@ function Chat() {
                         </div>
                       </div>
                     </div>
-                  ))
+                    </Fragment>
+                    );
+                  })
                 )}
                 <div ref={msgEndRef} />
               </div>

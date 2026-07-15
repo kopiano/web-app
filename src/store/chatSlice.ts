@@ -56,6 +56,43 @@ function readCache(): ChatContact[] {
 
 const cachedContacts = readCache()
 
+function padDatePart(value: number) {
+  return String(value).padStart(2, '0')
+}
+
+function formatLatestMessageTime(value: string | null) {
+  if (!value) return 'No messages'
+
+  const date = new Date(value)
+  const now = new Date()
+  const elapsedSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000))
+  if (elapsedSeconds < 60) return 'just now'
+
+  const isSameDay = date.getFullYear() === now.getFullYear()
+    && date.getMonth() === now.getMonth()
+    && date.getDate() === now.getDate()
+  if (isSameDay) {
+    const hours = Math.floor(elapsedSeconds / 3600)
+    const minutes = Math.floor((elapsedSeconds % 3600) / 60)
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+  }
+
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (
+    date.getFullYear() === yesterday.getFullYear()
+    && date.getMonth() === yesterday.getMonth()
+    && date.getDate() === yesterday.getDate()
+  ) {
+    return 'yesterday'
+  }
+
+  const dateText = `${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`
+  return date.getFullYear() === now.getFullYear()
+    ? dateText
+    : `${dateText}-${date.getFullYear()}`
+}
+
 function conversationId(contact: ApiContact) {
   const contactId = contact.chat_type === 'public' ? contact.group_id : contact.user_id
   return contactId ? `${contact.chat_type === 'public' ? 'group' : 'user'}:${contactId}` : null
@@ -76,11 +113,7 @@ function formatContact(contact: ApiContact): ChatContact | null {
     type: contact.chat_type === 'public' ? 'group' : 'user',
     avatar: resolveAvatarUrl(contact.avatar) || fallbackAvatar(contact),
     lastMsg: contact.content || 'No messages yet',
-    time: contact.last_message_time
-      ? new Date(contact.last_message_time).toLocaleString(undefined, {
-        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-      })
-      : 'No messages',
+    time: formatLatestMessageTime(contact.last_message_time || null),
     lastMessageTime: contact.last_message_time || null,
     online: contact.status ?? undefined,
     members: contact.members || [],
@@ -156,12 +189,7 @@ const chatSlice = createSlice({
 
       contact.lastMsg = action.payload.content
       contact.lastMessageTime = action.payload.lastMessageTime
-      contact.time = new Date(action.payload.lastMessageTime).toLocaleString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+      contact.time = formatLatestMessageTime(action.payload.lastMessageTime)
       state.contacts.sort((a, b) => {
         if (!a.lastMessageTime) return 1
         if (!b.lastMessageTime) return -1
