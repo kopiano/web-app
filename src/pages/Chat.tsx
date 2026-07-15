@@ -1,4 +1,4 @@
-import { Fragment, useState, useRef, useEffect, useMemo } from 'react';
+import { Fragment, useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { getMessageHistory, sendMessage } from '@/api/chat';
@@ -216,7 +216,10 @@ function Chat() {
   const imageRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const msgListRef = useRef<HTMLDivElement>(null);
   const msgEndRef = useRef<HTMLDivElement>(null);
+  const lastScrolledConversationRef = useRef('');
+  const wasHistoryLoadingRef = useRef(false);
   const contactsPanelRef = useRef<HTMLElement>(null);
   const visibleContacts = useMemo<Contact[]>(
     () => currentUser ? remoteContacts : contacts,
@@ -427,9 +430,21 @@ function Chat() {
     }
   }
 
-  useEffect(() => {
-    msgEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, activeConversationId]);
+  useLayoutEffect(() => {
+    const conversationChanged = lastScrolledConversationRef.current !== activeConversationId;
+    const historyJustLoaded = wasHistoryLoadingRef.current && !historyLoading;
+    const shouldJumpToBottom = conversationChanged || historyLoading || historyJustLoaded;
+
+    if (shouldJumpToBottom) {
+      const messageList = msgListRef.current;
+      if (messageList) messageList.scrollTop = messageList.scrollHeight;
+    } else {
+      msgEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    lastScrolledConversationRef.current = activeConversationId;
+    wasHistoryLoadingRef.current = historyLoading;
+  }, [messages, activeConversationId, historyLoading]);
 
   useEffect(() => {
     const input = momentInputRef.current;
@@ -746,7 +761,7 @@ function Chat() {
                   )
                 )}
               </div>
-              <div className="msg-list">
+              <div ref={msgListRef} className="msg-list">
                 {isConversationLoading || historyLoading ? (
                   <div className="messages-loading" role="status" aria-label="Loading conversation">
                     <span className="chat-loading-spinner" aria-hidden="true" />
