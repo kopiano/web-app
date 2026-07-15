@@ -2,7 +2,7 @@ export interface ChatApiMember {
   user_id: string;
   avatar?: string | null;
   username: string;
-  status: boolean;
+  online: boolean;
 }
 
 export interface ChatApiContact {
@@ -11,7 +11,7 @@ export interface ChatApiContact {
   chat_type: 'private' | 'public';
   avatar?: string | null;
   username: string;
-  status?: boolean | null;
+  online?: boolean | null;
   content?: string | null;
   last_message_time?: string | null;
   members?: ChatApiMember[];

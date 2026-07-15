@@ -62,14 +62,16 @@ interface MomentPost {
 const EMOJIS = [
   '😀','😃','😄','😁','😆','😅','😂','🤣',
   '😊','😇','🙂','😉','😍','😘','😋','😎',
-  '🤩','🥳','🤔','🤗','👍','👌','👏','🙌',
-  '💪','🙏','🎉','✨','🔥','🚀','❤️','💜',
-  '👍','👌','👏','🙌','🎉','🍉','☁️','🌍',
-  '✨','🔥','🚀','🎮','🥇','🏅','🥬','🍇',
+  '🤩','🥳','🤔','🤗','🤓','😏','😒','😞',
+  '👍','👌','👏','🙌','💪','🙏','👋', '🎉',
+  '✨','🔥','🚀','❤️','🌍','🎮','🥇','🏅',
   '🌩️','🌨️','🌧️','🌦️','🌥️','🌤️','⛈️','⛅',
+  '🍉','🥬','🍇',
 ];
 
 const ACTIVE_CONTACT_KEY = 'chat_active_contact';
+const WEBSOCKET_HEARTBEAT_INTERVAL_MS = 25_000;
+const CONTACT_PRESENCE_REFRESH_INTERVAL_MS = 30_000;
 
 function landscapeAvatar(seed: number) {
   return `https://picsum.photos/seed/${seed}/100/100`;
@@ -236,6 +238,9 @@ function Chat() {
   const wasHistoryLoadingRef = useRef(false);
   const imagePreviewUrlsRef = useRef(new Set<string>());
   const contactsPanelRef = useRef<HTMLElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const momentEmojiPickerRef = useRef<HTMLDivElement>(null);
+  const commentEmojiPickerRef = useRef<HTMLDivElement>(null);
   const visibleContacts = useMemo<Contact[]>(
     () => currentUser ? remoteContacts : contacts,
     [currentUser, remoteContacts],
@@ -251,6 +256,28 @@ function Chat() {
       && !(contactsInitialized && visibleContacts.length === 0),
   );
   const momentInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!showEmoji && !showMomentEmoji && commentEmojiPost === null) return;
+
+    const closeEmojiPickersOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+
+      if (showEmoji && !emojiPickerRef.current?.contains(target)) {
+        setShowEmoji(false);
+      }
+      if (showMomentEmoji && !momentEmojiPickerRef.current?.contains(target)) {
+        setShowMomentEmoji(false);
+      }
+      if (commentEmojiPost !== null && !commentEmojiPickerRef.current?.contains(target)) {
+        setCommentEmojiPost(null);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeEmojiPickersOutside);
+    return () => document.removeEventListener('pointerdown', closeEmojiPickersOutside);
+  }, [showEmoji, showMomentEmoji, commentEmojiPost]);
 
   useEffect(() => {
     if (currentUser) {
@@ -273,8 +300,16 @@ function Chat() {
     let socket: WebSocket | null = null;
     let connectTimer: number | undefined;
     let reconnectTimer: number | undefined;
+    let heartbeatTimer: number | undefined;
     let disposed = false;
     let reconnectDelay = 1000;
+
+    const stopHeartbeat = () => {
+      if (heartbeatTimer !== undefined) {
+        window.clearInterval(heartbeatTimer);
+        heartbeatTimer = undefined;
+      }
+    };
 
     const connect = () => {
       if (disposed) return;
@@ -283,6 +318,14 @@ function Chat() {
 
       currentSocket.onopen = () => {
         reconnectDelay = 1000;
+        const sendHeartbeat = () => {
+          if (currentSocket.readyState === WebSocket.OPEN) {
+            currentSocket.send(JSON.stringify({ type: 'heartbeat' }));
+          }
+        };
+        sendHeartbeat();
+        stopHeartbeat();
+        heartbeatTimer = window.setInterval(sendHeartbeat, WEBSOCKET_HEARTBEAT_INTERVAL_MS);
       };
 
       currentSocket.onmessage = event => {
@@ -319,6 +362,7 @@ function Chat() {
       };
 
       currentSocket.onclose = () => {
+        stopHeartbeat();
         if (socket === currentSocket) socket = null;
         if (disposed) return;
         reconnectTimer = window.setTimeout(connect, reconnectDelay);
@@ -335,6 +379,7 @@ function Chat() {
       disposed = true;
       if (connectTimer !== undefined) window.clearTimeout(connectTimer);
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
+      stopHeartbeat();
 
       const currentSocket = socket;
       socket = null;
@@ -358,19 +403,20 @@ function Chat() {
     const refresh = () => {
       if (
         currentUser
-        && !contactsInitialized
         && document.visibilityState === 'visible'
       ) {
         dispatch(refreshContacts({ silent: true }));
       }
     };
+    const refreshTimer = window.setInterval(refresh, CONTACT_PRESENCE_REFRESH_INTERVAL_MS);
     window.addEventListener('pageshow', refresh);
     document.addEventListener('visibilitychange', refresh);
     return () => {
+      window.clearInterval(refreshTimer);
       window.removeEventListener('pageshow', refresh);
       document.removeEventListener('visibilitychange', refresh);
     };
-  }, [contactsInitialized, currentUser?.id, dispatch]);
+  }, [currentUser?.id, dispatch]);
 
   useEffect(() => {
     if (
@@ -846,7 +892,21 @@ function Chat() {
                     </div>
                     <div className="messages-header-info">
                       <div className="messages-header-name">{activeContactInfo.name}</div>
-                      <div className="messages-header-status">Active now</div>
+                      <div
+                        className={`messages-header-status ${
+                          activeContactInfo.type === 'group'
+                            ? 'group'
+                            : activeContactInfo.online
+                              ? 'online'
+                              : 'offline'
+                        }`}
+                      >
+                        {activeContactInfo.type === 'group'
+                          ? `${activeContactInfo.members?.length || 0} members`
+                          : activeContactInfo.online
+                            ? 'Online'
+                            : 'Offline'}
+                      </div>
                     </div>
                   </>
                 ) : (
@@ -1000,7 +1060,7 @@ function Chat() {
                       </svg>
                     </button>
                     {showEmoji && (
-                      <div className="emoji-picker">
+                      <div ref={emojiPickerRef} className="emoji-picker">
                         <div className="emoji-grid">
                           {EMOJIS.map(e => (<button key={e} className="emoji-btn" onClick={() => pickEmoji(e)}>{e}</button>))}
                         </div>
@@ -1059,7 +1119,7 @@ function Chat() {
                     </svg>
                   </button>
                   {showMomentEmoji && (
-                    <div className="emoji-picker moment-emoji-picker">
+                    <div ref={momentEmojiPickerRef} className="emoji-picker moment-emoji-picker">
                       <div className="emoji-grid">
                         {EMOJIS.map(e => (
                           <button key={e} className="emoji-btn" onClick={() => pickMomentEmoji(e)}>{e}</button>
@@ -1216,7 +1276,7 @@ function Chat() {
                               </svg>
                             </button>
                             {commentEmojiPost === post.id && (
-                              <div className="emoji-picker comment-emoji-picker">
+                              <div ref={commentEmojiPickerRef} className="emoji-picker comment-emoji-picker">
                                 <div className="emoji-grid">
                                   {EMOJIS.map(e => (
                                     <button key={e} className="emoji-btn" onClick={() => pickCommentEmoji(post.id, e)}>{e}</button>

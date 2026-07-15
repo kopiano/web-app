@@ -423,6 +423,23 @@ $chat-margin-left: 100px;
     flex-shrink: 0;
 }
 
+.messages-header-status.offline {
+    color: rgba(71, 85, 105, 0.78);
+}
+
+.messages-header-status.offline::before {
+    background: #94a3b8;
+    box-shadow: none;
+}
+
+.messages-header-status.group {
+    color: rgba(71, 85, 105, 0.78);
+}
+
+.messages-header-status.group::before {
+    display: none;
+}
+
 .msg-list {
     flex: 1;
     padding: 20px 24px;
@@ -998,9 +1015,10 @@ $chat-margin-left: 100px;
     border-radius: 20px;
     padding: 14px;
     width: 300px;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
+    // background: rgba(255, 255, 255, 0.92);
+    background-color: rgba(254, 236, 236, 1);
+    // backdrop-filter: blur(40px);
+    // -webkit-backdrop-filter: blur(40px);
     border: 1px solid rgba(255, 255, 255, 0.6);
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1);
     z-index: 50;

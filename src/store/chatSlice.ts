@@ -18,7 +18,7 @@ export interface ChatMember {
   user_id: string
   avatar?: string | null
   username: string
-  status: boolean
+  online: boolean
 }
 
 interface ApiContact {
@@ -27,7 +27,7 @@ interface ApiContact {
   chat_type: 'private' | 'public'
   avatar?: string | null
   username: string
-  status?: boolean | null
+  online?: boolean | null
   content?: string | null
   last_message_time?: string | null
   members?: ChatMember[]
@@ -115,7 +115,7 @@ function formatContact(contact: ApiContact): ChatContact | null {
     lastMsg: contact.content || 'No messages yet',
     time: formatLatestMessageTime(contact.last_message_time || null),
     lastMessageTime: contact.last_message_time || null,
-    online: contact.status ?? undefined,
+    online: contact.online ?? undefined,
     members: contact.members || [],
   }
 }
