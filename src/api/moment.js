@@ -130,3 +130,17 @@ export function createMomentComment(id, content) {
     throw new Error('Invalid create moment comment response')
   })
 }
+
+export function viewMoment(id) {
+  return request.post(`/moment/${encodeURIComponent(id)}/view`).then(response => {
+    if (
+      response.data
+      && typeof response.data === 'object'
+      && response.data.moment_id === id
+      && typeof response.data.view_count === 'number'
+    ) {
+      return response.data
+    }
+    throw new Error('Invalid view moment response')
+  })
+}

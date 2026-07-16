@@ -18,6 +18,7 @@ export interface MomentApiItem {
   processing_error?: string | null;
   like_count: number;
   comment_count: number;
+  view_count: number;
   liked: boolean;
   comments: MomentApiComment[];
   created_at: string;
@@ -39,6 +40,14 @@ export interface MomentLikeState {
   moment_id: string;
   liked: boolean;
   like_count: number;
+}
+
+export interface MomentViewState {
+  moment_id: string;
+  counted: boolean;
+  like_count: number;
+  comment_count: number;
+  view_count: number;
 }
 
 export interface CreateMomentInput {
@@ -68,3 +77,4 @@ export function deleteMoment(id: string): Promise<void>;
 export function likeMoment(id: string): Promise<MomentLikeState>;
 export function unlikeMoment(id: string): Promise<MomentLikeState>;
 export function createMomentComment(id: string, content: string): Promise<MomentApiComment>;
+export function viewMoment(id: string): Promise<MomentViewState>;

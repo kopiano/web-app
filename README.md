@@ -279,3 +279,14 @@ threshold: 0.6 或 0.7。
   POST   /api/moment/{id}/like
   DELETE /api/moment/{id}/like
   POST   /api/moment/{id}/comment
+
+- 视频真实播放达到 3 秒或 25% 后才调用 POST /moment/{id}/view；暂停、缓冲、提前划走不会继续计时。
+- 前端会话内防止重复请求，页面显示后端返回的真实 view_count。
+- Redis 使用“动态 + 用户 + 上海日期”去重，并在上海零点过期。
+
+视频动态：播放达到 3 秒或 25% 后计数。
+文字和图片动态：在动态超过 60% 可见并持续 1 秒 后调用 /moment/{id}/view，仍使用 Redis 按用户每日去重。
+
+游客支持浏览量计数：
+登录用户：按 user_id 去重统计。
+游客：使用 visitor_id（UUID Cookie）去重统计。

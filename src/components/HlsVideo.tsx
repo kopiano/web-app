@@ -11,6 +11,7 @@ interface HlsVideoProps {
   autoPlay?: boolean;
   onActivate?: () => void;
   onDeactivate?: () => void;
+  onViewQualified?: () => void;
 }
 
 export default function HlsVideo({
@@ -23,14 +24,86 @@ export default function HlsVideo({
   autoPlay = false,
   onActivate,
   onDeactivate,
+  onViewQualified,
 }: HlsVideoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const autoPlayRef = useRef(autoPlay);
+  const onViewQualifiedRef = useRef(onViewQualified);
   const [playbackError, setPlaybackError] = useState(false);
   const hasDimensions = Boolean(width && height && width > 0 && height > 0);
   const aspectRatio = hasDimensions ? `${width} / ${height}` : '16 / 9';
   autoPlayRef.current = autoPlay;
+  onViewQualifiedRef.current = onViewQualified;
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !active || !onViewQualifiedRef.current) return;
+
+    let playedMilliseconds = 0;
+    let playingStartedAt: number | null = null;
+    let qualificationTimer: number | undefined;
+    let qualified = false;
+    let hasStartedPlayback = false;
+
+    const clearQualificationTimer = () => {
+      if (qualificationTimer !== undefined) {
+        window.clearTimeout(qualificationTimer);
+        qualificationTimer = undefined;
+      }
+    };
+    const playedDuration = () => (
+      playedMilliseconds
+      + (playingStartedAt === null ? 0 : performance.now() - playingStartedAt)
+    );
+    const qualifyView = () => {
+      if (qualified) return;
+      const reachedPlaybackTime = playedDuration() >= 3_000;
+      const reachedPlaybackProgress = hasStartedPlayback
+        && Number.isFinite(video.duration)
+        && video.duration > 0
+        && video.currentTime / video.duration >= 0.25;
+      if (!reachedPlaybackTime && !reachedPlaybackProgress) return;
+
+      qualified = true;
+      clearQualificationTimer();
+      onViewQualifiedRef.current?.();
+    };
+    const startPlaybackTimer = () => {
+      if (qualified || playingStartedAt !== null) return;
+      hasStartedPlayback = true;
+      playingStartedAt = performance.now();
+      clearQualificationTimer();
+      qualificationTimer = window.setTimeout(
+        qualifyView,
+        Math.max(0, 3_000 - playedMilliseconds),
+      );
+    };
+    const stopPlaybackTimer = () => {
+      if (playingStartedAt !== null) {
+        playedMilliseconds += performance.now() - playingStartedAt;
+        playingStartedAt = null;
+      }
+      clearQualificationTimer();
+      qualifyView();
+    };
+
+    video.addEventListener('playing', startPlaybackTimer);
+    video.addEventListener('timeupdate', qualifyView);
+    video.addEventListener('pause', stopPlaybackTimer);
+    video.addEventListener('waiting', stopPlaybackTimer);
+    video.addEventListener('ended', stopPlaybackTimer);
+    if (!video.paused && !video.ended) startPlaybackTimer();
+
+    return () => {
+      clearQualificationTimer();
+      video.removeEventListener('playing', startPlaybackTimer);
+      video.removeEventListener('timeupdate', qualifyView);
+      video.removeEventListener('pause', stopPlaybackTimer);
+      video.removeEventListener('waiting', stopPlaybackTimer);
+      video.removeEventListener('ended', stopPlaybackTimer);
+    };
+  }, [active, src]);
 
   useEffect(() => {
     const video = videoRef.current;

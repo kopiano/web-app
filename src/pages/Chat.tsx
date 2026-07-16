@@ -1,4 +1,5 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar';
 import { getMessageHistory, sendImageMessage, sendMessage } from '@/api/chat';
@@ -10,6 +11,7 @@ import {
   getMoments,
   likeMoment,
   unlikeMoment,
+  viewMoment,
 } from '@/api/moment';
 import HlsVideo from '@/components/HlsVideo';
 import type {
@@ -94,6 +96,98 @@ const ACTIVE_CONTACT_KEY = 'chat_active_contact';
 const ACTIVE_TAB_KEY = 'chat_tab';
 const WEBSOCKET_HEARTBEAT_INTERVAL_MS = 25_000;
 const CONTACT_PRESENCE_REFRESH_INTERVAL_MS = 30_000;
+const MOMENT_IMPRESSION_DELAY_MS = 1_000;
+const MOMENT_IMPRESSION_VISIBILITY_RATIO = 0.6;
+
+interface MomentImpressionProps {
+  enabled: boolean;
+  className: string;
+  style?: CSSProperties;
+  children: ReactNode;
+  onQualified: () => void;
+}
+
+function MomentImpression({
+  enabled,
+  className,
+  style,
+  children,
+  onQualified,
+}: MomentImpressionProps) {
+  const elementRef = useRef<HTMLDivElement>(null);
+  const onQualifiedRef = useRef(onQualified);
+  onQualifiedRef.current = onQualified;
+
+  useEffect(() => {
+    const element = elementRef.current;
+    if (!enabled || !element) return;
+
+    let timer: number | undefined;
+    let visibleEnough = false;
+    let qualified = false;
+
+    const clearTimer = () => {
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+        timer = undefined;
+      }
+    };
+    const scheduleQualification = () => {
+      clearTimer();
+      if (
+        qualified
+        || !visibleEnough
+        || document.visibilityState !== 'visible'
+      ) {
+        return;
+      }
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        if (
+          qualified
+          || !visibleEnough
+          || document.visibilityState !== 'visible'
+        ) {
+          return;
+        }
+        qualified = true;
+        onQualifiedRef.current();
+      }, MOMENT_IMPRESSION_DELAY_MS);
+    };
+    const observer = new IntersectionObserver(([entry]) => {
+      visibleEnough = entry.isIntersecting
+        && entry.intersectionRatio >= MOMENT_IMPRESSION_VISIBILITY_RATIO;
+      if (visibleEnough) {
+        scheduleQualification();
+      } else {
+        clearTimer();
+      }
+    }, {
+      threshold: [0, MOMENT_IMPRESSION_VISIBILITY_RATIO, 1],
+    });
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        scheduleQualification();
+      } else {
+        clearTimer();
+      }
+    };
+
+    observer.observe(element);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      clearTimer();
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [enabled]);
+
+  return (
+    <div ref={elementRef} className={className} style={style}>
+      {children}
+    </div>
+  );
+}
 
 function landscapeAvatar(seed: number) {
   return `https://picsum.photos/seed/${seed}/100/100`;
@@ -271,7 +365,7 @@ function toMomentPost(item: MomentApiItem): MomentPost {
     time: momentTimeLabel(item.created_at),
     likes: item.like_count ?? 0,
     liked: item.liked ?? false,
-    views: 0,
+    views: item.view_count ?? 0,
     comments: Array.isArray(item.comments)
       ? item.comments.map(comment => ({
         id: comment.id,
@@ -351,7 +445,7 @@ function Chat() {
   const [commentTexts, setCommentTexts] = useState<Record<string, string>>({});
   const [showCommentInput, setShowCommentInput] = useState<Record<string, boolean>>({});
   const [commentEmojiPost, setCommentEmojiPost] = useState<string | null>(null);
-  const [viewedPosts] = useState(new Set<string>());
+  const viewedPostsRef = useRef(new Set<string>());
   const [animatingLikes, setAnimatingLikes] = useState<Set<string>>(new Set());
   const [activeIndicatorTop, setActiveIndicatorTop] = useState(0);
   const chatImageRef = useRef<HTMLInputElement>(null);
@@ -1247,12 +1341,23 @@ function Chat() {
     }
   }
 
-  function trackView(postId: string) {
-    if (viewedPosts.has(postId)) return;
-    viewedPosts.add(postId);
-    setMoments(p => p.map(m =>
-      m.id === postId ? { ...m, views: m.views + 1 } : m
-    ));
+  async function trackView(postId: string) {
+    if (viewedPostsRef.current.has(postId)) return;
+    viewedPostsRef.current.add(postId);
+    try {
+      const result = await viewMoment(postId);
+      setMoments(previous => previous.map(moment =>
+        moment.id === postId
+          ? {
+            ...moment,
+            likes: result.like_count,
+            views: result.view_count,
+          }
+          : moment
+      ));
+    } catch {
+      viewedPostsRef.current.delete(postId);
+    }
   }
 
   async function handleCommentSubmit(postId: string) {
@@ -1778,10 +1883,15 @@ function Chat() {
             ) : (
               <>
                 {moments.map((post, idx) => {
-                  trackView(post.id);
                   const isCurrentUserPost = post.authorId === currentUser?.id;
                   return (
-                  <div key={post.id} className="moment-card" style={{ animationDelay: `${idx * 0.06}s` }}>
+                  <MomentImpression
+                    key={post.id}
+                    enabled={post.mediaType !== 'video'}
+                    className="moment-card"
+                    style={{ animationDelay: `${idx * 0.06}s` }}
+                    onQualified={() => void trackView(post.id)}
+                  >
                     <div className="card-header">
                       <div className="card-avatar">
                         <img src={isCurrentUserPost ? currentUserAvatar : post.avatar} alt="" className="avatar-img" />
@@ -1992,6 +2102,7 @@ function Chat() {
                           className="card-media"
                           active={playingMomentVideoId === post.id}
                           autoPlay={playingMomentVideoId === post.id}
+                          onViewQualified={() => void trackView(post.id)}
                         />
                       </div>
                     )}
@@ -2136,7 +2247,7 @@ function Chat() {
                         </div>
                       </div>
                     )}
-                  </div>
+                  </MomentImpression>
                   );
                 })}
                 {momentsLoading && momentsInitialized && (
