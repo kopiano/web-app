@@ -1,1 +1,8 @@
-/* /index.html 200
+/chat /index.html 200
+/music /index.html 200
+/video /index.html 200
+/oauth/success /index.html 200
+
+# Do not enable this catch-all: missing JavaScript assets must return 404,
+# otherwise browsers reject the index.html fallback as an invalid JS MIME type.
+# /* /index.html 200
