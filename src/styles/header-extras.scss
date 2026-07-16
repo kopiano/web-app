@@ -304,7 +304,8 @@
 }
 
 .notif-dropdown-panel {
-  width: min(92vw, 24rem);
+  width: clamp(24rem, 34vw, 36rem);
+  max-width: calc(100vw - 24px);
   border-radius: 2rem;
   padding: 10px;
   overflow: hidden;
