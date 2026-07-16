@@ -186,7 +186,7 @@ export default function HlsVideo({
         startFragPrefetch: false,
         maxBufferLength: 12,
         maxMaxBufferLength: 12,
-        maxBufferSize: 32 * 1024 * 1024,
+        maxBufferSize: 128 * 1024 * 1024,
         backBufferLength: 6,
       });
       hls.loadSource(src);
