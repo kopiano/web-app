@@ -18,3 +18,11 @@ section {
 .glass-border:hover {
     border-color: rgba(56, 56, 56, 0.65);
 }
+
+// card
+.glass-card {
+    background:rgba(255, 255, 255, 0.26);
+    backdrop-filter: blur(9px);
+    -webkit-backdrop-filter: blur(9px);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}

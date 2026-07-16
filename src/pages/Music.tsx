@@ -16,37 +16,30 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent } from 'react';
 import bg0 from '@/assets/images/bg-0.webp';
-import bg1 from '@/assets/images/bg-1.webp';
-import bg2 from '@/assets/images/bg-2.webp';
-import bg3 from '@/assets/images/bg-3.webp';
-import bg4 from '@/assets/images/bg-4.webp';
-import bg8 from '@/assets/images/bg-8.webp';
-import bg9 from '@/assets/images/bg-9.webp';
+import { getMusic, updateMusicFavorite, uploadMusic, type MusicTrack } from '@/api/music';
 import '@/styles/music.scss';
 
 type View = 'home' | 'playlist' | 'favorites';
 type PlayMode = 'sequential' | 'shuffle' | 'single';
 
-type Track = {
-  id: number;
-  title: string;
-  artist: string;
-  duration: number;
-  cover: string;
-  color: string;
+const EMPTY_TRACK: MusicTrack = {
+  id: '',
+  title: 'Your music library',
+  artist: 'Add music to begin',
+  album: 'Private Collection',
+  duration: 0,
+  bitrate: 0,
+  sampleRate: 0,
+  cover: bg0,
+  audioUrl: '',
+  originalUrl: '',
+  format: 'm4a',
+  originalFormat: '',
+  size: 0,
+  originalSize: 0,
+  isFavorite: false,
+  createdAt: '',
 };
-
-const initialTracks: Track[] = [
-  { id: 1, title: 'Aerial Bloom', artist: 'Nora Vale', duration: 242, cover: bg9, color: '#8d7cff' },
-  { id: 2, title: 'After the Rain', artist: 'Cedar Lane', duration: 218, cover: bg8, color: '#77b8d3' },
-  { id: 3, title: 'Velvet Horizon', artist: 'Mira Sol', duration: 196, cover: bg3, color: '#e08f9e' },
-  { id: 4, title: 'Quiet Constellation', artist: 'Eli North', duration: 264, cover: bg1, color: '#7aa6c8' },
-  { id: 5, title: 'Amber Hours', artist: 'Sunday Echo', duration: 231, cover: bg4, color: '#dca67b' },
-  { id: 6, title: 'Softly, Again', artist: 'The Daydreamers', duration: 207, cover: bg2, color: '#a696ca' },
-];
-
-const localTrackCovers = [bg9, bg8, bg3, bg1, bg4, bg2];
-const localTrackColors = ['#8d7cff', '#77b8d3', '#e08f9e', '#7aa6c8', '#dca67b', '#a696ca'];
 
 const navItems: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'home', label: 'Home', icon: Home },
@@ -65,37 +58,24 @@ const formatTime = (seconds: number) => {
   return `${Math.floor(safeSeconds / 60)}:${String(safeSeconds % 60).padStart(2, '0')}`;
 };
 
-const readAudioDuration = (file: File) => new Promise<number>((resolve) => {
-  const audio = new Audio();
-  const source = URL.createObjectURL(file);
-  const finish = (duration: number) => {
-    URL.revokeObjectURL(source);
-    resolve(duration);
-  };
-
-  audio.preload = 'metadata';
-  audio.onloadedmetadata = () => finish(Number.isFinite(audio.duration) ? Math.round(audio.duration) : 210);
-  audio.onerror = () => finish(210);
-  audio.src = source;
-});
-
 function Music() {
   const [activeView, setActiveView] = useState<View>('home');
-  const [tracks, setTracks] = useState<Track[]>(initialTracks);
+  const [tracks, setTracks] = useState<MusicTrack[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [volume, setVolume] = useState(68);
   const [lastVolume, setLastVolume] = useState(68);
-  const [favorites, setFavorites] = useState<Set<number>>(() => new Set([3, 5]));
   const [playMode, setPlayMode] = useState<PlayMode>('sequential');
-  const currentTrack = tracks[currentIndex];
+  const currentTrack = tracks[currentIndex] ?? EMPTY_TRACK;
+  const featuredTrack = tracks[0] ?? EMPTY_TRACK;
+  const audioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLInputElement>(null);
   const progressFillRef = useRef<HTMLDivElement>(null);
   const elapsedLabelRef = useRef<HTMLSpanElement>(null);
-  const elapsedRef = useRef(74);
-  const renderedSecondRef = useRef(Math.floor(74));
+  const elapsedRef = useRef(0);
+  const renderedSecondRef = useRef(0);
   const addMusicInputRef = useRef<HTMLInputElement>(null);
-  const nextTrackIdRef = useRef(initialTracks.length + 1);
 
   const syncProgressVisual = useCallback((value: number, duration: number) => {
     const progress = duration > 0 ? Math.min((value / duration) * 100, 100) : 0;
@@ -112,22 +92,21 @@ function Music() {
 
   const visibleTracks = useMemo(() => {
     if (activeView === 'favorites') {
-      return tracks.filter((track) => favorites.has(track.id));
+      return tracks.filter((track) => track.isFavorite);
     }
-    if (activeView === 'playlist') {
-      return tracks;
-    }
-    return tracks.slice(1, 5);
-  }, [activeView, favorites, tracks]);
+    return tracks;
+  }, [activeView, tracks]);
 
-  const playTrack = useCallback((track: Track) => {
+  const playTrack = useCallback((track: MusicTrack) => {
     const index = tracks.findIndex((item) => item.id === track.id);
+    if (index < 0) return;
     setCurrentIndex(index);
     resetProgress();
     setIsPlaying(true);
   }, [resetProgress, tracks]);
 
   const goToTrack = useCallback((direction: 1 | -1) => {
+    if (!tracks.length) return;
     setCurrentIndex((current) => {
       if (playMode === 'shuffle') {
         if (tracks.length < 2) return current;
@@ -151,51 +130,110 @@ function Music() {
   }, []);
 
   useEffect(() => {
-    if (!isPlaying) return;
+    let cancelled = false;
+    getMusic()
+      .then((music) => {
+        if (!cancelled) setTracks(music);
+      })
+      .catch((error) => {
+        console.error('Failed to load music', error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (currentIndex >= tracks.length && tracks.length) {
+      setCurrentIndex(0);
+    }
+  }, [currentIndex, tracks.length]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = volume / 100;
+  }, [volume]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (!currentTrack.audioUrl) {
+      audio.removeAttribute('src');
+      audio.load();
+      setIsPlaying(false);
+      resetProgress();
+      return;
+    }
+    if (audio.dataset.trackId !== currentTrack.id) {
+      audio.dataset.trackId = currentTrack.id;
+      audio.src = currentTrack.audioUrl;
+      audio.load();
+      resetProgress();
+    }
+  }, [currentTrack.audioUrl, currentTrack.id, resetProgress]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !currentTrack.audioUrl) return;
+    if (isPlaying) {
+      void audio.play().catch((error) => {
+        console.error('Audio playback failed', error);
+        setIsPlaying(false);
+      });
+    } else {
+      audio.pause();
+    }
+  }, [currentTrack.audioUrl, currentTrack.id, isPlaying]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !isPlaying) return;
     let frameId = 0;
-    let previousTime: number | null = null;
 
-    const updateProgress = (time: number) => {
-      if (previousTime !== null) {
-        const deltaSeconds = (time - previousTime) / 1000;
-        const nextElapsed = Math.min(elapsedRef.current + deltaSeconds, currentTrack.duration);
-        const nextSecond = Math.floor(nextElapsed);
+    const updateProgress = () => {
+      const duration = Number.isFinite(audio.duration) ? audio.duration : currentTrack.duration;
+      const nextElapsed = Math.min(audio.currentTime, duration || currentTrack.duration);
+      const nextSecond = Math.floor(nextElapsed);
+      elapsedRef.current = nextElapsed;
+      syncProgressVisual(nextElapsed, duration || currentTrack.duration);
 
-        elapsedRef.current = nextElapsed;
-        syncProgressVisual(nextElapsed, currentTrack.duration);
-
-        if (nextSecond !== renderedSecondRef.current || nextElapsed >= currentTrack.duration) {
-          renderedSecondRef.current = nextSecond;
-          if (progressRef.current) progressRef.current.value = String(nextElapsed);
-          if (elapsedLabelRef.current) elapsedLabelRef.current.textContent = formatTime(nextElapsed);
-        }
-      }
-      previousTime = time;
-      if (elapsedRef.current >= currentTrack.duration) {
-        if (playMode === 'single') {
-          resetProgress();
-          frameId = window.requestAnimationFrame(updateProgress);
-          return;
-        }
-        goToTrack(1);
-        return;
+      if (nextSecond !== renderedSecondRef.current) {
+        renderedSecondRef.current = nextSecond;
+        if (progressRef.current) progressRef.current.value = String(nextElapsed);
+        if (elapsedLabelRef.current) elapsedLabelRef.current.textContent = formatTime(nextElapsed);
       }
       frameId = window.requestAnimationFrame(updateProgress);
     };
 
     frameId = window.requestAnimationFrame(updateProgress);
     return () => window.cancelAnimationFrame(frameId);
-  }, [currentTrack.duration, goToTrack, isPlaying, playMode, resetProgress, syncProgressVisual]);
+  }, [currentTrack.duration, isPlaying, syncProgressVisual]);
 
   useEffect(() => {
     syncProgressVisual(elapsedRef.current, currentTrack.duration);
   }, [currentTrack.duration, currentTrack.id, syncProgressVisual]);
 
   useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const handleEnded = () => {
+      if (playMode === 'single') {
+        audio.currentTime = 0;
+        void audio.play();
+        return;
+      }
+      goToTrack(1);
+    };
+    audio.addEventListener('ended', handleEnded);
+    return () => audio.removeEventListener('ended', handleEnded);
+  }, [goToTrack, playMode]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
       if (target.matches('input, button, a')) return;
-      if (event.code === 'Space') {
+      if (event.code === 'Space' && tracks.length > 0) {
         event.preventDefault();
         setIsPlaying((value) => !value);
       }
@@ -204,15 +242,26 @@ function Music() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [goToTrack]);
+  }, [goToTrack, tracks.length]);
 
-  const toggleFavorite = (trackId: number) => {
-    setFavorites((current) => {
-      const next = new Set(current);
-      if (next.has(trackId)) next.delete(trackId);
-      else next.add(trackId);
-      return next;
-    });
+  const toggleFavorite = async (trackId: string) => {
+    const track = tracks.find((item) => item.id === trackId);
+    if (!track) return;
+    const nextFavorite = !track.isFavorite;
+    setTracks((current) => current.map((item) => (
+      item.id === trackId ? { ...item, isFavorite: nextFavorite } : item
+    )));
+    try {
+      const persisted = await updateMusicFavorite(trackId, nextFavorite);
+      setTracks((current) => current.map((item) => (
+        item.id === trackId ? { ...item, isFavorite: persisted } : item
+      )));
+    } catch (error) {
+      console.error('Failed to update favorite', error);
+      setTracks((current) => current.map((item) => (
+        item.id === trackId ? { ...item, isFavorite: track.isFavorite } : item
+      )));
+    }
   };
 
   const toggleMute = () => {
@@ -243,25 +292,28 @@ function Music() {
   const handleAddMusic = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     if (!files.length) return;
-
-    const addedTracks = await Promise.all(files.map(async (file, index) => ({
-      id: nextTrackIdRef.current++,
-      title: file.name.replace(/\.[^.]+$/, ''),
-      artist: 'Local Library',
-      duration: await readAudioDuration(file),
-      cover: localTrackCovers[index % localTrackCovers.length],
-      color: localTrackColors[index % localTrackColors.length],
-    })));
-
-    setTracks((current) => [...current, ...addedTracks]);
-    setActiveView('playlist');
-    event.target.value = '';
+    setIsUploading(true);
+    try {
+      await uploadMusic(files);
+      const refreshed = await getMusic();
+      setTracks(refreshed);
+      setCurrentIndex(0);
+      setActiveView('playlist');
+      setIsPlaying(false);
+      resetProgress();
+    } catch (error) {
+      console.error('Failed to upload music', error);
+    } finally {
+      setIsUploading(false);
+      event.target.value = '';
+    }
   };
 
   const VolumeIcon = volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
 
   return (
-    <main className="music-page" style={{ '--track-accent': currentTrack.color } as CSSProperties}>
+    <main className="music-page" style={{ '--track-accent': '#fea6d8' } as CSSProperties}>
+      <audio ref={audioRef} preload="metadata" />
       <div className="music-ambient music-ambient-one" />
       <div className="music-ambient music-ambient-two" />
 
@@ -286,8 +338,10 @@ function Music() {
           type="button"
           className="music-add-button"
           onClick={() => addMusicInputRef.current?.click()}
+          disabled={isUploading}
+          aria-busy={isUploading}
           aria-label="Add music"
-          title="Add music"
+          title={isUploading ? 'Uploading and converting music' : 'Add music'}
         >
           <Plus size={23} strokeWidth={1.8} />
         </button>
@@ -295,7 +349,7 @@ function Music() {
           ref={addMusicInputRef}
           className="music-add-input"
           type="file"
-          accept="audio/*"
+          accept=".mp3,.m4a,.aac,.flac,.wav,.ogg,.opus,audio/*"
           multiple
           onChange={handleAddMusic}
           tabIndex={-1}
@@ -311,16 +365,17 @@ function Music() {
 
         <article
           className="music-feature-card"
-          style={{ backgroundImage: `url(${bg0})` }}
+          style={{ backgroundImage: `url(${featuredTrack.cover})` }}
         >
           <div className="music-feature-shine" />
           <div className="music-feature-copy">
-            <span className="music-feature-label">FEATURED ALBUM / 2026</span>
-            <h2>Chromatic Daydreams</h2>
-            <p>Six luminous tracks for slow mornings and late-night focus.</p>
+            <span className="music-feature-label">{featuredTrack.album.toUpperCase()}</span>
+            <h2>{featuredTrack.title}</h2>
+            <p>{featuredTrack.artist}</p>
             <button
               className="music-album-play"
               type="button"
+              disabled={!tracks.length}
               onClick={() => {
                 setCurrentIndex(0);
                 resetProgress();
@@ -331,7 +386,7 @@ function Music() {
               <span>Play album</span>
             </button>
           </div>
-          <div className="music-feature-index">01 - 06</div>
+          <div className="music-feature-index">{tracks.length ? `01 - ${String(tracks.length).padStart(2, '0')}` : '00'}</div>
         </article>
 
         <div className="music-section-heading">
@@ -367,14 +422,14 @@ function Music() {
                 >
                   <button
                     type="button"
-                    className={`music-card-favorite${favorites.has(track.id) ? ' is-favorite' : ''}`}
-                    aria-label={favorites.has(track.id) ? `Remove ${track.title} from favorites` : `Add ${track.title} to favorites`}
+                    className={`music-card-favorite${track.isFavorite ? ' is-favorite' : ''}`}
+                    aria-label={track.isFavorite ? `Remove ${track.title} from favorites` : `Add ${track.title} to favorites`}
                     onClick={(event) => {
                       event.stopPropagation();
                       toggleFavorite(track.id);
                     }}
                   >
-                    <Heart size={16} fill={favorites.has(track.id) ? 'currentColor' : 'none'} />
+                    <Heart size={16} fill={track.isFavorite ? 'currentColor' : 'none'} />
                   </button>
                   <div className="music-track-glass">
                     <div>
@@ -403,7 +458,7 @@ function Music() {
             <Heart size={25} />
             <h3>Your favorites are waiting.</h3>
             <p>Tap the heart on a track to keep it close.</p>
-            <button type="button" onClick={() => setActiveView('home')}>Explore music</button>
+            <button type="button" onClick={() => addMusicInputRef.current?.click()}>Add music</button>
           </div>
         )}
       </div>
@@ -421,16 +476,17 @@ function Music() {
         </div>
 
         <div className="music-transport">
-          <button type="button" onClick={() => goToTrack(-1)} aria-label="Previous track"><SkipBack size={19} fill="currentColor" /></button>
+          <button type="button" disabled={!tracks.length} onClick={() => goToTrack(-1)} aria-label="Previous track"><SkipBack size={19} fill="currentColor" /></button>
           <button
             type="button"
             className="music-main-play"
+            disabled={!tracks.length}
             onClick={() => setIsPlaying((value) => !value)}
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
           </button>
-          <button type="button" onClick={() => goToTrack(1)} aria-label="Next track"><SkipForward size={19} fill="currentColor" /></button>
+          <button type="button" disabled={!tracks.length} onClick={() => goToTrack(1)} aria-label="Next track"><SkipForward size={19} fill="currentColor" /></button>
         </div>
 
         <div className={`music-timeline${isPlaying ? ' is-playing' : ''}`}>
@@ -446,9 +502,10 @@ function Music() {
               type="range"
               min="0"
               max={currentTrack.duration}
-              defaultValue={elapsedRef.current}
+              value={Math.min(elapsedRef.current, currentTrack.duration)}
               onChange={(event) => {
                 const nextElapsed = Number(event.target.value);
+                if (audioRef.current) audioRef.current.currentTime = nextElapsed;
                 elapsedRef.current = nextElapsed;
                 renderedSecondRef.current = Math.floor(nextElapsed);
                 if (elapsedLabelRef.current) elapsedLabelRef.current.textContent = formatTime(nextElapsed);
@@ -462,11 +519,12 @@ function Music() {
 
         <button
           type="button"
-          className={`music-player-favorite${favorites.has(currentTrack.id) ? ' is-favorite' : ''}`}
+          className={`music-player-favorite${currentTrack.isFavorite ? ' is-favorite' : ''}`}
+          disabled={!currentTrack.id}
           onClick={() => toggleFavorite(currentTrack.id)}
-          aria-label={favorites.has(currentTrack.id) ? 'Remove from favorites' : 'Add to favorites'}
+          aria-label={currentTrack.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
         >
-          <Heart size={16} fill={favorites.has(currentTrack.id) ? 'currentColor' : 'none'} />
+          <Heart size={16} fill={currentTrack.isFavorite ? 'currentColor' : 'none'} />
           {/* <span>Favorites</span> */}
         </button>
 
