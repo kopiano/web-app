@@ -12,5 +12,12 @@
     "language": "Language",
     "en": "en",
     "zh": "zh"
+  },
+  "chat": {
+    "groups": "Groups",
+    "contacts": "Contacts",
+    "post": "Post",
+    "online": "Online",
+    "offline": "Offline"
   }
 }

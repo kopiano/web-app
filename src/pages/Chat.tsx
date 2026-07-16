@@ -1,6 +1,7 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import { resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar';
 import { getMessageHistory, sendImageMessage, sendMessage } from '@/api/chat';
 import {
@@ -401,6 +402,7 @@ function insertAtSelection(
 }
 
 function Chat() {
+  const { t } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const authInitialized = useSelector((state: RootState) => state.auth.initialized);
@@ -1459,7 +1461,7 @@ function Chat() {
           <div className="chat-panel">
             <aside ref={contactsPanelRef} className="contacts-panel">
               <div className="contact-active-indicator" style={{ top: activeIndicatorTop }} />
-              <div className="contact-group-label">Groups</div>
+              <div className="contact-group-label">{t('chat.groups')}</div>
               {visibleContacts.filter(c => c.type === 'group').map(c => (
                 <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => selectContact(c.id)}>
                   <div className="contact-avatar">
@@ -1473,7 +1475,7 @@ function Chat() {
                 </div>
               ))}
               <div className="contact-divider" />
-              <div className="contact-group-label">Contacts</div>
+              <div className="contact-group-label">{t('chat.contacts')}</div>
               {visibleContacts.filter(c => c.type === 'user').map(c => (
                 <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => selectContact(c.id)}>
                   <div className="contact-avatar">
@@ -1532,8 +1534,8 @@ function Chat() {
                         {activeContactInfo.type === 'group'
                           ? `${activeContactInfo.members?.length || 0} members`
                           : activeContactInfo.online
-                            ? 'Online'
-                            : 'Offline'}
+                            ? t('chat.online')
+                            : t('chat.offline')}
                       </div>
                     </div>
                   </>
@@ -1862,7 +1864,7 @@ function Chat() {
                   onClick={handleMomentPublish}
                 >
                   {momentPublishing && <span className="moment-submit-spinner" aria-hidden="true" />}
-                  {momentPublishing ? 'Posting' : 'Post'}
+                  {momentPublishing ? 'Posting' : t('chat.post')}
                 </button>
               </div>
             </div>

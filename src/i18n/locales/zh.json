@@ -12,5 +12,12 @@
     "language": "语言",
     "en": "英",
     "zh": "中"
+  },
+  "chat": {
+    "groups": "群聊",
+    "contacts": "用户",
+    "post": "发布",
+    "online": "在线",
+    "offline": "离线"
   }
 }
