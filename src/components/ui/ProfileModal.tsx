@@ -121,23 +121,34 @@ export default function ProfileModal({ user, onClose, onSaved }: ProfileModalPro
     <div className="auth-overlay">
       <div className="auth-backdrop" onClick={onClose} />
       <section className="auth-panel profile-panel" role="dialog" aria-modal="true" aria-labelledby="profile-title">
-        <button className="auth-close" type="button" onClick={onClose} aria-label="Close profile">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path d="M1 1L13 13M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
-        <header className="auth-header">
-          <h2 id="profile-title" className="auth-title">Profile</h2>
-          <p className="auth-subtitle">Update your avatar, username, or password.</p>
+        <header className="profile-header">
+          <div className="profile-title-group">
+            <button className="profile-close" type="button" onClick={onClose} aria-label="Close profile">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M1 1L13 13M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+            <h2 id="profile-title" className="auth-title">Edit Profile</h2>
+          </div>
+          <button
+            className="profile-save"
+            type="submit"
+            form="profile-form"
+            disabled={loading}
+          >
+            {loading ? 'Saving...' : 'Save'}
+          </button>
         </header>
-        <form className="auth-form" onSubmit={handleSave}>
+        <div className="profile-intro">
+          <p className="auth-subtitle">Update your avatar, username, or password.</p>
+        </div>
+        <form id="profile-form" className="auth-form" onSubmit={handleSave}>
           <div className="profile-avatar-field">
             <button
               className="profile-avatar-button"
               type="button"
               onClick={() => fileInputRef.current?.click()}
               aria-label="Change avatar"
-              title="Change avatar"
             >
               {preview ? <img src={preview} alt="" /> : <span>{username.trim().charAt(0).toUpperCase() || 'U'}</span>}
               <span className="profile-avatar-edit" aria-hidden="true">
@@ -149,7 +160,7 @@ export default function ProfileModal({ user, onClose, onSaved }: ProfileModalPro
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} hidden />
           </div>
           <label className="auth-field">
-            <span className="auth-label">Username</span>
+            <span className="auth-label">Name</span>
             <span className="auth-input-wrap">
               <input className="auth-input" value={username} onChange={event => setUsername(event.target.value)} required autoComplete="username" />
             </span>
@@ -157,14 +168,10 @@ export default function ProfileModal({ user, onClose, onSaved }: ProfileModalPro
           <label className="auth-field">
             <span className="auth-label">Password</span>
             <span className="auth-input-wrap">
-              <input className="auth-input" type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Leave blank to keep your password" autoComplete="new-password" />
+              <input className="auth-input" type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="" autoComplete="new-password" />
             </span>
           </label>
           {error && <p className="auth-error" role="alert">{error}</p>}
-          <div className="profile-actions">
-            <button className="profile-cancel" type="button" onClick={onClose} disabled={loading}>Cancel</button>
-            <button className="auth-submit profile-save" type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save'}</button>
-          </div>
         </form>
       </section>
     </div>

@@ -153,7 +153,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-field">
-            <label className="auth-label">Username</label>
+            <label className="auth-label">Name</label>
             <div className="auth-input-wrap">
               <input
                 className="auth-input"
