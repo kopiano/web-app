@@ -71,7 +71,7 @@ const authSlice = createSlice({
       state.user = action.payload;
       state.initialized = true;
       if (action.payload) {
-        authStorage.clearLoggedOut();
+        authStorage.markAuthenticated();
         sessionStorage.setItem('auth_user', JSON.stringify(action.payload));
       } else {
         sessionStorage.removeItem('auth_user');
@@ -99,7 +99,7 @@ const authSlice = createSlice({
         state.user = action.payload;
         state.loading = false;
         state.initialized = true;
-        authStorage.clearLoggedOut();
+        authStorage.markAuthenticated();
         sessionStorage.setItem('auth_user', JSON.stringify(action.payload));
       })
       .addCase(fetchCurrentUser.rejected, (state, action) => {
@@ -109,13 +109,15 @@ const authSlice = createSlice({
           // The HttpOnly Cookie is the source of truth. Do not keep a stale
           // cached profile after the server rejects the session.
           state.user = null;
+          authStorage.clear();
+          authStorage.markLoggedOut();
           sessionStorage.removeItem('auth_user');
         }
       })
       .addCase(updateCurrentUserProfile.fulfilled, (state, action) => {
         state.user = action.payload;
         state.initialized = true;
-        authStorage.clearLoggedOut();
+        authStorage.markAuthenticated();
         sessionStorage.setItem('auth_user', JSON.stringify(action.payload));
       });
   },

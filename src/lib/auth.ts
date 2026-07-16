@@ -4,6 +4,7 @@ const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8100/api/')
 export const AUTH_CHANGED_EVENT = 'auth:changed';
 export const AUTH_LOGGED_OUT_KEY = 'auth_logged_out';
 export const AUTH_RETURN_TO_KEY = 'auth_return_to';
+export const AUTH_SESSION_HINT_KEY = 'auth_session_active';
 
 function currentLocationPath() {
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -49,16 +50,28 @@ export const authStorage = {
     localStorage.setItem('token', token);
     localStorage.setItem('auth_token', token);
     localStorage.removeItem(AUTH_LOGGED_OUT_KEY);
+    localStorage.setItem(AUTH_SESSION_HINT_KEY, '1');
   },
   getRefreshToken: () => localStorage.getItem('refresh_token'),
   setRefreshToken: (token: string) => localStorage.setItem('refresh_token', token),
   isLoggedOut: () => localStorage.getItem(AUTH_LOGGED_OUT_KEY) === '1',
+  hasSessionHint: () => Boolean(
+    localStorage.getItem('token')
+    || localStorage.getItem('auth_token')
+    || localStorage.getItem(AUTH_SESSION_HINT_KEY) === '1'
+    || sessionStorage.getItem('auth_user'),
+  ),
+  markAuthenticated: () => {
+    localStorage.setItem(AUTH_SESSION_HINT_KEY, '1');
+    localStorage.removeItem(AUTH_LOGGED_OUT_KEY);
+  },
   markLoggedOut: () => localStorage.setItem(AUTH_LOGGED_OUT_KEY, '1'),
   clearLoggedOut: () => localStorage.removeItem(AUTH_LOGGED_OUT_KEY),
   clear: () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem(AUTH_SESSION_HINT_KEY);
   },
 };
 

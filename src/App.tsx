@@ -68,7 +68,7 @@ const Layout = () => {
 
   useEffect(() => {
     if (isOAuthSuccess) return;
-    if (authStorage.isLoggedOut()) {
+    if (authStorage.isLoggedOut() || !authStorage.hasSessionHint()) {
       dispatch(clearUser());
       return;
     }
