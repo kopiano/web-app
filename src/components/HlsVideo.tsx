@@ -46,11 +46,8 @@ export default function HlsVideo({
 
     const startPlayback = () => {
       if (!autoPlayRef.current) return;
-      video.muted = false;
-      void video.play().catch(() => {
-        video.muted = true;
-        return video.play().catch(() => undefined);
-      });
+      video.muted = true;
+      void video.play().catch(() => undefined);
     };
 
     if (!src.toLowerCase().split(/[?#]/, 1)[0].endsWith('.m3u8')) {
@@ -64,33 +61,37 @@ export default function HlsVideo({
       };
     }
 
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = src;
-      video.addEventListener('canplay', startPlayback);
-      return () => {
-        video.removeEventListener('canplay', startPlayback);
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
-      };
-    }
-
     let disposed = false;
     let hls: Hls | null = null;
-    void import('hls.js').then(({ default: HlsPlayer }) => {
+    let nativeHlsAttached = false;
+    const attachNativeHls = () => {
       if (disposed) return;
-      if (!HlsPlayer.isSupported()) {
+      if (!video.canPlayType('application/vnd.apple.mpegurl')) {
         setPlaybackError(true);
         return;
       }
 
+      nativeHlsAttached = true;
+      video.src = src;
+      video.addEventListener('canplay', startPlayback);
+    };
+
+    void import('hls.js').then(({ default: HlsPlayer }) => {
+      if (disposed) return;
+      if (!HlsPlayer.isSupported()) {
+        attachNativeHls();
+        return;
+      }
+
       hls = new HlsPlayer({
+        // autoStartLoad: true,
         enableWorker: true,
         lowLatencyMode: false,
+        startFragPrefetch: false,
         maxBufferLength: 12,
-        maxMaxBufferLength: 24,
-        maxBufferSize: 16 * 1024 * 1024,
-        backBufferLength: 12,
+        maxMaxBufferLength: 12,
+        maxBufferSize: 8 * 1024 * 1024,
+        backBufferLength: 6,
       });
       hls.loadSource(src);
       hls.attachMedia(video);
@@ -107,12 +108,13 @@ export default function HlsVideo({
           hls = null;
         }
       });
-    }).catch(() => {
-      if (!disposed) setPlaybackError(true);
-    });
+    }).catch(attachNativeHls);
 
     return () => {
       disposed = true;
+      if (nativeHlsAttached) {
+        video.removeEventListener('canplay', startPlayback);
+      }
       hls?.destroy();
       video.pause();
       video.removeAttribute('src');
@@ -125,11 +127,8 @@ export default function HlsVideo({
     if (!video || !active) return;
 
     if (autoPlay) {
-      video.muted = false;
-      void video.play().catch(() => {
-        video.muted = true;
-        return video.play().catch(() => undefined);
-      });
+      video.muted = true;
+      void video.play().catch(() => undefined);
     } else {
       video.pause();
     }
@@ -158,7 +157,7 @@ export default function HlsVideo({
         ref={videoRef}
         controls={active}
         playsInline
-        preload={active ? 'auto' : 'none'}
+        preload={active ? 'metadata' : 'none'}
         poster={poster}
         className={className}
       />

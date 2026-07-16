@@ -368,6 +368,8 @@ function Chat() {
   const momentEmojiPickerRef = useRef<HTMLDivElement>(null);
   const commentEmojiPickerRef = useRef<HTMLDivElement>(null);
   const momentMenuRef = useRef<HTMLDivElement>(null);
+  const momentsFeedRef = useRef<HTMLDivElement>(null);
+  const momentVideoElementsRef = useRef(new Map<string, HTMLDivElement>());
   const momentsLoadingRef = useRef(false);
   const momentsCursorRef = useRef<{ createdAt: string; id: string } | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
@@ -399,6 +401,18 @@ function Chat() {
       .join(','),
     [moments],
   );
+  const readyMomentVideoIds = useMemo(
+    () => moments
+      .filter(moment => (
+        moment.media
+        && moment.mediaType === 'video'
+        && moment.processingStatus === 'ready'
+        && !completedProcessingMoments.has(moment.id)
+      ))
+      .map(moment => moment.id),
+    [moments, completedProcessingMoments],
+  );
+  const readyMomentVideoKey = readyMomentVideoIds.join(',');
   const loadMoments = async (reset = false) => {
     if (momentsLoadingRef.current || (!reset && !momentsHasMore)) return;
     momentsLoadingRef.current = true;
@@ -552,6 +566,47 @@ function Chat() {
     }
     void loadMoments(true);
   }, [activeTab, authInitialized, currentUser?.id, momentsInitialized, momentsLoading, momentsError]);
+
+  useEffect(() => {
+    const feed = momentsFeedRef.current;
+    if (activeTab !== 'moments' || !feed || !readyMomentVideoKey) {
+      setPlayingMomentVideoId(null);
+      return;
+    }
+
+    const visibleRatios = new Map<string, number>();
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        const momentId = (entry.target as HTMLElement).dataset.momentVideoId;
+        if (!momentId) return;
+        visibleRatios.set(momentId, entry.isIntersecting ? entry.intersectionRatio : 0);
+      });
+
+      let nextPlayingId: string | null = null;
+      let highestRatio = 0;
+      readyMomentVideoIds.forEach(momentId => {
+        const ratio = visibleRatios.get(momentId) || 0;
+        if (ratio >= 0.65 && ratio > highestRatio) {
+          highestRatio = ratio;
+          nextPlayingId = momentId;
+        }
+      });
+      setPlayingMomentVideoId(current => current === nextPlayingId ? current : nextPlayingId);
+    }, {
+      root: feed,
+      threshold: [0, 0.65, 1],
+    });
+
+    readyMomentVideoIds.forEach(momentId => {
+      const element = momentVideoElementsRef.current.get(momentId);
+      if (element) observer.observe(element);
+    });
+
+    return () => {
+      observer.disconnect();
+      setPlayingMomentVideoId(null);
+    };
+  }, [activeTab, readyMomentVideoKey]);
 
   useEffect(() => {
     return () => {
@@ -1571,7 +1626,7 @@ function Chat() {
 
         {/* ── Moments View ── */}
         <div className={`moments-view${activeTab === 'moments' ? '' : ' hidden'}`}>
-          <div className="moments-feed" onScroll={handleMomentsScroll}>
+          <div ref={momentsFeedRef} className="moments-feed" onScroll={handleMomentsScroll}>
             <div className="moment-post">
               <div className="moment-post-top">
                 <div className="moment-post-avatar">
@@ -1918,7 +1973,17 @@ function Chat() {
                       && post.mediaType === 'video'
                       && post.processingStatus === 'ready'
                       && !completedProcessingMoments.has(post.id) && (
-                      <div className="card-media-wrap video-media-wrap">
+                      <div
+                        ref={element => {
+                          if (element) {
+                            momentVideoElementsRef.current.set(post.id, element);
+                          } else {
+                            momentVideoElementsRef.current.delete(post.id);
+                          }
+                        }}
+                        data-moment-video-id={post.id}
+                        className="card-media-wrap video-media-wrap"
+                      >
                         <HlsVideo
                           src={post.media}
                           poster={post.poster}
@@ -1927,10 +1992,6 @@ function Chat() {
                           className="card-media"
                           active={playingMomentVideoId === post.id}
                           autoPlay={playingMomentVideoId === post.id}
-                          onActivate={() => setPlayingMomentVideoId(post.id)}
-                          onDeactivate={() => {
-                            setPlayingMomentVideoId(current => current === post.id ? null : current);
-                          }}
                         />
                       </div>
                     )}
