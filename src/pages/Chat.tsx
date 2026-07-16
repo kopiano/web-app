@@ -2,7 +2,15 @@ import { Fragment, useState, useRef, useEffect, useLayoutEffect, useMemo } from 
 import { useDispatch, useSelector } from 'react-redux';
 import { resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar';
 import { getMessageHistory, sendImageMessage, sendMessage } from '@/api/chat';
-import { createMoment, deleteMoment, getMoment, getMoments } from '@/api/moment';
+import {
+  createMoment,
+  createMomentComment,
+  deleteMoment,
+  getMoment,
+  getMoments,
+  likeMoment,
+  unlikeMoment,
+} from '@/api/moment';
 import HlsVideo from '@/components/HlsVideo';
 import type {
   ChatApiMessage,
@@ -42,7 +50,7 @@ interface Message {
 }
 
 interface Comment {
-  id: number;
+  id: string;
   author: string;
   text: string;
 }
@@ -261,10 +269,16 @@ function toMomentPost(item: MomentApiItem): MomentPost {
     processingProgress: Math.min(100, Math.max(0, item.processing_progress ?? 100)),
     processingError: item.processing_error || undefined,
     time: momentTimeLabel(item.created_at),
-    likes: 0,
-    liked: false,
+    likes: item.like_count ?? 0,
+    liked: item.liked ?? false,
     views: 0,
-    comments: [],
+    comments: Array.isArray(item.comments)
+      ? item.comments.map(comment => ({
+        id: comment.id,
+        author: comment.username,
+        text: comment.content,
+      }))
+      : [],
   };
 }
 
@@ -359,6 +373,8 @@ function Chat() {
   const commentInputRefs = useRef(new Map<string, HTMLInputElement>());
   const processingFailureNotifiedRef = useRef(new Set<string>());
   const processingCompletionTimersRef = useRef(new Map<string, number>());
+  const momentLikeRequestsRef = useRef(new Set<string>());
+  const momentCommentRequestsRef = useRef(new Set<string>());
   const visibleContacts = useMemo<Contact[]>(
     () => currentUser ? remoteContacts : contacts,
     [currentUser, remoteContacts],
@@ -1125,27 +1141,52 @@ function Chat() {
     }
   }
 
-  function toggleLike(postId: string) {
+  async function toggleLike(postId: string) {
+    if (momentLikeRequestsRef.current.has(postId)) return;
     const current = moments.find(m => m.id === postId);
-    if (!current || current.liked) {
-      // unlike: no animation
-      setMoments(p => p.map(m =>
-        m.id === postId ? { ...m, liked: false, likes: m.likes - 1 } : m
-      ));
-      return;
+    if (!current) return;
+
+    const nextLiked = !current.liked;
+    momentLikeRequestsRef.current.add(postId);
+    if (nextLiked) {
+      setAnimatingLikes(prev => new Set(prev).add(postId));
+      window.setTimeout(() => {
+        setAnimatingLikes(prev => {
+          const next = new Set(prev);
+          next.delete(postId);
+          return next;
+        });
+      }, 650);
     }
-    // like: trigger particle animation
-    setAnimatingLikes(prev => new Set(prev).add(postId));
     setMoments(p => p.map(m =>
-      m.id === postId ? { ...m, liked: true, likes: m.likes + 1 } : m
+      m.id === postId
+        ? {
+          ...m,
+          liked: nextLiked,
+          likes: Math.max(0, m.likes + (nextLiked ? 1 : -1)),
+        }
+        : m
     ));
-    setTimeout(() => {
-      setAnimatingLikes(prev => {
-        const next = new Set(prev);
-        next.delete(postId);
-        return next;
-      });
-    }, 650);
+
+    try {
+      const result = nextLiked
+        ? await likeMoment(postId)
+        : await unlikeMoment(postId);
+      setMoments(previous => previous.map(moment =>
+        moment.id === postId
+          ? { ...moment, liked: result.liked, likes: result.like_count }
+          : moment
+      ));
+    } catch {
+      setMoments(previous => previous.map(moment =>
+        moment.id === postId
+          ? { ...moment, liked: current.liked, likes: current.likes }
+          : moment
+      ));
+      notify('Unable to update the like. Please try again.', 'error');
+    } finally {
+      momentLikeRequestsRef.current.delete(postId);
+    }
   }
 
   function trackView(postId: string) {
@@ -1156,14 +1197,53 @@ function Chat() {
     ));
   }
 
-  function handleCommentSubmit(postId: string) {
+  async function handleCommentSubmit(postId: string) {
     const text = commentTexts[postId]?.trim();
-    if (!text) return;
+    if (!text || !currentUser || momentCommentRequestsRef.current.has(postId)) return;
+    const temporaryId = `temporary:${crypto.randomUUID()}`;
+    momentCommentRequestsRef.current.add(postId);
     setMoments(p => p.map(m =>
-      m.id === postId ? { ...m, comments: [...m.comments, { id: Date.now(), author: currentUserName, text }] } : m
+      m.id === postId
+        ? {
+          ...m,
+          comments: [...m.comments, { id: temporaryId, author: currentUserName, text }],
+        }
+        : m
     ));
     setCommentTexts(p => ({ ...p, [postId]: '' }));
     setCommentEmojiPost(null);
+
+    try {
+      const comment = await createMomentComment(postId, text);
+      setMoments(previous => previous.map(moment =>
+        moment.id === postId
+          ? {
+            ...moment,
+            comments: moment.comments.map(item =>
+              item.id === temporaryId
+                ? { id: comment.id, author: comment.username, text: comment.content }
+                : item
+            ),
+          }
+          : moment
+      ));
+    } catch {
+      setMoments(previous => previous.map(moment =>
+        moment.id === postId
+          ? {
+            ...moment,
+            comments: moment.comments.filter(item => item.id !== temporaryId),
+          }
+          : moment
+      ));
+      setCommentTexts(previous => ({
+        ...previous,
+        [postId]: previous[postId]?.trim() ? previous[postId] : text,
+      }));
+      notify('Unable to publish the comment. Please try again.', 'error');
+    } finally {
+      momentCommentRequestsRef.current.delete(postId);
+    }
   }
 
   function toggleCommentInput(postId: string) {

@@ -241,3 +241,13 @@ faq：上传成功后一直显示Processing video？
 要显示转码进度，需要解析 FFmpeg 的 -progress输出，将进度保存到 Redis 或数据库，并通过 WebSocket或轮询接口返回给前端
 
 不要一次加载所有动态，开始只加载10条动态，向下滚动后继续追加加载10条动态，后面一样。LIMIT 10;
+
+### 动态点赞、评论
+  - 前端点赞和评论采用`乐观更新`，失败时自动回滚并提示。
+  - 点赞接口支持`幂等`处理，重复点击不会产生重复记录或错误计数。
+  - 评论限制为非空且最多 1000 字符。
+接口：
+  POST   /api/moment/{id}/like
+  DELETE /api/moment/{id}/like
+  POST   /api/moment/{id}/comment
+  

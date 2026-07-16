@@ -88,3 +88,45 @@ export function createMoment(input) {
 export function deleteMoment(id) {
   return request.delete(`/moment/${encodeURIComponent(id)}`).then(() => undefined)
 }
+
+export function likeMoment(id) {
+  return request.post(`/moment/${encodeURIComponent(id)}/like`).then(response => {
+    if (
+      response.data
+      && typeof response.data === 'object'
+      && response.data.moment_id === id
+      && response.data.liked === true
+    ) {
+      return response.data
+    }
+    throw new Error('Invalid like moment response')
+  })
+}
+
+export function unlikeMoment(id) {
+  return request.delete(`/moment/${encodeURIComponent(id)}/like`).then(response => {
+    if (
+      response.data
+      && typeof response.data === 'object'
+      && response.data.moment_id === id
+      && response.data.liked === false
+    ) {
+      return response.data
+    }
+    throw new Error('Invalid unlike moment response')
+  })
+}
+
+export function createMomentComment(id, content) {
+  return request.post(`/moment/${encodeURIComponent(id)}/comment`, { content }).then(response => {
+    if (
+      response.data
+      && typeof response.data === 'object'
+      && response.data.moment_id === id
+      && typeof response.data.id === 'string'
+    ) {
+      return response.data
+    }
+    throw new Error('Invalid create moment comment response')
+  })
+}
