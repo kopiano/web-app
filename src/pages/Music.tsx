@@ -248,9 +248,6 @@ function Music() {
         <header className="music-heading">
           <div>
             <span className="music-eyebrow">YOUR PRIVATE COLLECTION</span>
-            {activeView !== 'home' && (
-              <h1>{activeView === 'favorites' ? 'Songs you love.' : 'Your playlist.'}</h1>
-            )}
           </div>
         </header>
 
