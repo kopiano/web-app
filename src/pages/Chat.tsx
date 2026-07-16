@@ -2104,6 +2104,10 @@ function Chat() {
                           className="card-media"
                           active={playingMomentVideoId === post.id}
                           autoPlay={playingMomentVideoId === post.id}
+                          onActivate={() => setPlayingMomentVideoId(post.id)}
+                          onDeactivate={() => setPlayingMomentVideoId(current => (
+                            current === post.id ? null : current
+                          ))}
                           onViewQualified={() => void trackView(post.id)}
                         />
                       </div>

@@ -270,6 +270,7 @@ threshold: 0.6 或 0.7。
 这种方案既能获得类似 Twitter 的滚动自动播放体验，又能避免你现在遇到的"进入页面就请求大量 .m3u8 和 .ts 文件"的问题，同时内存和网络占用也会低很多。
 根因是当前代码先检测原生 HLS，Safari/WebKit 会直接走原生播放器，从而完全绕过 HLS.js 的 maxMaxBufferLength: 12；
 优先使用 HLS.js。只有 HLS.js 不支持时才回退到原生 HLS。
+google chrome无法保证同时保持滚动播放和不静音，要开静音video.muted = true
 
 ### 动态点赞、评论
   - 前端点赞和评论采用`乐观更新`，失败时自动回滚并提示。

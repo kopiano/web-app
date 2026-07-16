@@ -1,6 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import type Hls from 'hls.js';
 
+interface NavigatorWithUserAgentData extends Navigator {
+  userAgentData?: {
+    brands?: Array<{ brand: string }>;
+  };
+}
+
+function isGoogleChromeBrowser() {
+  const navigatorWithBrands = navigator as NavigatorWithUserAgentData;
+  const brands = navigatorWithBrands.userAgentData?.brands;
+  if (brands?.length) {
+    return brands.some(({ brand }) => brand === 'Google Chrome');
+  }
+
+  return /\bChrome\/\d+/.test(navigator.userAgent)
+    && !/\b(?:Edg|OPR|SamsungBrowser|CriOS)\//.test(navigator.userAgent);
+}
+
 interface HlsVideoProps {
   src: string;
   poster?: string;
@@ -31,6 +48,7 @@ export default function HlsVideo({
   const autoPlayRef = useRef(autoPlay);
   const onViewQualifiedRef = useRef(onViewQualified);
   const [playbackError, setPlaybackError] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const hasDimensions = Boolean(width && height && width > 0 && height > 0);
   const aspectRatio = hasDimensions ? `${width} / ${height}` : '16 / 9';
   autoPlayRef.current = autoPlay;
@@ -110,6 +128,7 @@ export default function HlsVideo({
     if (!video) return;
 
     setPlaybackError(false);
+    setIsPlaying(false);
     if (!active) {
       video.pause();
       video.removeAttribute('src');
@@ -119,7 +138,7 @@ export default function HlsVideo({
 
     const startPlayback = () => {
       if (!autoPlayRef.current) return;
-      // video.muted = true;
+      video.muted = isGoogleChromeBrowser();
       void video.play().catch(() => undefined);
     };
 
@@ -200,12 +219,41 @@ export default function HlsVideo({
     if (!video || !active) return;
 
     if (autoPlay) {
-      // video.muted = true;
+      video.muted = isGoogleChromeBrowser();
       void video.play().catch(() => undefined);
     } else {
       video.pause();
     }
   }, [active, autoPlay]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handlePlaying = () => setIsPlaying(true);
+    const handleStopped = () => setIsPlaying(false);
+    video.addEventListener('playing', handlePlaying);
+    video.addEventListener('pause', handleStopped);
+    video.addEventListener('ended', handleStopped);
+
+    return () => {
+      video.removeEventListener('playing', handlePlaying);
+      video.removeEventListener('pause', handleStopped);
+      video.removeEventListener('ended', handleStopped);
+    };
+  }, []);
+
+  const handlePlay = () => {
+    setPlaybackError(false);
+    if (!active) {
+      onActivate?.();
+      return;
+    }
+
+    void videoRef.current?.play().catch(() => {
+      setPlaybackError(true);
+    });
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -234,12 +282,12 @@ export default function HlsVideo({
         poster={poster}
         className={className}
       />
-      {!active && onActivate && (
+      {onActivate && (!active || !isPlaying) && (
         <button
           type="button"
           className="hls-video-play"
-          aria-label="Play video"
-          onClick={onActivate}
+          aria-label={active ? 'Resume video' : 'Play video'}
+          onClick={handlePlay}
         >
           <svg
             width="32"
