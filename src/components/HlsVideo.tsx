@@ -18,6 +18,12 @@ function isGoogleChromeBrowser() {
     && !/\b(?:Edg|OPR|SamsungBrowser|CriOS)\//.test(navigator.userAgent);
 }
 
+function configureAutoplayAudio(video: HTMLVideoElement) {
+  const shouldMute = isGoogleChromeBrowser();
+  video.defaultMuted = shouldMute;
+  video.muted = shouldMute;
+}
+
 interface HlsVideoProps {
   src: string;
   poster?: string;
@@ -136,9 +142,11 @@ export default function HlsVideo({
       return;
     }
 
+    configureAutoplayAudio(video);
+
     const startPlayback = () => {
       if (!autoPlayRef.current) return;
-      video.muted = isGoogleChromeBrowser();
+      configureAutoplayAudio(video);
       void video.play().catch(() => undefined);
     };
 
@@ -219,7 +227,7 @@ export default function HlsVideo({
     if (!video || !active) return;
 
     if (autoPlay) {
-      video.muted = isGoogleChromeBrowser();
+      configureAutoplayAudio(video);
       void video.play().catch(() => undefined);
     } else {
       video.pause();

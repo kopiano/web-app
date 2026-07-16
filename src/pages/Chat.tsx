@@ -675,14 +675,19 @@ function Chat() {
       entries.forEach(entry => {
         const momentId = (entry.target as HTMLElement).dataset.momentVideoId;
         if (!momentId) return;
-        visibleRatios.set(momentId, entry.isIntersecting ? entry.intersectionRatio : 0);
+        const targetHeight = entry.boundingClientRect.height;
+        const rootHeight = entry.rootBounds?.height || feed.clientHeight;
+        const visibleHeight = entry.intersectionRect.height;
+        const effectiveHeight = Math.min(targetHeight, rootHeight);
+        const visibleRatio = effectiveHeight > 0 ? visibleHeight / effectiveHeight : 0;
+        visibleRatios.set(momentId, entry.isIntersecting ? visibleRatio : 0);
       });
 
       let nextPlayingId: string | null = null;
       let highestRatio = 0;
       readyMomentVideoIds.forEach(momentId => {
         const ratio = visibleRatios.get(momentId) || 0;
-        if (ratio >= 0.65 && ratio > highestRatio) {
+        if (ratio >= 0.6 && ratio > highestRatio) {
           highestRatio = ratio;
           nextPlayingId = momentId;
         }
@@ -690,7 +695,7 @@ function Chat() {
       setPlayingMomentVideoId(current => current === nextPlayingId ? current : nextPlayingId);
     }, {
       root: feed,
-      threshold: [0, 0.65, 1],
+      threshold: [0, 0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 1],
     });
 
     readyMomentVideoIds.forEach(momentId => {
