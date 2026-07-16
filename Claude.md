@@ -11,3 +11,4 @@
 * 图标按钮使用50%圆角
 * 长按钮（提交、CTA等）使用3rem圆角
 * 使用scss而不是Tailwind
+* 不用用title="..."，用aria-label="..."代替

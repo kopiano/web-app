@@ -340,3 +340,63 @@ created_at
 ✓ opus
 
 网易云音乐的ncm格式需要解密再用ffmpeg转码才行，大多数正规音乐平台都不会接受.ncm 上传，涉及音乐版权。
+前端页面上传音乐后后`异步ffmpeg解码`，这个很费时间好几秒延迟
+
+上传音乐流程：
+React
+    │
+multipart/form-data
+    │
+Axum
+    │
+保存原始文件（或 OSS）
+    │
+INSERT music(status='processing')
+    │
+tokio::spawn(FFmpeg 转码)
+    │
+立即返回 { id, status: "processing" }
+         │
+         ├─ 前端轮询或 WebSocket
+         ▼
+FFmpeg 完成
+    │
+UPDATE music
+SET
+    status='ready',
+    url='...',
+    duration=...,
+    format='aac'
+    │
+通知前端显示可播放
+这种方式可以将用户感知的等待时间从 约 5 秒降低到不到 1 秒，而转码仍在后台完成，是生产环境中处理音视频上传最常见、体验最好的方案。
+
+获取音乐流程：
+* 进入Music页面，GET /music，显示所有音乐卡片（封面、标题、作者）
+* 用户点击某首歌，GET /api/music/{id}，返回播放地址、歌词等
+* audio 开始缓冲并播放，后台可预加载下一首歌曲
+
+接口推荐：
+获取音乐列表 GET  /music
+获取歌曲详情（播放地址、歌词等）GET /api/music/:id
+<!-- 返回音频流（或重定向到 CDN/OSS） GET /music/:id/stream -->暂时不用
+
+上传音乐；
+POST /music/upload
+* 前端直接更新列表，上传成功，把新歌曲插入到 musicList 最前面
+* 后端FFmpeg后台异步转码
+* 通知前端WebSocket：FFmpeg完成WebSocket返回id,status: "ready",audio_url:"...".React更新该歌曲，整个列表不用刷新。
+
+什么时候重新获取整个列表？
+* 用户第一次进入 Music 页面
+* 用户点击"刷新"
+
+不要每次上传后重新获取整个音乐列表。 最佳实践是：
+* 首次进入页面：获取一次音乐列表。
+* 上传成功：将返回的新音乐直接插入前端列表。
+* 转码完成：仅更新这首音乐的状态和播放地址。
+* 只有在刷新、搜索、分页或排序变化时，才重新获取整个列表
+这种方式网络请求更少，页面不会闪烁，用户体验也更接近 Spotify、Apple Music 等主流音乐平台。
+
+歌词：AI 自动生成
+上传 MP3，Whisper生成带时间轴字幕，转换成 LRC，保存 song.lrc
