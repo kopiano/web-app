@@ -291,3 +291,52 @@ google chrome无法保证同时保持滚动播放和不静音，要开静音vide
 游客支持浏览量计数：
 登录用户：按 user_id 去重统计。
 游客：使用 visitor_id（UUID Cookie）去重统计。
+
+## music
+### 转码
+上传阶段：使用 FFmpeg 将各种音频统一转换为 AAC（.m4a） 或 MP3（320 kbps。现在使用AAc格式更好，以前多使用mp3兼容老设备。
+存储阶段：保存原音频文件到对象存储（如 S3、OSS、R2）或本地存储，同时把元数据写入 PostgreSQL。我使用本地存储在src/assets/music。
+
+AAC音质更好，文件更小，浏览器可以直接支持播放，减少带宽和存储。
+原数据
+```
+song.mp3
+      │
+      ▼
+FFmpeg / TagLib
+      │
+      ├── 标题
+      ├── 歌手
+      ├── 专辑
+      ├── 时长
+      ├── 比特率
+      ├── 封面
+      └── 采样率
+```
+存入数据库，前端进入播放页时只需获取这些信息即可。
+```
+music
+-------
+id
+title
+artist
+album
+duration
+bitrate
+cover_url
+audio_url
+format
+size
+created_at
+```
+
+音乐格式
+✓ mp3
+✓ m4a
+✓ aac
+✓ flac
+✓ wav
+✓ ogg
+✓ opus
+
+网易云音乐的ncm格式需要解密再用ffmpeg转码才行，大多数正规音乐平台都不会接受.ncm 上传，涉及音乐版权。

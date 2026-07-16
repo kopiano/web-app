@@ -263,7 +263,7 @@ export default function Header() {
                     className="dropdown-action-item"
                     onClick={handleProfile}
                     disabled={isExternalAccount}
-                    title={isExternalAccount ? 'GitHub accounts cannot be edited here.' : 'Profile'}
+                    // title={isExternalAccount ? 'GitHub accounts cannot be edited here.' : 'Profile'}
                   >
                     <ProfileIcon />
                     Profile
@@ -272,7 +272,7 @@ export default function Header() {
                     className="dropdown-action-item"
                     onClick={() => setProfileOpen(false)}
                     disabled={isExternalAccount}
-                    title={isExternalAccount ? 'GitHub accounts cannot be edited here.' : 'Settings'}
+                    // title={isExternalAccount ? 'GitHub accounts cannot be edited here.' : 'Settings'}
                   >
                     <SettingsIcon />
                     Settings
