@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type Hls from 'hls.js';
+import Hls from 'hls.js';
 
 interface NavigatorWithUserAgentData extends Navigator {
   userAgentData?: {
@@ -176,14 +176,10 @@ export default function HlsVideo({
       video.addEventListener('canplay', startPlayback);
     };
 
-    void import('hls.js').then(({ default: HlsPlayer }) => {
-      if (disposed) return;
-      if (!HlsPlayer.isSupported()) {
-        attachNativeHls();
-        return;
-      }
-
-      hls = new HlsPlayer({
+    if (!Hls.isSupported()) {
+      attachNativeHls();
+    } else {
+      hls = new Hls({
         // autoStartLoad: true,
         enableWorker: true,
         lowLatencyMode: false,
@@ -195,12 +191,12 @@ export default function HlsVideo({
       });
       hls.loadSource(src);
       hls.attachMedia(video);
-      hls.on(HlsPlayer.Events.MANIFEST_PARSED, startPlayback);
-      hls.on(HlsPlayer.Events.ERROR, (_event, data) => {
+      hls.on(Hls.Events.MANIFEST_PARSED, startPlayback);
+      hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal || !hls) return;
-        if (data.type === HlsPlayer.ErrorTypes.NETWORK_ERROR) {
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
           hls.startLoad();
-        } else if (data.type === HlsPlayer.ErrorTypes.MEDIA_ERROR) {
+        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
           hls.recoverMediaError();
         } else {
           setPlaybackError(true);
@@ -208,7 +204,7 @@ export default function HlsVideo({
           hls = null;
         }
       });
-    }).catch(attachNativeHls);
+    }
 
     return () => {
       disposed = true;
