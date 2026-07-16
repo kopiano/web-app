@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import '@/styles/auth.scss';
-import { authStorage, startGithubLogin } from '@/lib/auth';
+import { authStorage, consumeAuthReturnTo, startGithubLogin } from '@/lib/auth';
 import { login, register } from '@/api/auth';
 import { fetchCurrentUser, setUser } from '@/store/authSlice';
 import { useDispatch } from 'react-redux';
@@ -23,6 +24,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
   const [toast, setToast] = useState('');
   const [toastClosing, setToastClosing] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -89,6 +91,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
         }));
       }
       onClose();
+      navigate(consumeAuthReturnTo(), { replace: true });
     } catch (requestError: any) {
       const status = requestError?.response?.status;
       setError(status === 409

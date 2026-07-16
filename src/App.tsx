@@ -13,7 +13,13 @@ import { useEffect } from 'react';
 import { Provider, useDispatch } from 'react-redux';
 import { store } from '@/store/store';
 import { clearUser, fetchCurrentUser } from '@/store/authSlice';
-import { authStorage } from '@/lib/auth';
+import { authStorage, clearAuthReturnTo, getAuthReturnTo } from '@/lib/auth';
+
+function withAuthError(returnTo: string) {
+  const url = new URL(returnTo, window.location.origin);
+  url.searchParams.set('auth_error', 'github_login_failed');
+  return `${url.pathname}${url.search}${url.hash}`;
+}
 
 const OAuthSuccess = () => {
   const navigate = useNavigate();
@@ -21,19 +27,27 @@ const OAuthSuccess = () => {
 
   useEffect(() => {
     let cancelled = false;
+    const returnTo = getAuthReturnTo();
     const params = new URLSearchParams(window.location.search);
     if (params.get('auth_error')) {
-      navigate('/?auth_error=github_login_failed', { replace: true });
+      clearAuthReturnTo();
+      navigate(withAuthError(returnTo), { replace: true });
       return;
     }
     authStorage.clearLoggedOut();
     dispatch(fetchCurrentUser())
       .unwrap()
       .then(() => {
-        if (!cancelled) navigate('/', { replace: true });
+        if (!cancelled) {
+          clearAuthReturnTo();
+          navigate(returnTo, { replace: true });
+        }
       })
       .catch(() => {
-        if (!cancelled) navigate('/?auth_error=github_login_failed', { replace: true });
+        if (!cancelled) {
+          clearAuthReturnTo();
+          navigate(withAuthError(returnTo), { replace: true });
+        }
       });
     return () => {
       cancelled = true;

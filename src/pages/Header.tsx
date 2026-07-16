@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/context/ThemeContext';
@@ -15,6 +15,7 @@ import { clearContacts } from '@/store/chatSlice';
 import { logout as logoutRequest } from '@/api/auth';
 import ProfileModal from '@/components/ui/ProfileModal';
 import { resolveAvatarUrl } from '@/lib/avatar';
+import { rememberAuthReturnTo } from '@/lib/auth';
 
 function padTimePart(value: number) {
   return String(value).padStart(2, '0');
@@ -48,6 +49,7 @@ function formatNotificationTime(value: Date, now: Date) {
 
 export default function Header() {
   const { t, i18n } = useTranslation();
+  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const dispatch = useDispatch();
   const [notifOpen, setNotifOpen] = useState(false);
@@ -104,6 +106,13 @@ export default function Header() {
     if (isExternalAccount) return;
     setProfileOpen(false);
     setProfileModalOpen(true);
+  };
+
+  const openAuth = (mode: 'login' | 'signup') => {
+    rememberAuthReturnTo(`${location.pathname}${location.search}${location.hash}`);
+    setProfileOpen(false);
+    setAuthMode(mode);
+    setAuthOpen(true);
   };
 
   const handleLogout = async () => {
@@ -275,11 +284,11 @@ export default function Header() {
                 </>
               ) : (
                 <>
-                  <button className="dropdown-action-item" onClick={() => { setProfileOpen(false); setAuthMode('login'); setAuthOpen(true); }}
+                  <button className="dropdown-action-item" onClick={() => openAuth('login')}
                     style={{ color: '#000', fontWeight: 500 }}>
                     {t('header.signIn')}
                   </button>
-                  <button className="dropdown-action-item" onClick={() => { setProfileOpen(false); setAuthMode('signup'); setAuthOpen(true); }}
+                  <button className="dropdown-action-item" onClick={() => openAuth('signup')}
                     style={{ color: '#000' }}>
                     {t('header.signUp')}
                   </button>

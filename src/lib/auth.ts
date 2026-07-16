@@ -3,6 +3,41 @@ const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8100/api/')
 
 export const AUTH_CHANGED_EVENT = 'auth:changed';
 export const AUTH_LOGGED_OUT_KEY = 'auth_logged_out';
+export const AUTH_RETURN_TO_KEY = 'auth_return_to';
+
+function currentLocationPath() {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
+function normalizeAuthReturnTo(returnTo: string | null | undefined) {
+  if (
+    !returnTo
+    || !returnTo.startsWith('/')
+    || returnTo.startsWith('//')
+    || returnTo.startsWith('/oauth/success')
+  ) {
+    return '/';
+  }
+  return returnTo;
+}
+
+export function rememberAuthReturnTo(returnTo = currentLocationPath()) {
+  sessionStorage.setItem(AUTH_RETURN_TO_KEY, normalizeAuthReturnTo(returnTo));
+}
+
+export function getAuthReturnTo() {
+  return normalizeAuthReturnTo(sessionStorage.getItem(AUTH_RETURN_TO_KEY));
+}
+
+export function consumeAuthReturnTo() {
+  const returnTo = getAuthReturnTo();
+  sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
+  return returnTo;
+}
+
+export function clearAuthReturnTo() {
+  sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
+}
 
 export function notifyAuthChanged() {
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
@@ -31,6 +66,7 @@ export const githubLoginUrl = `${API_BASE}auth/github/login`;
 
 // OAuth must use a top-level browser navigation so the backend can redirect to GitHub.
 export function startGithubLogin() {
+  rememberAuthReturnTo();
   window.location.href = githubLoginUrl;
 }
 
