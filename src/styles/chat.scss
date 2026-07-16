@@ -1407,7 +1407,7 @@ $chat-margin-left: 100px;
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: #22a06b;
+    background: #75f3bf;
     box-shadow: 0 0 12px rgba(34, 160, 107, 0.3);
     transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1826,10 +1826,10 @@ $chat-margin-left: 100px;
     place-items: center;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.96);
-    border: 1px solid rgba(46, 55, 82, 0.07);
-    box-shadow:
-        0 14px 34px rgba(65, 62, 160, 0.12),
-        inset 0 0 0 6px rgba(246, 247, 251, 0.72);
+    // border: 1px solid rgba(46, 55, 82, 0.07);
+    // box-shadow:
+    //     0 14px 34px rgba(65, 62, 160, 0.12),
+    //     inset 0 0 0 6px rgba(246, 247, 251, 0.72);
     isolation: isolate;
     animation: moment-progress-enter 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
     transition:
@@ -1861,7 +1861,8 @@ $chat-margin-left: 100px;
 }
 
 .moment-video-progress-track {
-    stroke: #e8eaf1;
+    // stroke: #e8eaf1;
+    stroke: rgba(148, 150, 150, 0.79);
 }
 
 .moment-video-progress-indicator {

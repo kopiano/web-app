@@ -1745,8 +1745,8 @@ function Chat() {
                                 y2="94"
                                 gradientUnits="userSpaceOnUse"
                               >
-                                <stop offset="0" stopColor="#635bff" />
-                                <stop offset="1" stopColor="#14b8a6" />
+                                <stop offset="0" stopColor="#bdffc9" />
+                                <stop offset="1" stopColor="#fdc5d8" />
                               </linearGradient>
                             </defs>
                             <circle
