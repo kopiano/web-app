@@ -46,7 +46,7 @@ export default function HlsVideo({
 
     const startPlayback = () => {
       if (!autoPlayRef.current) return;
-      video.muted = true;
+      // video.muted = true;
       void video.play().catch(() => undefined);
     };
 
@@ -127,7 +127,7 @@ export default function HlsVideo({
     if (!video || !active) return;
 
     if (autoPlay) {
-      video.muted = true;
+      // video.muted = true;
       void video.play().catch(() => undefined);
     } else {
       video.pause();
