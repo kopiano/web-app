@@ -637,6 +637,9 @@ $chat-margin-left: 100px;
     align-items: flex-start;
     gap: 8px;
     max-width: 72%;
+    isolation: isolate;
+    backface-visibility: hidden;
+    will-change: opacity, transform;
     animation: msg-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -701,6 +704,8 @@ $chat-margin-left: 100px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    backface-visibility: hidden;
+    transform: translateZ(0);
 }
 
 .msg-wrap.sent .msg-content {
@@ -708,7 +713,7 @@ $chat-margin-left: 100px;
 }
 
 .msg.received {
-    // background: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.6);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     // border-bottom-left-radius: 4px;
@@ -787,10 +792,9 @@ $chat-margin-left: 100px;
 
 .msg-char {
     display: inline-block;
-    opacity: 0;
-    will-change: opacity, transform;
-    transform: translateX(2px);
-    animation: message-char-in 0.18s ease-out var(--char-delay) both;
+    opacity: 1;
+    transform: none;
+    animation: none;
 }
 
 .msg-time {
@@ -806,7 +810,7 @@ $chat-margin-left: 100px;
     letter-spacing: 0.015em;
     line-height: 1;
     opacity: 1;
-    animation: message-time-in 0.18s ease-out both;
+    animation: none;
     transition: color 0.2s ease, opacity 0.2s ease;
 }
 
