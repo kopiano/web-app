@@ -5,6 +5,7 @@ import {
   ListMusic,
   Pause,
   Play,
+  Plus,
   RefreshCw,
   Shuffle,
   SkipBack,
@@ -13,7 +14,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent } from 'react';
 import bg0 from '@/assets/images/bg-0.webp';
 import bg1 from '@/assets/images/bg-1.webp';
 import bg2 from '@/assets/images/bg-2.webp';
@@ -35,7 +36,7 @@ type Track = {
   color: string;
 };
 
-const tracks: Track[] = [
+const initialTracks: Track[] = [
   { id: 1, title: 'Aerial Bloom', artist: 'Nora Vale', duration: 242, cover: bg9, color: '#8d7cff' },
   { id: 2, title: 'After the Rain', artist: 'Cedar Lane', duration: 218, cover: bg8, color: '#77b8d3' },
   { id: 3, title: 'Velvet Horizon', artist: 'Mira Sol', duration: 196, cover: bg3, color: '#e08f9e' },
@@ -43,6 +44,9 @@ const tracks: Track[] = [
   { id: 5, title: 'Amber Hours', artist: 'Sunday Echo', duration: 231, cover: bg4, color: '#dca67b' },
   { id: 6, title: 'Softly, Again', artist: 'The Daydreamers', duration: 207, cover: bg2, color: '#a696ca' },
 ];
+
+const localTrackCovers = [bg9, bg8, bg3, bg1, bg4, bg2];
+const localTrackColors = ['#8d7cff', '#77b8d3', '#e08f9e', '#7aa6c8', '#dca67b', '#a696ca'];
 
 const navItems: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'home', label: 'Home', icon: Home },
@@ -61,8 +65,23 @@ const formatTime = (seconds: number) => {
   return `${Math.floor(safeSeconds / 60)}:${String(safeSeconds % 60).padStart(2, '0')}`;
 };
 
+const readAudioDuration = (file: File) => new Promise<number>((resolve) => {
+  const audio = new Audio();
+  const source = URL.createObjectURL(file);
+  const finish = (duration: number) => {
+    URL.revokeObjectURL(source);
+    resolve(duration);
+  };
+
+  audio.preload = 'metadata';
+  audio.onloadedmetadata = () => finish(Number.isFinite(audio.duration) ? Math.round(audio.duration) : 210);
+  audio.onerror = () => finish(210);
+  audio.src = source;
+});
+
 function Music() {
   const [activeView, setActiveView] = useState<View>('home');
+  const [tracks, setTracks] = useState<Track[]>(initialTracks);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(68);
@@ -75,6 +94,8 @@ function Music() {
   const elapsedLabelRef = useRef<HTMLSpanElement>(null);
   const elapsedRef = useRef(74);
   const renderedSecondRef = useRef(Math.floor(74));
+  const addMusicInputRef = useRef<HTMLInputElement>(null);
+  const nextTrackIdRef = useRef(initialTracks.length + 1);
 
   const syncProgressVisual = useCallback((value: number, duration: number) => {
     const progress = duration > 0 ? Math.min((value / duration) * 100, 100) : 0;
@@ -94,17 +115,17 @@ function Music() {
       return tracks.filter((track) => favorites.has(track.id));
     }
     if (activeView === 'playlist') {
-      return [...tracks].slice(1, 6);
+      return tracks;
     }
     return tracks.slice(1, 5);
-  }, [activeView, favorites]);
+  }, [activeView, favorites, tracks]);
 
   const playTrack = useCallback((track: Track) => {
     const index = tracks.findIndex((item) => item.id === track.id);
     setCurrentIndex(index);
     resetProgress();
     setIsPlaying(true);
-  }, [resetProgress]);
+  }, [resetProgress, tracks]);
 
   const goToTrack = useCallback((direction: 1 | -1) => {
     setCurrentIndex((current) => {
@@ -118,7 +139,7 @@ function Music() {
     });
     resetProgress();
     setIsPlaying(true);
-  }, [playMode, resetProgress]);
+  }, [playMode, resetProgress, tracks]);
 
   useEffect(() => {
     document.body.classList.add('music-route');
@@ -219,6 +240,24 @@ function Music() {
     event.currentTarget.style.setProperty('--tilt-y', '0deg');
   };
 
+  const handleAddMusic = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (!files.length) return;
+
+    const addedTracks = await Promise.all(files.map(async (file, index) => ({
+      id: nextTrackIdRef.current++,
+      title: file.name.replace(/\.[^.]+$/, ''),
+      artist: 'Local Library',
+      duration: await readAudioDuration(file),
+      cover: localTrackCovers[index % localTrackCovers.length],
+      color: localTrackColors[index % localTrackColors.length],
+    })));
+
+    setTracks((current) => [...current, ...addedTracks]);
+    setActiveView('playlist');
+    event.target.value = '';
+  };
+
   const VolumeIcon = volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
 
   return (
@@ -242,6 +281,25 @@ function Music() {
             </button>
           ))}
         </nav>
+        <span className="music-sidebar-divider" aria-hidden="true" />
+        <button
+          type="button"
+          className="music-add-button"
+          onClick={() => addMusicInputRef.current?.click()}
+          aria-label="Add music"
+          title="Add music"
+        >
+          <Plus size={23} strokeWidth={1.8} />
+        </button>
+        <input
+          ref={addMusicInputRef}
+          className="music-add-input"
+          type="file"
+          accept="audio/*"
+          multiple
+          onChange={handleAddMusic}
+          tabIndex={-1}
+        />
       </aside>
 
       <div className="music-content">
