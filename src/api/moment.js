@@ -4,8 +4,8 @@ const listRequests = new Map()
 
 export function getMoments(cursor) {
   const params = cursor
-    ? { before_created_at: cursor.createdAt, before_id: cursor.id }
-    : {}
+    ? { limit: 10, before_created_at: cursor.createdAt, before_id: cursor.id }
+    : { limit: 10 }
   const requestKey = cursor ? `${cursor.createdAt}:${cursor.id}` : 'initial'
   const activeRequest = listRequests.get(requestKey)
   if (activeRequest) return activeRequest

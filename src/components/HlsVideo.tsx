@@ -7,22 +7,58 @@ interface HlsVideoProps {
   className?: string;
   width?: number;
   height?: number;
+  active?: boolean;
+  autoPlay?: boolean;
+  onActivate?: () => void;
+  onDeactivate?: () => void;
 }
 
-export default function HlsVideo({ src, poster, className, width, height }: HlsVideoProps) {
+export default function HlsVideo({
+  src,
+  poster,
+  className,
+  width,
+  height,
+  active = false,
+  autoPlay = false,
+  onActivate,
+  onDeactivate,
+}: HlsVideoProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const autoPlayRef = useRef(autoPlay);
   const [playbackError, setPlaybackError] = useState(false);
   const hasDimensions = Boolean(width && height && width > 0 && height > 0);
   const aspectRatio = hasDimensions ? `${width} / ${height}` : '16 / 9';
+  autoPlayRef.current = autoPlay;
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     setPlaybackError(false);
+    if (!active) {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      return;
+    }
+
+    const startPlayback = () => {
+      if (!autoPlayRef.current) return;
+      video.muted = false;
+      void video.play().catch(() => {
+        video.muted = true;
+        return video.play().catch(() => undefined);
+      });
+    };
+
     if (!src.toLowerCase().split(/[?#]/, 1)[0].endsWith('.m3u8')) {
       video.src = src;
+      video.addEventListener('canplay', startPlayback);
       return () => {
+        video.removeEventListener('canplay', startPlayback);
+        video.pause();
         video.removeAttribute('src');
         video.load();
       };
@@ -30,7 +66,10 @@ export default function HlsVideo({ src, poster, className, width, height }: HlsV
 
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = src;
+      video.addEventListener('canplay', startPlayback);
       return () => {
+        video.removeEventListener('canplay', startPlayback);
+        video.pause();
         video.removeAttribute('src');
         video.load();
       };
@@ -48,13 +87,14 @@ export default function HlsVideo({ src, poster, className, width, height }: HlsV
       hls = new HlsPlayer({
         enableWorker: true,
         lowLatencyMode: false,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        maxBufferSize: 30 * 1024 * 1024,
-        backBufferLength: 30,
+        maxBufferLength: 12,
+        maxMaxBufferLength: 24,
+        maxBufferSize: 16 * 1024 * 1024,
+        backBufferLength: 12,
       });
       hls.loadSource(src);
       hls.attachMedia(video);
+      hls.on(HlsPlayer.Events.MANIFEST_PARSED, startPlayback);
       hls.on(HlsPlayer.Events.ERROR, (_event, data) => {
         if (!data.fatal || !hls) return;
         if (data.type === HlsPlayer.ErrorTypes.NETWORK_ERROR) {
@@ -74,19 +114,72 @@ export default function HlsVideo({ src, poster, className, width, height }: HlsV
     return () => {
       disposed = true;
       hls?.destroy();
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
     };
-  }, [src]);
+  }, [active, src]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !active) return;
+
+    if (autoPlay) {
+      video.muted = false;
+      void video.play().catch(() => {
+        video.muted = true;
+        return video.play().catch(() => undefined);
+      });
+    } else {
+      video.pause();
+    }
+  }, [active, autoPlay]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!active || !container || !onDeactivate) return;
+
+    let hasBeenVisible = false;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        hasBeenVisible = true;
+      } else if (hasBeenVisible) {
+        onDeactivate();
+      }
+    }, { threshold: 0.01 });
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, [active, onDeactivate]);
 
   return (
-    <div className="hls-video" style={{ aspectRatio }}>
+    <div ref={containerRef} className="hls-video" style={{ aspectRatio }}>
       <video
         ref={videoRef}
-        controls
+        controls={active}
         playsInline
-        preload="metadata"
+        preload={active ? 'auto' : 'none'}
         poster={poster}
         className={className}
       />
+      {!active && onActivate && (
+        <button
+          type="button"
+          className="hls-video-play"
+          aria-label="Play video"
+          onClick={onActivate}
+        >
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M8 5.5v13l10-6.5-10-6.5Z" />
+          </svg>
+        </button>
+      )}
       {playbackError && (
         <div className="hls-video-error" role="alert">
           Unable to play this video.

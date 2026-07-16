@@ -335,6 +335,7 @@ function Chat() {
   const [momentsError, setMomentsError] = useState('');
   const [momentsLoadMoreError, setMomentsLoadMoreError] = useState('');
   const [momentsHasMore, setMomentsHasMore] = useState(true);
+  const [playingMomentVideoId, setPlayingMomentVideoId] = useState<string | null>(null);
   const [momentPublishing, setMomentPublishing] = useState(false);
   const [momentUploadProgress, setMomentUploadProgress] = useState<MomentUploadProgress | null>(null);
   const [openMomentMenuId, setOpenMomentMenuId] = useState<string | null>(null);
@@ -398,7 +399,6 @@ function Chat() {
       .join(','),
     [moments],
   );
-
   const loadMoments = async (reset = false) => {
     if (momentsLoadingRef.current || (!reset && !momentsHasMore)) return;
     momentsLoadingRef.current = true;
@@ -521,11 +521,13 @@ function Chat() {
     setMomentsError('');
     setMomentsLoadMoreError('');
     setMomentsHasMore(true);
+    setPlayingMomentVideoId(null);
     momentsCursorRef.current = null;
   }, [currentUser?.id]);
 
   function selectTab(tab: 'chat' | 'moments') {
     setActiveTab(tab);
+    if (tab !== 'moments') setPlayingMomentVideoId(null);
     localStorage.setItem(ACTIVE_TAB_KEY, tab);
     if (currentUser) {
       localStorage.setItem(`${ACTIVE_TAB_KEY}:${currentUser.id}`, tab);
@@ -1132,6 +1134,7 @@ function Chat() {
         return next;
       });
       setMoments(previous => previous.filter(moment => moment.id !== momentId));
+      setPlayingMomentVideoId(current => current === momentId ? null : current);
       setDeleteMomentId(null);
       notify('Moment deleted successfully.', 'success');
     } catch {
@@ -1922,6 +1925,12 @@ function Chat() {
                           width={post.mediaWidth}
                           height={post.mediaHeight}
                           className="card-media"
+                          active={playingMomentVideoId === post.id}
+                          autoPlay={playingMomentVideoId === post.id}
+                          onActivate={() => setPlayingMomentVideoId(post.id)}
+                          onDeactivate={() => {
+                            setPlayingMomentVideoId(current => current === post.id ? null : current);
+                          }}
                         />
                       </div>
                     )}

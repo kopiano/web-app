@@ -2027,6 +2027,39 @@ $chat-margin-left: 100px;
     object-fit: contain;
 }
 
+.hls-video-play {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    display: grid;
+    width: 64px;
+    height: 64px;
+    padding: 0;
+    place-items: center;
+    color: #fff;
+    background: rgba(10, 10, 10, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transform: translate(-50%, -50%);
+    transition: transform 180ms ease, background-color 180ms ease;
+    cursor: pointer;
+}
+
+.hls-video-play:hover {
+    background: rgba(10, 10, 10, 0.86);
+    transform: translate(-50%, -50%) scale(1.06);
+}
+
+.hls-video-play:active {
+    transform: translate(-50%, -50%) scale(0.96);
+}
+
+.hls-video-play:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 3px;
+}
+
 .hls-video-error {
     position: absolute;
     inset: 0;
