@@ -1,6 +1,7 @@
 import {
   ChevronLeft,
   ChevronRight,
+  Check,
   CircleAlert,
   Clock3,
   Heart,
@@ -86,6 +87,26 @@ const playModeLabelKeys: Record<PlayMode, string> = {
 };
 
 const CURRENT_MUSIC_TRACK_KEY = 'music_current_track_id';
+const ACTIVE_MUSIC_VIEW_KEY = 'music_active_view';
+const MUSIC_LIBRARY_LAYOUT_KEY = 'music_library_layout';
+const MUSIC_ADD_PARTICLE_COUNT = 60;
+
+const getStoredMusicView = (): View => {
+  try {
+    const storedView = window.localStorage.getItem(ACTIVE_MUSIC_VIEW_KEY);
+    return storedView === 'playlist' || storedView === 'favorites' ? storedView : 'home';
+  } catch {
+    return 'home';
+  }
+};
+
+const getStoredLibraryLayout = (): LibraryLayout => {
+  try {
+    return window.localStorage.getItem(MUSIC_LIBRARY_LAYOUT_KEY) === 'cards' ? 'cards' : 'list';
+  } catch {
+    return 'list';
+  }
+};
 
 const formatTime = (seconds: number) => {
   const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
@@ -114,8 +135,8 @@ const formatDateAdded = (value: string, locale: string) => {
 function Music() {
   const { t, i18n } = useTranslation();
   const currentUser = useSelector((state: RootState) => state.auth.user);
-  const [activeView, setActiveView] = useState<View>('home');
-  const [libraryLayout, setLibraryLayout] = useState<LibraryLayout>('list');
+  const [activeView, setActiveView] = useState<View>(getStoredMusicView);
+  const [libraryLayout, setLibraryLayout] = useState<LibraryLayout>(getStoredLibraryLayout);
   const [libraryPage, setLibraryPage] = useState(1);
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -126,6 +147,7 @@ function Music() {
   const [duplicateAction, setDuplicateAction] = useState<'confirm' | 'ignore' | ''>('');
   const [pendingDuplicateUpload, setPendingDuplicateUpload] = useState<PendingDuplicateUpload | null>(null);
   const [openTrackMenuId, setOpenTrackMenuId] = useState('');
+  const [favoriteBurstId, setFavoriteBurstId] = useState('');
   const [deletingTrackId, setDeletingTrackId] = useState('');
   const [removingTrackId, setRemovingTrackId] = useState('');
   const [featuredTrackId, setFeaturedTrackId] = useState('');
@@ -196,6 +218,7 @@ function Music() {
   const featuredTrackIdRef = useRef('');
   const detailRequestsRef = useRef(new Map<string, Promise<MusicTrack>>());
   const playRequestRef = useRef(0);
+  const favoriteBurstTimeoutRef = useRef<number | undefined>(undefined);
   tracksRef.current = tracks;
 
   const requireMusicAccount = useCallback(() => {
@@ -225,6 +248,7 @@ function Music() {
     }
     return tracks;
   }, [activeView, tracks]);
+  const sectionTracks = activeView === 'home' ? visibleTracks.slice(0, 4) : visibleTracks;
 
   const loadTrackDetails = useCallback(async (trackId: string) => {
     const current = tracksRef.current.find((track) => track.id === trackId);
@@ -299,6 +323,12 @@ function Music() {
       document.body.classList.remove('music-route');
       document.documentElement.classList.remove('music-route');
     };
+  }, []);
+
+  useEffect(() => () => {
+    if (favoriteBurstTimeoutRef.current !== undefined) {
+      window.clearTimeout(favoriteBurstTimeoutRef.current);
+    }
   }, []);
 
   useEffect(() => {
@@ -456,6 +486,22 @@ function Music() {
     if (!currentTrack.id) return;
     window.localStorage.setItem(CURRENT_MUSIC_TRACK_KEY, currentTrack.id);
   }, [currentTrack.id]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ACTIVE_MUSIC_VIEW_KEY, activeView);
+    } catch {
+      // Keep the current view usable when storage is unavailable.
+    }
+  }, [activeView]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(MUSIC_LIBRARY_LAYOUT_KEY, libraryLayout);
+    } catch {
+      // Keep the selected layout usable when storage is unavailable.
+    }
+  }, [libraryLayout]);
 
   useEffect(() => {
     setLibraryPage((page) => Math.min(page, libraryPageCount));
@@ -626,6 +672,18 @@ function Music() {
     const track = tracks.find((item) => item.id === trackId);
     if (!track) return;
     const nextFavorite = !track.isFavorite;
+    if (favoriteBurstTimeoutRef.current !== undefined) {
+      window.clearTimeout(favoriteBurstTimeoutRef.current);
+    }
+    if (nextFavorite) {
+      setFavoriteBurstId(trackId);
+      favoriteBurstTimeoutRef.current = window.setTimeout(() => {
+        setFavoriteBurstId((current) => current === trackId ? '' : current);
+        favoriteBurstTimeoutRef.current = undefined;
+      }, 1120);
+    } else {
+      setFavoriteBurstId('');
+    }
     setTracks((current) => current.map((item) => (
       item.id === trackId ? { ...item, isFavorite: nextFavorite } : item
     )));
@@ -983,7 +1041,6 @@ function Music() {
                 </span>
               </button>
               <div className="music-library-hero-copy">
-                <span>{t('music.playlistLabel')}</span>
                 <h1 id="music-library-title">{t('music.likedSongs')}</h1>
                 <p>
                   {t('music.likedSongsSummary', {
@@ -1078,9 +1135,12 @@ function Music() {
                               )}
                             >
                               {isCurrent && isPlaying ? (
-                                <span className="music-library-equalizer" aria-hidden="true">
-                                  <i /><i /><i /><i />
-                                </span>
+                                <>
+                                  <span className="music-library-equalizer" aria-hidden="true">
+                                    <i /><i /><i /><i />
+                                  </span>
+                                  <Pause className="music-library-row-pause" size={15} fill="currentColor" aria-hidden="true" />
+                                </>
                               ) : (
                                 <>
                                   <span className="music-library-index">{trackNumber}</span>
@@ -1112,7 +1172,36 @@ function Music() {
                               onClick={() => void toggleFavorite(track.id)}
                               aria-label={t(track.isFavorite ? 'music.removeFromFavorites' : 'music.addToFavorites')}
                             >
-                              <Heart size={17} fill={track.isFavorite ? 'currentColor' : 'none'} />
+                              <span className="music-library-add-icon" aria-hidden="true">
+                                <Plus className="music-library-add-plus" size={15} strokeWidth={2.2} />
+                                <Check className="music-library-add-check" size={14} strokeWidth={2.8} />
+                              </span>
+                              {favoriteBurstId === track.id && (
+                                <span className="music-library-add-particles" aria-hidden="true">
+                                  {Array.from({ length: MUSIC_ADD_PARTICLE_COUNT }, (_, particleIndex) => {
+                                    const angle = ((Math.PI * 2 * particleIndex) / MUSIC_ADD_PARTICLE_COUNT) - (Math.PI / 2);
+                                    const distance = 2.1 + ((particleIndex % 5) * 0.28);
+                                    const colors = [
+                                      '#ff5f7e',
+                                      '#ff9f43',
+                                      '#ffd166',
+                                      '#48d597',
+                                      '#38bdf8',
+                                      '#7c83fd',
+                                      '#c084fc',
+                                      '#f472b6',
+                                    ];
+                                    const style = {
+                                      '--particle-x': `${(Math.cos(angle) * distance).toFixed(3)}rem`,
+                                      '--particle-y': `${(Math.sin(angle) * distance).toFixed(3)}rem`,
+                                      animationDelay: '0s',
+                                      backgroundColor: colors[particleIndex % colors.length],
+                                    } as CSSProperties;
+
+                                    return <i key={particleIndex} style={style} />;
+                                  })}
+                                </span>
+                              )}
                             </button>
                             <span className="music-library-duration" role="cell">{formatTime(track.duration)}</span>
                             <div
@@ -1340,9 +1429,19 @@ function Music() {
             <p>{t('music.songCount', { count: visibleTracks.length })}</p>
           </div>
           <div className="music-section-actions">
-            <button type="button" className="view-all" onClick={() => setActiveView('playlist')}>
-              {t('music.seeMore')} <ChevronRight size={15} />
-            </button>
+            {activeView === 'home' && (
+              <button
+                type="button"
+                className="view-all"
+                onClick={() => {
+                  setLibraryLayout('cards');
+                  setLibraryPage(1);
+                  setActiveView('playlist');
+                }}
+              >
+                {t('music.seeMore')} <ChevronRight size={15} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1350,9 +1449,9 @@ function Music() {
           <div className="music-list-loading" aria-label={t('music.loadingMusicList')} aria-busy="true">
             <LoaderCircle size={22} aria-hidden="true" />
           </div>
-        ) : visibleTracks.length ? (
+        ) : sectionTracks.length ? (
           <div className="music-card-grid">
-            {visibleTracks.map((track, index) => {
+            {sectionTracks.map((track, index) => {
               const isCurrent = track.id === currentTrack.id;
               const isReady = track.processingStatus === 'ready';
               return (

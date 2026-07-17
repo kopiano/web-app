@@ -29,7 +29,10 @@ html {
 }
 
 body {
-    font-family: 'Roboto', sans-serif;
+    // font-family: 'Roboto', sans-serif;
+    font-family: SpotifyMixUI, CircularSp-Arab, CircularSp-Hebr, CircularSp-Cyrl, CircularSp-Grek,
+  CircularSp-Deva, "Helvetica Neue", helvetica, arial, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+  Meiryo, "MS Gothic";
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
 }
