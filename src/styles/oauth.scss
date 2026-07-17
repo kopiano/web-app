@@ -17,6 +17,17 @@
   animation: oauth-spin 0.8s linear infinite;
 }
 
+.subscription-return-button {
+  min-height: 42px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 3rem;
+  color: #fff;
+  background: #1d2025;
+  font: inherit;
+  cursor: pointer;
+}
+
 @keyframes oauth-spin {
   to { transform: rotate(360deg); }
 }

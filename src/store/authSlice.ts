@@ -11,6 +11,7 @@ export interface AuthUser {
   github_id?: string | null;
   avatar?: string | null;
   username?: string | null;
+  plan?: string;
 }
 
 interface AuthState {

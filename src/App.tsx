@@ -9,8 +9,9 @@ import BackgroundImg from '@/components/BackgroundImg';
 import { ThemeProvider } from '@/context/ThemeContext';
 import "@/App.scss";
 import "@/styles/oauth.scss";
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Provider, useDispatch } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import { store } from '@/store/store';
 import { clearUser, fetchCurrentUser } from '@/store/authSlice';
 import { authStorage, clearAuthReturnTo, getAuthReturnTo } from '@/lib/auth';
@@ -62,6 +63,73 @@ const OAuthSuccess = () => {
   );
 };
 
+function normalizeSubscriptionReturnTo(value: string | null) {
+  if (value?.startsWith('/') && !value.startsWith('//') && !value.includes('\\')) {
+    return value;
+  }
+  const stored = window.sessionStorage.getItem('subscription_return_to');
+  if (stored?.startsWith('/') && !stored.startsWith('//') && !stored.includes('\\')) {
+    return stored;
+  }
+  return '/music';
+}
+
+const SubscriptionSuccess = () => {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const dispatch = useDispatch<typeof store.dispatch>();
+  const [status, setStatus] = useState<'refreshing' | 'pending'>('refreshing');
+
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams(window.location.search);
+    const returnTo = normalizeSubscriptionReturnTo(params.get('return_to'));
+
+    const refreshSubscription = async () => {
+      for (let attempt = 0; attempt < 10 && !cancelled; attempt += 1) {
+        try {
+          const user = await dispatch(fetchCurrentUser()).unwrap();
+          const plan = user.plan?.toLowerCase();
+          if (plan === 'pro' || plan === 'plus') {
+            window.sessionStorage.removeItem('subscription_return_to');
+            navigate(returnTo, { replace: true });
+            return;
+          }
+        } catch {
+          // Retry briefly while the payment webhook and session settle.
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+      }
+      if (!cancelled) setStatus('pending');
+    };
+
+    void refreshSubscription();
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, navigate]);
+
+  return (
+    <main className="oauth-success-loading" role="status" aria-live="polite">
+      {status === 'refreshing' && <div className="oauth-success-spinner" aria-hidden="true" />}
+      <span>
+        {t(status === 'refreshing'
+          ? 'music.subscriptionRefreshing'
+          : 'music.subscriptionPending')}
+      </span>
+      {status === 'pending' && (
+        <button
+          type="button"
+          className="subscription-return-button"
+          onClick={() => window.location.reload()}
+        >
+          {t('music.checkSubscriptionAgain')}
+        </button>
+      )}
+    </main>
+  );
+};
+
 const Layout = () => {
   const dispatch = useDispatch<typeof store.dispatch>();
   const isOAuthSuccess = window.location.pathname === '/oauth/success';
@@ -94,6 +162,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { path: '/oauth/success', element: <OAuthSuccess /> },
+      { path: '/subscription/success', element: <SubscriptionSuccess /> },
     ],
   },
   {

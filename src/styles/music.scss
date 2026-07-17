@@ -2220,6 +2220,7 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
 }
 
 .music-user-playlist-copy {
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -2261,6 +2262,209 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
 .music-user-playlist-copy small svg {
   flex: 0 0 auto;
   color: #4e8a72;
+}
+
+.music-user-playlist-pro-badge {
+  flex: 0 0 3.2rem;
+  width: 3.2rem;
+  height: 3.2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(26, 29, 35, 0.12);
+  border-radius: 50%;
+  color: #f8fafc;
+  background: #1d2025;
+  box-shadow:
+    0 0.65rem 1.5rem rgba(27, 30, 36, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.music-user-playlist-card.is-locked .music-user-playlist-avatar,
+.music-user-playlist-card.is-locked .music-user-playlist-copy {
+  opacity: 0.72;
+}
+
+.music-pro-overlay {
+  position: fixed;
+  z-index: 920;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.2rem;
+}
+
+.music-pro-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: rgba(18, 23, 31, 0.28);
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+  cursor: default;
+}
+
+.music-pro-dialog {
+  position: relative;
+  width: min(39rem, calc(100vw - 2.4rem));
+  max-height: calc(100svh - 2.4rem);
+  padding: 2.8rem;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 2rem;
+  color: #17191e;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(246, 249, 251, 0.76));
+  box-shadow:
+    0 3rem 8rem -2rem rgba(15, 23, 42, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(36px) saturate(145%);
+  -webkit-backdrop-filter: blur(36px) saturate(145%);
+  animation: music-duplicate-dialog-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.music-pro-close {
+  position: absolute;
+  top: 1.4rem;
+  right: 1.4rem;
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #7c8491;
+  background: rgba(15, 23, 42, 0.055);
+  cursor: pointer;
+  transition: color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.music-pro-close:hover:not(:disabled) {
+  color: #252a32;
+  background: rgba(15, 23, 42, 0.1);
+  transform: rotate(5deg);
+}
+
+.music-pro-crown {
+  width: 4.5rem;
+  height: 4.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #f8fafc;
+  background: #1c2026;
+  box-shadow: 0 0.8rem 2rem rgba(28, 32, 38, 0.2);
+}
+
+.music-pro-eyebrow {
+  margin: 1.7rem 0 0;
+  color: #4f8a72;
+  font-size: 0.76rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.music-pro-dialog h2 {
+  margin: 0.5rem 3rem 0 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 680;
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.music-pro-description {
+  margin: 1rem 0 0;
+  color: #667085;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.music-pro-benefits {
+  margin-top: 1.8rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.music-pro-benefits span {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  color: #343a43;
+  font-size: 0.96rem;
+}
+
+.music-pro-benefits svg {
+  flex: 0 0 auto;
+  color: #4f8a72;
+}
+
+.music-pro-error {
+  margin: 1.4rem 0 0;
+  color: #b42318;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.music-pro-upgrade {
+  width: 100%;
+  min-height: 3.8rem;
+  margin-top: 2rem;
+  padding: 0.8rem 1.5rem;
+  border: 0;
+  border-radius: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  color: #fff;
+  background: #171a1f;
+  box-shadow: 0 1rem 2.2rem rgba(23, 26, 31, 0.2);
+  font-size: 1rem;
+  font-weight: 680;
+  cursor: pointer;
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.music-pro-upgrade:hover:not(:disabled) {
+  background: #2a3038;
+  box-shadow: 0 1.2rem 2.6rem rgba(23, 26, 31, 0.25);
+  transform: translateY(-0.12rem);
+}
+
+.music-pro-upgrade:disabled,
+.music-pro-close:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.music-pro-upgrade .is-spinning {
+  animation: music-spin 0.85s linear infinite;
+}
+
+.music-pro-footnote {
+  display: block;
+  margin-top: 1rem;
+  color: #7b8491;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .music-user-playlist-pro-badge {
+    flex-basis: 2.9rem;
+    width: 2.9rem;
+    height: 2.9rem;
+  }
+
+  .music-pro-dialog {
+    padding: 2.2rem 1.6rem 1.8rem;
+  }
 }
 
 .music-user-library-loading,

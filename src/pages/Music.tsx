@@ -4,7 +4,9 @@ import {
   Check,
   CircleAlert,
   Clock3,
+  Crown,
   Heart,
+  Headphones,
   Home,
   LayoutGrid,
   Library,
@@ -17,8 +19,10 @@ import {
   Plus,
   RefreshCw,
   Shuffle,
+  ShieldCheck,
   SkipBack,
   SkipForward,
+  Sparkles,
   Trash2,
   Volume1,
   Volume2,
@@ -45,6 +49,7 @@ import {
   type MusicTrack,
   type MusicUserLibrary,
 } from '@/api/music';
+import { createProCheckout } from '@/api/subscription';
 import type { RootState } from '@/store/store';
 import '@/styles/music.scss';
 
@@ -237,6 +242,9 @@ function Music() {
   const [isUserLibraryLoaded, setIsUserLibraryLoaded] = useState(false);
   const [isUserLibraryLoading, setIsUserLibraryLoading] = useState(false);
   const [userLibraryLoadFailed, setUserLibraryLoadFailed] = useState(false);
+  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
+  const [isStartingCheckout, setIsStartingCheckout] = useState(false);
+  const [upgradeError, setUpgradeError] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playbackTrackId, setPlaybackTrackId] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -283,6 +291,8 @@ function Music() {
   const libraryPageCount = Math.max(1, musicPageCount);
   const libraryTracks = pageTracks;
   const isCollectionView = activeView === 'playlist' || activeView === 'favorites';
+  const hasLibraryAccess = currentUser?.plan?.toLowerCase() === 'pro'
+    || currentUser?.plan?.toLowerCase() === 'plus';
   const activeCollection = activeView === 'favorites' ? 'favorites' : 'uploads';
   const collectionOwnerId = collectionUserId || currentUser?.id || '';
   const activeCollectionLibrary = userLibraries.find(
@@ -299,6 +309,9 @@ function Music() {
     || t('music.guestListener');
   const isViewingOwnCollection = Boolean(
     currentUser?.id && collectionOwnerId === currentUser.id,
+  );
+  const isViewingProCollection = Boolean(
+    isCollectionView && currentUser?.id && collectionOwnerId !== currentUser.id,
   );
   const libraryDuration = useMemo(() => {
     const totalSeconds = musicTotalDuration;
@@ -346,6 +359,42 @@ function Music() {
     }));
     return false;
   }, [currentUser, t]);
+
+  const openUpgradeDialog = useCallback(() => {
+    setUpgradeError('');
+    setIsUpgradeOpen(true);
+  }, []);
+
+  const openLibraryCollection = useCallback((library: MusicUserLibrary) => {
+    const isOwnLibrary = library.userId === currentUser?.id;
+    if (!isOwnLibrary && !hasLibraryAccess) {
+      openUpgradeDialog();
+      return;
+    }
+    setLibraryPage(1);
+    setCollectionUserId(library.userId);
+    setActiveView(library.collection === 'favorites' ? 'favorites' : 'playlist');
+  }, [currentUser?.id, hasLibraryAccess, openUpgradeDialog]);
+
+  const startProCheckout = useCallback(async () => {
+    if (isStartingCheckout) return;
+    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    setIsStartingCheckout(true);
+    setUpgradeError('');
+    try {
+      window.sessionStorage.setItem('subscription_return_to', returnTo);
+      const checkoutUrl = await createProCheckout(returnTo);
+      window.location.assign(checkoutUrl);
+    } catch (error: any) {
+      const message = error?.response?.data?.message;
+      setUpgradeError(
+        typeof message === 'string' && message.trim()
+          ? message
+          : t('music.proCheckoutFailed'),
+      );
+      setIsStartingCheckout(false);
+    }
+  }, [isStartingCheckout, t]);
 
   const syncProgressVisual = useCallback((value: number, duration: number) => {
     const progress = duration > 0 ? Math.min((value / duration) * 100, 100) : 0;
@@ -486,12 +535,42 @@ function Music() {
   }, [isUploading, pendingDuplicateUpload]);
 
   useEffect(() => {
+    if (!isUpgradeOpen || isStartingCheckout) return;
+    const closeDialog = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsUpgradeOpen(false);
+    };
+    document.addEventListener('keydown', closeDialog);
+    return () => document.removeEventListener('keydown', closeDialog);
+  }, [isStartingCheckout, isUpgradeOpen]);
+
+  useEffect(() => {
+    if (!authInitialized || !currentUser || hasLibraryAccess || !isViewingProCollection) return;
+    musicPageRequestRef.current += 1;
+    setActiveView('library');
+  }, [
+    authInitialized,
+    currentUser,
+    hasLibraryAccess,
+    isViewingProCollection,
+  ]);
+
+  useEffect(() => {
     if (activeView === 'library') {
       musicPageRequestRef.current += 1;
       setIsMusicPageLoading(false);
       return;
     }
     if (!authInitialized) return;
+    if (isViewingProCollection && currentUser && !hasLibraryAccess) {
+      musicPageRequestRef.current += 1;
+      setPageTracks([]);
+      setMusicTotal(0);
+      setMusicTotalDuration(0);
+      setMusicPageCount(0);
+      setIsMusicLoaded(true);
+      setIsMusicPageLoading(false);
+      return;
+    }
     if (activeView === 'favorites' && !currentUser) {
       musicPageRequestRef.current += 1;
       musicScopeRef.current = 'favorites:guest';
@@ -584,7 +663,9 @@ function Music() {
     authInitialized,
     collectionOwnerId,
     currentUser?.id,
+    hasLibraryAccess,
     isCollectionView,
+    isViewingProCollection,
     libraryPage,
     libraryPageSize,
     musicRefreshKey,
@@ -601,7 +682,6 @@ function Music() {
       setUserLibraryLoadFailed(false);
       return;
     }
-
     const requestId = userLibraryRequestRef.current + 1;
     userLibraryRequestRef.current = requestId;
     setIsUserLibraryLoading(true);
@@ -1302,40 +1382,47 @@ function Music() {
               </div>
             ) : userLibraries.length ? (
               <div className="music-user-library-grid">
-                {userLibraries.map((library, index) => (
-                  <button
-                    type="button"
-                    className="music-user-playlist-card"
-                    key={`${library.userId}:${library.collection}`}
-                    style={{ '--library-card-delay': `${index * 55}ms` } as CSSProperties}
-                    onClick={() => {
-                      setLibraryPage(1);
-                      setCollectionUserId(library.userId);
-                      setActiveView(library.collection === 'favorites' ? 'favorites' : 'playlist');
-                    }}
-                    aria-label={t('music.userPlaylistLabel', {
-                      playlist: library.playlistName,
-                      username: library.username,
-                      count: library.trackCount,
-                    })}
-                  >
-                    <div className="music-user-playlist-avatar" aria-hidden="true">
-                      {library.avatar ? (
-                        <img src={library.avatar} alt="" />
-                      ) : (
-                        <span>{library.username.trim().charAt(0).toUpperCase() || '?'}</span>
+                {userLibraries.map((library, index) => {
+                  const isOwnLibrary = library.userId === currentUser.id;
+                  const isLockedLibrary = !isOwnLibrary && !hasLibraryAccess;
+                  return (
+                    <button
+                      type="button"
+                      className={`music-user-playlist-card${isLockedLibrary ? ' is-locked' : ''}`}
+                      key={`${library.userId}:${library.collection}`}
+                      style={{ '--library-card-delay': `${index * 55}ms` } as CSSProperties}
+                      onClick={() => openLibraryCollection(library)}
+                      aria-label={isLockedLibrary
+                        ? t('music.proLockedPlaylistLabel', {
+                          playlist: library.playlistName,
+                        })
+                        : t('music.userPlaylistLabel', {
+                          playlist: library.playlistName,
+                          username: library.username,
+                          count: library.trackCount,
+                        })}
+                    >
+                      <div className="music-user-playlist-avatar" aria-hidden="true">
+                        {library.avatar ? (
+                          <img src={library.avatar} alt="" />
+                        ) : (
+                          <span>{library.username.trim().charAt(0).toUpperCase() || '?'}</span>
+                        )}
+                      </div>
+                      <div className="music-user-playlist-copy">
+                        <strong>{library.playlistName}</strong>
+                        <span>{library.username}</span>
+                        <small>
+                          <Music2 size={14} strokeWidth={1.9} aria-hidden="true" />
+                          {t('music.trackCount', { count: library.trackCount })}
+                        </small>
+                      </div>
+                      {!isOwnLibrary && (
+                        <span className="music-user-playlist-pro-badge" aria-hidden="true">PRO</span>
                       )}
-                    </div>
-                    <div className="music-user-playlist-copy">
-                      <strong>{library.playlistName}</strong>
-                      <span>{library.username}</span>
-                      <small>
-                        <Music2 size={14} strokeWidth={1.9} aria-hidden="true" />
-                        {t('music.trackCount', { count: library.trackCount })}
-                      </small>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <div className="music-user-library-empty">
@@ -2066,6 +2153,71 @@ function Music() {
             style={{ '--range-progress': `${volume}%` } as CSSProperties}
           />
         </div>
+        </div>
+      )}
+      {isUpgradeOpen && (
+        <div className="music-pro-overlay" role="presentation">
+          <button
+            type="button"
+            className="music-pro-backdrop"
+            aria-label={t('music.closeProDialog')}
+            disabled={isStartingCheckout}
+            onClick={() => setIsUpgradeOpen(false)}
+          />
+          <section
+            className="music-pro-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="music-pro-title"
+            aria-describedby="music-pro-description"
+          >
+            <button
+              type="button"
+              className="music-pro-close"
+              aria-label={t('music.closeProDialog')}
+              disabled={isStartingCheckout}
+              onClick={() => setIsUpgradeOpen(false)}
+            >
+              <X size={17} aria-hidden="true" />
+            </button>
+            <span className="music-pro-crown" aria-hidden="true">
+              <Crown size={25} strokeWidth={1.8} />
+            </span>
+            <p className="music-pro-eyebrow">{t('music.proPlan')}</p>
+            <h2 id="music-pro-title">{t('music.proUpgradeTitle')}</h2>
+            <p id="music-pro-description" className="music-pro-description">
+              {t('music.proUpgradeDescription')}
+            </p>
+            <div className="music-pro-benefits">
+              <span>
+                <Headphones size={19} aria-hidden="true" />
+                {t('music.proBenefitLibrary')}
+              </span>
+              <span>
+                <Sparkles size={19} aria-hidden="true" />
+                {t('music.proBenefitCollections')}
+              </span>
+              <span>
+                <ShieldCheck size={19} aria-hidden="true" />
+                {t('music.proBenefitSync')}
+              </span>
+            </div>
+            {upgradeError && (
+              <p className="music-pro-error" role="alert">{upgradeError}</p>
+            )}
+            <button
+              type="button"
+              className="music-pro-upgrade"
+              disabled={isStartingCheckout}
+              onClick={() => void startProCheckout()}
+            >
+              {isStartingCheckout
+                ? <LoaderCircle size={19} className="is-spinning" aria-hidden="true" />
+                : <Crown size={19} aria-hidden="true" />}
+              {t(isStartingCheckout ? 'music.openingCheckout' : 'music.upgradeToPro')}
+            </button>
+            <small className="music-pro-footnote">{t('music.proReturnNote')}</small>
+          </section>
         </div>
       )}
       {pendingDuplicateUpload && (
