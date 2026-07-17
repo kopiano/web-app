@@ -12,6 +12,9 @@ export interface AuthUser {
   avatar?: string | null;
   username?: string | null;
   plan?: string;
+  subscription_status?: string;
+  subscription_start_at?: string | null;
+  subscription_end_at?: string | null;
 }
 
 interface AuthState {

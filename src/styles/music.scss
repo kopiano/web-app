@@ -2325,6 +2325,20 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   backdrop-filter: blur(36px) saturate(145%);
   -webkit-backdrop-filter: blur(36px) saturate(145%);
   animation: music-duplicate-dialog-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width 360ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.music-pro-dialog.is-payment {
+  width: min(110rem, calc(100vw - 2.4rem));
+  padding: 3rem;
+}
+
+.music-pro-step-shell {
+  min-width: 0;
+}
+
+.music-pro-step {
+  animation: music-pro-step-in 340ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .music-pro-close {
@@ -2455,6 +2469,641 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   text-align: center;
 }
 
+@keyframes music-pro-step-in {
+  from {
+    opacity: 0;
+    transform: translateX(1.1rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.music-pro-payment-back {
+  width: 2.8rem;
+  height: 2.8rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  border: 1px solid rgba(29, 34, 42, 0.09);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #333942;
+  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: transform 180ms ease, background 180ms ease;
+}
+
+.music-pro-payment-back:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.92);
+  transform: translateX(-0.15rem);
+}
+
+.music-pro-payment-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(21rem, 1.05fr);
+  gap: 3.2rem;
+  align-items: start;
+}
+
+.music-pro-order {
+  min-width: 0;
+  padding: 0.5rem 0.6rem 0.4rem;
+}
+
+.music-pro-payment-step .music-pro-eyebrow {
+  margin-top: 0;
+}
+
+.music-pro-payment-step h2 {
+  margin-right: 0;
+  font-size: 16px;
+  color: rgba(25, 25, 25, 0.9);
+  font-weight: 500;
+}
+
+.music-pro-currency {
+  margin-top: 1.35rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3rem;
+}
+
+.music-pro-currency button {
+  position: relative;
+  isolation: isolate;
+  min-height: 3rem;
+  padding: 12px;
+  width: 100%;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 1);
+  border-radius: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.58rem;
+  color: #fff;
+  background-color: rgba(34, 34, 34, 0.823);
+  font-size: 16px;
+  font-weight: 720;
+  cursor: pointer;
+  transition: color .2s ease, border-color .3s ease, background-color .3s ease, transform .3s ease;
+}
+
+.music-pro-currency-icon {
+  width: 22px;
+  height: 16px;
+  object-fit: contain;
+}
+.music-pro-currency span,
+.music-pro-currency button strong {
+  position: relative;
+  z-index: 2;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Ubuntu, sans-serif
+}
+
+.music-pro-currency-icon {
+  position: relative;
+  z-index: 2;
+}
+
+.music-pro-currency button strong {
+  margin-left: 1.15rem;
+}
+
+.music-pro-currency button strong small,
+.music-pro-plan-price small {
+  margin-left: 0.34rem;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.7em;
+  font-weight: 620;
+}
+
+.music-pro-exchange-note {
+  margin: 0.7rem 0 0;
+  color: #4d4d4d;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.music-pro-currency button.is-active {
+  border-color: rgb(255, 137, 200);
+  color: #fff;
+  background: #20242a;
+  box-shadow: 0 10px 20px rgba(50, 50, 50, 0.877);
+}
+
+.music-pro-billing-toggle {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  height: 3.2rem;
+  margin-top: 1.35rem;
+  padding: 0.28rem;
+  overflow: visible;
+  border: 1px solid #464d57;
+  border-radius: 3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.16rem;
+  background: #252a30;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.music-pro-billing-toggle button {
+  position: relative;
+  z-index: 1;
+  min-width: 5.6rem;
+  height: 100%;
+  padding: 0 0.8rem;
+  border: 0;
+  border-radius: 3rem !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: rgba(255, 255, 255, 0.78);
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 690;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 300ms ease, background 300ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 300ms ease;
+}
+
+.music-pro-billing-toggle button > span {
+  position: relative;
+  z-index: 1;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  font-family: "Camera Plain Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+.music-pro-billing-toggle button.is-active {
+  color: #fff;
+  border-radius: 3rem !important;
+  background: #626365;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0.25rem 0.7rem rgba(0, 0, 0, 0.24);
+}
+
+.music-pro-billing-indicator {
+  display: none;
+}
+
+.music-pro-yearly-offer {
+  position: static;
+  z-index: 1;
+  padding: 0;
+  color: #ecb4f0;
+  background: transparent;
+  font-size: 0.58rem;
+  font-style: normal;
+  font-weight: 740;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.music-pro-plan-comparison {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+}
+
+.music-pro-plan-card {
+  min-width: 0;
+  padding: 1rem 5rem 2rem;
+  border: 1px solid rgba(26, 30, 37, 0.1);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.38);
+  text-align: center;
+}
+
+.music-pro-plan-card.is-pro {
+  border-color: rgba(34, 34, 34, 0.86);
+  background: rgba(254, 231, 206, 0.5);
+}
+
+.music-pro-plan-card h3 {
+  margin: 10px;
+  color: #252a31;
+  font-size: 20px;
+  font-weight: 740;
+}
+
+.music-pro-plan-price {
+  margin: 0.45rem 0 0;
+  color: #22272e;
+  font-size: 36px;
+  font-weight: 730;
+  line-height: 1.1;
+}
+
+.music-pro-plan-price small {
+  color: #5e6873;
+  font-size: 0.36em;
+}
+
+.music-pro-plan-original-price {
+  display: block;
+  min-height: 1.45rem;
+  margin-top: 0.18rem;
+  color: #3535357e;
+  font-size: 20px;
+  font-weight: 620;
+  text-decoration-thickness: 1.5px;
+}
+
+.music-pro-plan-original-price.is-placeholder {
+  visibility: hidden;
+}
+
+.music-pro-plan-features-label {
+  margin: 1.35rem 0 0;
+  color: #3a3a3a;
+  font-size: 16px;
+  font-weight: 720;
+  // text-transform: uppercase;
+}
+
+.music-pro-plan-card ul {
+  margin: 0.55rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.48rem;
+  list-style: none;
+}
+
+.music-pro-plan-card li {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  color: #47515d;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  text-align: left;
+  text-wrap: nowrap;
+}
+
+.music-pro-plan-card li svg {
+  flex: 0 0 auto;
+  color: #3fa66b;
+}
+
+.music-pro-plan-card li.is-unavailable {
+  color: #8d5c62;
+}
+
+.music-pro-plan-card li.is-unavailable svg {
+  color: #e15b64;
+}
+
+.music-pro-checkout {
+  min-width: 0;
+  padding: 1.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 1.6rem;
+  background: rgba(255, 255, 255, 0.38);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.music-pro-qr {
+  position: relative;
+  width: min(14rem, 62vw);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  padding: 0;
+  // border: 1px solid rgba(27, 31, 38, 0.09);
+  border-radius: 1.35rem;
+  background: transparent;
+  box-shadow: 0 1rem 2.6rem rgba(25, 31, 40, 0.1);
+  overflow: hidden;
+}
+
+.music-pro-qr img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  object-fit: contain;
+}
+
+.music-pro-qr-image {
+  animation: music-pro-qr-image-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.music-pro-qr-preview-trigger {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  display: block;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.music-pro-qr-preview-trigger:focus-visible {
+  outline: 2px solid #2c3540;
+  outline-offset: -4px;
+}
+
+@keyframes music-pro-qr-image-in {
+  from {
+    opacity: 0;
+    transform: scale(0.975);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.music-pro-qr-placeholder {
+  width: 100%;
+  height: 100%;
+  padding: 1.1rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 0.7rem;
+  opacity: 0.12;
+  background:
+    repeating-linear-gradient(45deg, #1c2026 0 0.45rem, transparent 0.45rem 0.9rem);
+}
+
+.music-pro-qr-placeholder span {
+  border: 0.4rem solid #1c2026;
+}
+
+.music-pro-qr-placeholder span:nth-child(2) {
+  grid-column: 3;
+}
+
+.music-pro-qr-placeholder span:nth-child(3) {
+  grid-row: 3;
+}
+
+.music-pro-qr-caption {
+  margin: 0.7rem 0 1.4rem;
+  color: #7a838f;
+  font-size: 0.76rem;
+  text-align: center;
+  display: none;
+}
+
+.music-pro-qr-preview-overlay {
+  position: fixed;
+  z-index: 940;
+  inset: 0;
+  padding: 1.5rem;
+  display: grid;
+  place-items: center;
+}
+
+.music-pro-qr-preview-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: rgba(18, 22, 29, 0.55);
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  cursor: zoom-out;
+}
+
+.music-pro-qr-preview-content {
+  position: relative;
+  z-index: 1;
+  width: min(26rem, calc(100vw - 3rem));
+  padding: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.84);
+  border-radius: 1.4rem;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1.5rem 4.5rem rgba(0, 0, 0, 0.34);
+  animation: music-pro-qr-preview-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.music-pro-qr-preview-content img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 1rem;
+  object-fit: contain;
+}
+
+.music-pro-qr-preview-close {
+  position: absolute;
+  top: -0.75rem;
+  right: -0.75rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #222831;
+  box-shadow: 0 0.5rem 1.2rem rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+}
+
+@keyframes music-pro-qr-preview-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.music-pro-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.music-pro-field > span,
+.music-pro-methods legend {
+  color: #262b32;
+  font-size: 16px;
+  font-weight: 690;
+  letter-spacing: 0.7px;
+}
+
+.music-pro-email-input {
+  position: relative;
+  display: block;
+}
+
+.music-pro-email-input > span {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 1rem;
+  color: #2d2d2d;
+  font-size: 15px;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.music-pro-email-input input {
+  width: 100%;
+  height: 4rem;
+  padding: 0 1rem 0 7rem;
+  border: 1px solid rgba(32, 32, 32, 0.833);
+  border-radius: 1rem;
+  color: #232323;
+  outline: 0;
+  background: rgba(255, 255, 255, 0.68);
+  font: inherp;
+  font-size: 15px;
+  letter-spacing: 0.7px;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.music-pro-email-input input:focus {
+  // border-color: rgba(32, 36, 42, 0.46);
+  // box-shadow: 0 0 0 0.22rem rgba(32, 36, 42, 0.08);
+}
+
+.music-pro-methods {
+  margin: 1.3rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.music-pro-methods legend {
+  margin-bottom: 0.65rem;
+}
+
+.music-pro-method {
+  min-height: 3.25rem;
+  padding: 0 1rem;
+  border: 1px solid rgba(52, 53, 54, 0.4);
+  border-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  color: #30353d;
+  background: rgba(255, 255, 255, 0.54);
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition: background 180ms ease;
+}
+
+.music-pro-method:first-of-type {
+  border-radius: 1rem 1rem 0 0;
+}
+
+.music-pro-method:last-of-type {
+  border-bottom: 1px solid rgba(27, 32, 39, 0.13);
+  border-radius: 0 0 1rem 1rem;
+}
+
+.music-pro-method:hover {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.music-pro-method input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.music-pro-radio {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 1.5px solid #000;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  transition: 0.2s;
+  background-clip: content-box;
+}
+
+.music-pro-method input:checked + .music-pro-radio {
+  border-color: #20242a;
+  background: #fff;
+  box-shadow: inset 0 0 0 3px #20242a;
+}
+
+.music-pro-method-logo,
+.music-pro-brand-mark {
+  min-width: 16px;
+  max-width: 24px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+.music-pro-method span {
+  font-size: 14px;
+  font-weight: 600px;
+  letter-spacing: 0.7px;
+}
+.music-pro-brand-mark {
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #1677ff;
+  font-size: 0.68rem;
+  font-weight: 780;
+}
+
+.music-pro-method.is-union_pay .music-pro-brand-mark {
+  background: #d9272e;
+}
+
+.music-pro-pay {
+  width: 100%;
+  min-height: 3.5rem;
+  margin-top: 1.35rem;
+  padding: 0.8rem 1.4rem;
+  border: 0;
+  border-radius: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  color: #fff;
+  background: #171a1f;
+  box-shadow: 0 0.9rem 2rem rgba(23, 26, 31, 0.18);
+  font-size: 15px !important;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 180ms ease, background 180ms ease;
+}
+
+.music-pro-pay:hover:not(:disabled) {
+  background: #2a3038;
+  transform: translateY(-0.1rem);
+}
+
+.music-pro-pay:disabled,
+.music-pro-payment-back:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.music-pro-pay .is-spinning {
+  animation: music-spin 0.85s linear infinite;
+}
+
 @media (max-width: 560px) {
   .music-user-playlist-pro-badge {
     flex-basis: 2.9rem;
@@ -2464,6 +3113,25 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
 
   .music-pro-dialog {
     padding: 2.2rem 1.6rem 1.8rem;
+  }
+
+  .music-pro-dialog.is-payment {
+    padding: 1.35rem 1rem 1rem;
+  }
+}
+
+@media (max-width: 860px) {
+  .music-pro-dialog.is-payment {
+    width: min(39rem, calc(100vw - 1.4rem));
+  }
+
+  .music-pro-payment-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
+
+  .music-pro-checkout {
+    padding: 1rem;
   }
 }
 

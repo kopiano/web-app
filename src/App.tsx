@@ -74,6 +74,19 @@ function normalizeSubscriptionReturnTo(value: string | null) {
   return '/music';
 }
 
+function hasActiveSubscription(user: {
+  plan?: string;
+  subscription_status?: string;
+  subscription_end_at?: string | null;
+}) {
+  const paidPlan = user.plan?.toLowerCase() === 'pro' || user.plan?.toLowerCase() === 'plus';
+  const activeStatus = (user.subscription_status ?? 'active').toLowerCase() === 'active';
+  const endTimestamp = user.subscription_end_at
+    ? Date.parse(user.subscription_end_at)
+    : Number.POSITIVE_INFINITY;
+  return paidPlan && activeStatus && endTimestamp > Date.now();
+}
+
 const SubscriptionSuccess = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -89,8 +102,7 @@ const SubscriptionSuccess = () => {
       for (let attempt = 0; attempt < 10 && !cancelled; attempt += 1) {
         try {
           const user = await dispatch(fetchCurrentUser()).unwrap();
-          const plan = user.plan?.toLowerCase();
-          if (plan === 'pro' || plan === 'plus') {
+          if (hasActiveSubscription(user)) {
             window.sessionStorage.removeItem('subscription_return_to');
             navigate(returnTo, { replace: true });
             return;
