@@ -80,6 +80,8 @@ const playModeLabelKeys: Record<PlayMode, string> = {
   single: 'music.repeatOne',
 };
 
+const CURRENT_MUSIC_TRACK_KEY = 'music_current_track_id';
+
 const formatTime = (seconds: number) => {
   const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
   return `${Math.floor(safeSeconds / 60)}:${String(safeSeconds % 60).padStart(2, '0')}`;
@@ -279,8 +281,23 @@ function Music() {
     getMusic()
       .then((music) => {
         if (!cancelled) {
+          const storedTrackId = window.localStorage.getItem(CURRENT_MUSIC_TRACK_KEY);
+          const storedTrackIndex = storedTrackId
+            ? music.findIndex((track) => track.id === storedTrackId)
+            : -1;
+          const firstPlayableIndex = music.findIndex(
+            (track) => track.processingStatus === 'ready',
+          );
+          const restoredIndex = storedTrackIndex >= 0
+            ? storedTrackIndex
+            : Math.max(0, firstPlayableIndex);
+
           tracksRef.current = music;
           setTracks(music);
+          setCurrentIndex(restoredIndex);
+          if (!music.length) {
+            window.localStorage.removeItem(CURRENT_MUSIC_TRACK_KEY);
+          }
         }
       })
       .catch((error) => {
@@ -382,6 +399,11 @@ function Music() {
     );
     if (firstPlayableIndex >= 0) setCurrentIndex(firstPlayableIndex);
   }, [currentIndex, tracks]);
+
+  useEffect(() => {
+    if (!currentTrack.id) return;
+    window.localStorage.setItem(CURRENT_MUSIC_TRACK_KEY, currentTrack.id);
+  }, [currentTrack.id]);
 
   useEffect(() => {
     const candidates = tracksRef.current.filter((track) => track.processingStatus === 'ready');
@@ -588,6 +610,7 @@ function Music() {
     setTracks(remainingTracks);
 
     if (!remainingTracks.length) {
+      window.localStorage.removeItem(CURRENT_MUSIC_TRACK_KEY);
       setCurrentIndex(0);
       return;
     }
