@@ -2,6 +2,7 @@ import { Fragment, useState, useRef, useEffect, useLayoutEffect, useMemo } from 
 import type { CSSProperties, ReactNode } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar';
 import { getMessageHistory, sendImageMessage, sendMessage } from '@/api/chat';
 import {
@@ -73,6 +74,7 @@ interface MomentPost {
   processingProgress: number;
   processingError?: string;
   time: string;
+  createdAt?: string;
   likes: number;
   liked: boolean;
   views: number;
@@ -236,7 +238,7 @@ function toUiMessage(message: ChatApiMessage, userId: string): Message | null {
   };
 }
 
-function historyDateLabel(value: string) {
+function historyDateLabel(value: string, t: TFunction) {
   const date = new Date(value);
   const now = new Date();
   const startOfDay = (input: Date) => new Date(
@@ -248,9 +250,23 @@ function historyDateLabel(value: string) {
     (startOfDay(now) - startOfDay(date)) / 86_400_000,
   );
 
-  if (dayDifference === 0) return 'Today';
-  if (dayDifference === 1) return 'Yesterday';
+  if (dayDifference === 0) return t('chat.today');
+  if (dayDifference === 1) return t('chat.yesterday');
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function messageTimeLabel(value: string, language: string) {
+  return new Date(value).toLocaleTimeString(language.startsWith('zh') ? 'zh-CN' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function localizedMockLabel(value: string, t: TFunction) {
+  if (value === 'Yesterday') return t('chat.yesterday');
+  if (value === 'Monday') return t('chat.monday');
+  if (value === 'Photo') return t('chat.photo');
+  return value;
 }
 
 function isChatMessageEvent(value: unknown): value is ChatMessageEvent {
@@ -293,7 +309,7 @@ const mockMessages: Record<string, Message[]> = {
   ],
 };
 
-function momentTimeLabel(value: string) {
+function momentTimeLabel(value: string, language: string, t: TFunction) {
   const date = new Date(value);
   const now = new Date();
   const elapsed = Math.max(0, now.getTime() - date.getTime());
@@ -305,11 +321,11 @@ function momentTimeLabel(value: string) {
   ).getTime();
   const dayDifference = Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000);
 
-  if (minutes < 1) return 'just now';
-  if (dayDifference === 0 && minutes < 60) return `${minutes}m`;
-  if (dayDifference === 0) return `${Math.floor(minutes / 60)}h`;
-  if (dayDifference === 1) return 'Yesterday';
-  return date.toLocaleDateString('en-US', {
+  if (minutes < 1) return t('chat.justNow');
+  if (dayDifference === 0 && minutes < 60) return t('chat.minutesAgo', { count: minutes });
+  if (dayDifference === 0) return t('chat.hoursAgo', { count: Math.floor(minutes / 60) });
+  if (dayDifference === 1) return t('chat.yesterday');
+  return date.toLocaleDateString(language.startsWith('zh') ? 'zh-CN' : 'en-US', {
     month: 'short',
     day: 'numeric',
     ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
@@ -329,22 +345,22 @@ function formatUploadBytes(bytes: number) {
   return `${megabytes.toFixed(2)} MB`;
 }
 
-function formatUploadSpeed(bytesPerSecond: number) {
-  if (!Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) return 'Calculating speed';
+function formatUploadSpeed(bytesPerSecond: number, t: TFunction) {
+  if (!Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) return t('chat.calculatingSpeed');
   if (bytesPerSecond >= 1024 * 1024) {
     return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`;
   }
   return `${Math.max(1, Math.round(bytesPerSecond / 1024))} KB/s`;
 }
 
-function formatRemainingTime(seconds: number) {
-  if (!Number.isFinite(seconds) || seconds <= 0) return '即将完成';
-  if (seconds < 60) return `剩余 ${Math.max(1, Math.ceil(seconds))} 秒`;
+function formatRemainingTime(seconds: number, t: TFunction) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return t('chat.finishingSoon');
+  if (seconds < 60) return t('chat.secondsRemaining', { count: Math.max(1, Math.ceil(seconds)) });
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.ceil(seconds % 60);
   return remainingSeconds > 0
-    ? `剩余 ${minutes} 分 ${remainingSeconds} 秒`
-    : `剩余 ${minutes} 分钟`;
+    ? t('chat.minuteSecondsRemaining', { minutes, seconds: remainingSeconds })
+    : t('chat.minutesRemaining', { count: minutes });
 }
 
 function toMomentPost(item: MomentApiItem): MomentPost {
@@ -363,7 +379,8 @@ function toMomentPost(item: MomentApiItem): MomentPost {
     processingStatus: item.processing_status || 'ready',
     processingProgress: Math.min(100, Math.max(0, item.processing_progress ?? 100)),
     processingError: item.processing_error || undefined,
-    time: momentTimeLabel(item.created_at),
+    time: item.created_at,
+    createdAt: item.created_at,
     likes: item.like_count ?? 0,
     liked: item.liked ?? false,
     views: item.view_count ?? 0,
@@ -402,7 +419,7 @@ function insertAtSelection(
 }
 
 function Chat() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const authInitialized = useSelector((state: RootState) => state.auth.initialized);
@@ -411,7 +428,7 @@ function Chat() {
   const contactsInitialized = useSelector((state: RootState) => state.chat.initialized);
   const contactsError = useSelector((state: RootState) => state.chat.error);
   const contactsLastFetchedAt = useSelector((state: RootState) => state.chat.lastFetchedAt);
-  const currentUserName = currentUser?.name || currentUser?.username || 'You';
+  const currentUserName = currentUser?.name || currentUser?.username || t('chat.you');
   const currentUserAvatar = resolveAvatarUrl(currentUser?.avatar)
     || (currentUser?.github_id
       ? `https://avatars.githubusercontent.com/u/${currentUser.github_id}?v=4`
@@ -545,9 +562,9 @@ function Chat() {
       setMomentsInitialized(true);
     } catch {
       if (reset || !momentsInitialized) {
-        setMomentsError('Unable to load moments.');
+        setMomentsError(t('chat.loadMomentsFailed'));
       } else {
-        setMomentsLoadMoreError('Unable to load more moments.');
+        setMomentsLoadMoreError(t('chat.loadMoreMomentsFailed'));
       }
     } finally {
       momentsLoadingRef.current = false;
@@ -763,7 +780,7 @@ function Chat() {
           && !processingFailureNotifiedRef.current.has(post.id)
         ) {
           processingFailureNotifiedRef.current.add(post.id);
-          notify('Video processing failed. Please publish the video again.', 'error');
+          notify(`${t('chat.videoProcessingFailed')}. ${t('chat.publishVideoAgain')}`, 'error');
         }
       });
       if (updates.size > 0) {
@@ -1113,6 +1130,7 @@ function Chat() {
       text: content,
       from: 'me',
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString(),
       status: 'sending',
       clientMessageId,
       sendRequest: request,
@@ -1192,6 +1210,7 @@ function Chat() {
       text: f.name,
       from: 'me',
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString(),
       status: 'sending',
       clientMessageId,
       sendImageRequest: request,
@@ -1216,14 +1235,14 @@ function Chat() {
     const expectedType = type === 'image' ? 'image/' : 'video/';
     const maxBytes = type === 'image' ? 10 * 1024 * 1024 : 2 * 1024 * 1024 * 1024;
     if (!file.type.startsWith(expectedType)) {
-      notify(`Please select a valid ${type} file.`, 'warning');
+      notify(t(type === 'image' ? 'chat.invalidImageFile' : 'chat.invalidVideoFile'), 'warning');
       return;
     }
     if (file.size > maxBytes) {
       notify(
         type === 'image'
-          ? 'Image exceeds the 10 MB upload limit.'
-          : 'Video exceeds the 2 GB upload limit.',
+          ? t('chat.imageTooLarge')
+          : t('chat.videoTooLarge'),
         'warning',
       );
       return;
@@ -1258,12 +1277,12 @@ function Chat() {
       setMomentFile(null);
       notify(
         created.processing_status === 'processing'
-          ? 'Video uploaded. Processing will continue in the background.'
-          : 'Moment published successfully.',
+          ? t('chat.videoUploadedProcessing')
+          : t('chat.momentPublished'),
         'success',
       );
     } catch {
-      notify('Unable to publish moment. Please try again.', 'error');
+      notify(t('chat.publishMomentFailed'), 'error');
     } finally {
       setMomentPublishing(false);
       setMomentUploadProgress(null);
@@ -1291,9 +1310,9 @@ function Chat() {
       setMoments(previous => previous.filter(moment => moment.id !== momentId));
       setPlayingMomentVideoId(current => current === momentId ? null : current);
       setDeleteMomentId(null);
-      notify('Moment deleted successfully.', 'success');
+      notify(t('chat.momentDeleted'), 'success');
     } catch {
-      notify('Unable to delete moment. Please try again.', 'error');
+      notify(t('chat.deleteMomentFailed'), 'error');
     } finally {
       setDeletingMomentId(null);
     }
@@ -1345,7 +1364,7 @@ function Chat() {
           ? { ...moment, liked: current.liked, likes: current.likes }
           : moment
       ));
-      notify('Unable to update the like. Please try again.', 'error');
+      notify(t('chat.updateLikeFailed'), 'error');
     } finally {
       momentLikeRequestsRef.current.delete(postId);
     }
@@ -1417,7 +1436,7 @@ function Chat() {
         ...previous,
         [postId]: previous[postId]?.trim() ? previous[postId] : text,
       }));
-      notify('Unable to publish the comment. Please try again.', 'error');
+      notify(t('chat.publishCommentFailed'), 'error');
     } finally {
       momentCommentRequestsRef.current.delete(postId);
     }
@@ -1453,7 +1472,7 @@ function Chat() {
             <button
               className={`chat-nav-btn${activeTab === 'chat' ? ' active' : ''}`}
               onClick={() => selectTab('chat')}
-              aria-label="Chat"
+              aria-label={t('chat.chat')}
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -1462,7 +1481,7 @@ function Chat() {
             <button
               className={`chat-nav-btn${activeTab === 'moments' ? ' active' : ''}`}
               onClick={() => selectTab('moments')}
-              aria-label="Moments"
+              aria-label={t('chat.moments')}
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 12h4l2.5-7 5 14 2.5-7h4" />
@@ -1485,9 +1504,9 @@ function Chat() {
                   </div>
                   <div className="contact-info">
                     <div className="contact-name">{c.name}</div>
-                    <div className="contact-preview">{c.lastMsg}</div>
+                    <div className="contact-preview">{localizedMockLabel(c.lastMsg, t)}</div>
                   </div>
-                  <div className="contact-time">{c.time}</div>
+                  <div className="contact-time">{localizedMockLabel(c.time, t)}</div>
                 </div>
               ))}
               <div className="contact-divider" />
@@ -1500,19 +1519,19 @@ function Chat() {
                   </div>
                   <div className="contact-info">
                     <div className="contact-name">{c.name}</div>
-                    <div className="contact-preview">{c.lastMsg}</div>
+                    <div className="contact-preview">{localizedMockLabel(c.lastMsg, t)}</div>
                   </div>
-                  <div className="contact-time">{c.time}</div>
+                  <div className="contact-time">{localizedMockLabel(c.time, t)}</div>
                 </div>
               ))}
               {currentUser && visibleContacts.length === 0 && (
                 <div className="contacts-state" role={contactsError ? 'alert' : 'status'}>
                   <span>
                     {contactsLoading || !contactsInitialized
-                      ? 'Loading contacts...'
+                      ? t('chat.loadingContacts')
                       : contactsError
-                        ? 'Unable to load contacts.'
-                        : 'No contacts yet.'}
+                        ? t('chat.loadContactsFailed')
+                        : t('chat.noContacts')}
                   </span>
                   {contactsError && (
                     <button
@@ -1520,7 +1539,7 @@ function Chat() {
                       className="contacts-retry"
                       onClick={() => dispatch(refreshContacts())}
                     >
-                      Retry
+                      {t('chat.retry')}
                     </button>
                   )}
                 </div>
@@ -1548,7 +1567,7 @@ function Chat() {
                         }`}
                       >
                         {activeContactInfo.type === 'group'
-                          ? `${activeContactInfo.members?.length || 0} members`
+                          ? t('chat.members', { count: activeContactInfo.members?.length || 0 })
                           : activeContactInfo.online
                             ? t('chat.online')
                             : t('chat.offline')}
@@ -1557,37 +1576,37 @@ function Chat() {
                   </>
                 ) : (
                   isConversationLoading ? (
-                    <div className="messages-header-loading" role="status" aria-label="Loading conversation">
+                    <div className="messages-header-loading" role="status" aria-label={t('chat.loadingConversation')}>
                       <span className="chat-loading-spinner" aria-hidden="true" />
                     </div>
                   ) : (
                     <div className="messages-header-info">
-                      <div className="messages-header-name">No contacts yet</div>
+                      <div className="messages-header-name">{t('chat.noContacts')}</div>
                     </div>
                   )
                 )}
               </div>
               <div ref={msgListRef} className="msg-list">
                 {isConversationLoading || historyLoading ? (
-                  <div className="messages-loading" role="status" aria-label="Loading conversation">
+                  <div className="messages-loading" role="status" aria-label={t('chat.loadingConversation')}>
                     <span className="chat-loading-spinner" aria-hidden="true" />
                   </div>
                 ) : (messages[activeConversationId] || []).length === 0 ? (
-                  <div className="msg-empty">No messages yet</div>
+                  <div className="msg-empty">{t('chat.noMessages')}</div>
                 ) : (
                   (messages[activeConversationId] || []).map((msg, msgIndex, contactMessages) => {
                     const previousMessage = contactMessages[msgIndex - 1];
                     const showDateDivider = Boolean(
                       msg.createdAt
                       && (!previousMessage?.createdAt
-                        || historyDateLabel(previousMessage.createdAt) !== historyDateLabel(msg.createdAt)),
+                        || historyDateLabel(previousMessage.createdAt, t) !== historyDateLabel(msg.createdAt, t)),
                     );
 
                     return (
                     <Fragment key={msg.id}>
                       {showDateDivider && msg.createdAt && (
                         <div className="message-date-divider" role="separator">
-                          <span>{historyDateLabel(msg.createdAt)}</span>
+                          <span>{historyDateLabel(msg.createdAt, t)}</span>
                         </div>
                       )}
                     <div className={`msg-wrap ${msg.from === 'me' ? 'sent' : 'received'}`}>
@@ -1608,12 +1627,12 @@ function Chat() {
                               href={msg.imageUrl}
                               target="_blank"
                               rel="noreferrer"
-                              aria-label={`Open image ${msg.imageName || ''}`.trim()}
+                              aria-label={t('chat.openImage', { name: msg.imageName || '' }).trim()}
                             >
                               <img
                                 className="chat-message-image"
                                 src={msg.imageUrl}
-                                alt={msg.imageName || 'Shared image'}
+                                alt={msg.imageName || t('chat.sharedImage')}
                               />
                             </a>
                           )}
@@ -1634,17 +1653,19 @@ function Chat() {
                           )}
                         </div>
                         <div className="msg-time">
-                          {msg.time}
+                          {msg.createdAt
+                            ? messageTimeLabel(msg.createdAt, i18n.resolvedLanguage || i18n.language)
+                            : localizedMockLabel(msg.time, t)}
                           {msg.from === 'me' && msg.status && (
                             <>
                               <span
                                 className={`msg-status ${msg.status}`}
                                 aria-label={
                                   msg.status === 'sent'
-                                    ? 'Delivered'
+                                    ? t('chat.delivered')
                                     : msg.status === 'sending'
-                                      ? 'Sending...'
-                                      : 'Message failed'
+                                      ? t('chat.sending')
+                                      : t('chat.messageFailed')
                                 }
                               >
                                 {msg.status === 'sending' && (
@@ -1663,10 +1684,10 @@ function Chat() {
                                 )}
                                 <span className="msg-status-label">
                                   {msg.status === 'sent'
-                                    ? 'Delivered'
+                                    ? t('chat.delivered')
                                     : msg.status === 'sending'
-                                      ? 'Sending...'
-                                      : 'Failed'}
+                                      ? t('chat.sending')
+                                      : t('chat.failed')}
                                 </span>
                               </span>
                               {msg.status === 'failed' && (msg.sendRequest || msg.sendImageRequest) && (
@@ -1675,7 +1696,7 @@ function Chat() {
                                   className="msg-retry-btn"
                                   onClick={() => retryMessage(msg)}
                                 >
-                                  Retry
+                                  {t('chat.retry')}
                                 </button>
                               )}
                             </>
@@ -1698,7 +1719,7 @@ function Chat() {
                       className="input-tool-btn"
                       onPointerDown={event => event.preventDefault()}
                       onClick={() => setShowEmoji(!showEmoji)}
-                      aria-label="Emoji"
+                      aria-label={t('chat.emoji')}
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" />
@@ -1722,21 +1743,21 @@ function Chat() {
                       </div>
                     )}
                   </div>
-                  <button className="input-tool-btn" onClick={() => chatImageRef.current?.click()} aria-label="Image">
+                  <button className="input-tool-btn" onClick={() => chatImageRef.current?.click()} aria-label={t('chat.image')}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
                     </svg>
                   </button>
                   <input ref={chatImageRef} type="file" accept="image/*" hidden onChange={pickImage} />
-                  <button className="input-tool-btn" onClick={() => fileRef.current?.click()} aria-label="File">
+                  <button className="input-tool-btn" onClick={() => fileRef.current?.click()} aria-label={t('chat.file')}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
                     </svg>
                   </button>
                   <input ref={fileRef} type="file" hidden onChange={pickFile} />
-                  <input ref={chatInputRef} className="msg-text-input" type="text" placeholder="Message..." value={inputText}
+                  <input ref={chatInputRef} className="msg-text-input" type="text" placeholder={t('chat.messagePlaceholder')} value={inputText}
                     onChange={e => setInputText(e.target.value)} onKeyDown={handleKeyDown} />
-                  <button className="msg-send-btn" disabled={!inputText.trim()} onClick={handleSend}>
+                  <button className="msg-send-btn" disabled={!inputText.trim()} onClick={handleSend} aria-label={t('chat.sendMessage')}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
                     </svg>
@@ -1755,7 +1776,7 @@ function Chat() {
                 <div className="moment-post-avatar">
                   <img src={currentUserAvatar} alt="" className="avatar-img" />
                 </div>
-                <textarea ref={momentInputRef} className="moment-post-input" placeholder="What's happening?" value={momentText}
+                <textarea ref={momentInputRef} className="moment-post-input" placeholder={t('chat.whatsHappening')} value={momentText}
                   onChange={e => setMomentText(e.target.value)} />
               </div>
               {momentMedia && (
@@ -1782,8 +1803,8 @@ function Chat() {
                       </span>
                       <span>
                         {momentUploadProgress.percent >= 100
-                          ? 'Upload complete'
-                          : `Uploading ${momentMediaType === 'video' ? 'video' : 'image'}`}
+                          ? t('chat.uploadComplete')
+                          : t(momentMediaType === 'video' ? 'chat.uploadingVideo' : 'chat.uploadingImage')}
                       </span>
                     </div>
                     <strong>{momentUploadProgress.percent}%</strong>
@@ -1804,17 +1825,17 @@ function Chat() {
                     {momentUploadProgress.percent >= 100 ? (
                       <span>
                         {momentMediaType === 'video'
-                          ? '正在创建动态，视频将在后台转码'
-                          : '正在创建动态'}
+                          ? t('chat.creatingVideoMoment')
+                          : t('chat.creatingMoment')}
                       </span>
                     ) : (
                       <>
-                        <span>{formatUploadSpeed(momentUploadProgress.bytesPerSecond)}</span>
+                        <span>{formatUploadSpeed(momentUploadProgress.bytesPerSecond, t)}</span>
                         <i aria-hidden="true" />
                         <span>
                           {momentUploadProgress.bytesPerSecond > 0
-                            ? formatRemainingTime(momentUploadProgress.remainingSeconds)
-                            : '正在计算剩余时间'}
+                            ? formatRemainingTime(momentUploadProgress.remainingSeconds, t)
+                            : t('chat.calculatingRemainingTime')}
                         </span>
                       </>
                     )}
@@ -1828,7 +1849,7 @@ function Chat() {
                     className="moment-tool-btn"
                     onPointerDown={event => event.preventDefault()}
                     onClick={() => setShowMomentEmoji(p => !p)}
-                    aria-label="Add emoji"
+                    aria-label={t('chat.addEmoji')}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10" />
@@ -1854,7 +1875,7 @@ function Chat() {
                       </div>
                     </div>
                   )}
-                  <button className="moment-tool-btn media-image" onClick={() => handleMomentUpload('image')} aria-label="Image">
+                  <button className="moment-tool-btn media-image" onClick={() => handleMomentUpload('image')} aria-label={t('chat.image')}>
                     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="3" width="18" height="18" rx="3" />
                       <circle cx="9" cy="9" r="2" />
@@ -1862,7 +1883,7 @@ function Chat() {
                       <path d="m14 14 1.1-1.1" />
                     </svg>
                   </button>
-                  <button className="moment-tool-btn media-video" onClick={() => handleMomentUpload('video')} aria-label="Video">
+                  <button className="moment-tool-btn media-video" onClick={() => handleMomentUpload('video')} aria-label={t('chat.video')}>
                     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M3 7h18" />
                       <path d="m7 3 3 4" />
@@ -1878,28 +1899,28 @@ function Chat() {
                   className="moment-submit"
                   disabled={!currentUser || momentPublishing || (!momentText.trim() && !momentFile)}
                   onClick={handleMomentPublish}
-                  aria-label={currentUser ? t('chat.post') : 'Sign in to post'}
-                  title={currentUser ? undefined : 'Sign in to post'}
+                  aria-label={currentUser ? t('chat.post') : t('chat.signInToPost')}
+                  title={currentUser ? undefined : t('chat.signInToPost')}
                 >
                   {momentPublishing && <span className="moment-submit-spinner" aria-hidden="true" />}
-                  {momentPublishing ? 'Posting' : t('chat.post')}
+                  {momentPublishing ? t('chat.posting') : t('chat.post')}
                 </button>
               </div>
             </div>
 
             {momentsLoading && !momentsInitialized ? (
-              <div className="moments-loading" role="status" aria-label="Loading moments">
+              <div className="moments-loading" role="status" aria-label={t('chat.loadingMoments')}>
                 <span className="chat-loading-spinner" aria-hidden="true" />
               </div>
             ) : momentsError ? (
               <div className="moment-empty" role="alert">
                 <span>{momentsError}</span>
                 <button type="button" className="moments-retry" onClick={() => void loadMoments(true)}>
-                  Retry
+                  {t('chat.retry')}
                 </button>
               </div>
             ) : moments.length === 0 ? (
-              <div className="moment-empty">No moments yet</div>
+              <div className="moment-empty">{t('chat.noMoments')}</div>
             ) : (
               <>
                 {moments.map((post, idx) => {
@@ -1918,7 +1939,11 @@ function Chat() {
                       </div>
                       <div className="card-author">
                         <div className="card-name">{isCurrentUserPost ? currentUserName : post.name}</div>
-                        <div className="card-time">{post.time}</div>
+                        <div className="card-time">
+                          {post.createdAt
+                            ? momentTimeLabel(post.createdAt, i18n.resolvedLanguage || i18n.language, t)
+                            : post.time}
+                        </div>
                       </div>
                       {isCurrentUserPost && (
                         <div
@@ -1928,7 +1953,7 @@ function Chat() {
                           <button
                             type="button"
                             className={`card-menu${openMomentMenuId === post.id ? ' active' : ''}`}
-                            aria-label="More actions"
+                            aria-label={t('chat.moreActions')}
                             aria-haspopup="menu"
                             aria-expanded={openMomentMenuId === post.id}
                             onClick={() => setOpenMomentMenuId(current => (
@@ -1956,7 +1981,7 @@ function Chat() {
                                   <path d="M19 6l-1 14H6L5 6" />
                                   <path d="M10 11v5M14 11v5" />
                                 </svg>
-                                <span>Delete</span>
+                                <span>{t('chat.delete')}</span>
                               </button>
                             </div>
                           )}
@@ -1990,7 +2015,7 @@ function Chat() {
                               && post.processingProgress === 0 ? ' idle' : ''
                           }`}
                           role="progressbar"
-                          aria-label="Video transcoding progress"
+                          aria-label={t('chat.videoTranscodingProgress')}
                           aria-valuemin={0}
                           aria-valuemax={100}
                           aria-valuenow={
@@ -2058,7 +2083,7 @@ function Chat() {
                                 >
                                   <path d="m5 12 4 4L19 6" />
                                 </svg>
-                                <small className="moment-video-progress-label">Ready</small>
+                                <small className="moment-video-progress-label">{t('chat.ready')}</small>
                               </>
                             ) : (
                               <>
@@ -2067,7 +2092,7 @@ function Chat() {
                                   <small>%</small>
                                 </span>
                                 <small className="moment-video-progress-label">
-                                  {post.processingProgress > 0 ? 'Encoding' : 'Queued'}
+                                  {post.processingProgress > 0 ? t('chat.encoding') : t('chat.queued')}
                                 </small>
                               </>
                             )}
@@ -2076,17 +2101,17 @@ function Chat() {
                         <div className="moment-video-processing-content">
                           <strong>
                             {completedProcessingMoments.has(post.id)
-                              ? 'Processing complete'
+                              ? t('chat.processingComplete')
                               : post.processingProgress > 0
-                                ? 'Transcoding video'
-                                : 'Waiting to process'}
+                                ? t('chat.transcodingVideo')
+                                : t('chat.waitingToProcess')}
                           </strong>
                           <span>
                             {completedProcessingMoments.has(post.id)
-                              ? 'The video is ready to play.'
+                              ? t('chat.videoReady')
                               : post.processingProgress > 0
-                              ? 'Preparing the video for playback.'
-                              : 'The video is queued and will start shortly.'}
+                              ? t('chat.preparingVideo')
+                              : t('chat.videoQueued')}
                           </span>
                         </div>
                       </div>
@@ -2094,8 +2119,8 @@ function Chat() {
                     {post.mediaType === 'video' && post.processingStatus === 'failed' && (
                       <div className="moment-video-status failed" role="alert">
                         <div>
-                          <strong>Video processing failed</strong>
-                          <span>{post.processingError || 'Please publish the video again.'}</span>
+                          <strong>{t('chat.videoProcessingFailed')}</strong>
+                          <span>{post.processingError || t('chat.publishVideoAgain')}</span>
                         </div>
                       </div>
                     )}
@@ -2135,6 +2160,7 @@ function Chat() {
                         className={`card-action-btn heart-btn${post.liked ? ' liked' : ''}${currentUser ? '' : ' guest-restricted'}`}
                         onClick={() => toggleLike(post.id)}
                         aria-disabled={!currentUser}
+                        aria-label={t('chat.likeMoment')}
                         title={currentUser ? undefined : t('chat.signInRequired')}
                       >
                         <span className={`heart-icon${post.liked ? ' liked' : ''}`}>
@@ -2182,6 +2208,7 @@ function Chat() {
                         className={`card-action-btn comment-action-btn${showCommentInput[post.id] ? ' comment-active' : ''}${currentUser ? '' : ' guest-restricted'}`}
                         onClick={() => toggleCommentInput(post.id)}
                         aria-disabled={!currentUser}
+                        aria-label={t('chat.commentOnMoment')}
                         title={currentUser ? undefined : t('chat.signInRequired')}
                       >
                         <span className="action-svg">
@@ -2191,7 +2218,7 @@ function Chat() {
                         </span>
                         <span className="action-label">{post.comments.length}</span>
                       </button>
-                      <span className="card-action-btn views-btn">
+                      <span className="card-action-btn views-btn" aria-label={t('chat.momentViews')}>
                         <span className="action-svg">
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="2" y1="12" x2="2" y2="20" />
@@ -2202,7 +2229,7 @@ function Chat() {
                         </span>
                         <span className="action-label">{post.views}</span>
                       </span>
-                      <button className="card-action-btn share-btn">
+                      <button className="card-action-btn share-btn" aria-label={t('chat.shareMoment')}>
                         <span className="action-svg">
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
@@ -2230,7 +2257,7 @@ function Chat() {
                                 setCommentEmojiPost(p => p === post.id ? null : post.id);
                                 setShowCommentInput(p => ({ ...p, [post.id]: true }));
                               }}
-                              aria-label="Add emoji to comment"
+                              aria-label={t('chat.addEmojiToComment')}
                             >
                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                                 <circle cx="12" cy="12" r="10" />
@@ -2264,7 +2291,7 @@ function Chat() {
                             }}
                             className="comment-input"
                             type="text"
-                            placeholder="Write a comment..."
+                            placeholder={t('chat.commentPlaceholder')}
                             value={commentTexts[post.id] || ''}
                             onChange={e => setCommentTexts(p => ({ ...p, [post.id]: e.target.value }))}
                             onKeyDown={e => { if (e.key === 'Enter') handleCommentSubmit(post.id); }} />
@@ -2272,7 +2299,7 @@ function Chat() {
                             className="comment-submit"
                             disabled={!commentTexts[post.id]?.trim()}
                             onClick={() => handleCommentSubmit(post.id)}
-                            aria-label="Send comment"
+                            aria-label={t('chat.sendComment')}
                           >
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
@@ -2285,7 +2312,7 @@ function Chat() {
                   );
                 })}
                 {momentsLoading && momentsInitialized && (
-                  <div className="moments-loading-more" role="status" aria-label="Loading more moments">
+                  <div className="moments-loading-more" role="status" aria-label={t('chat.loadingMoreMoments')}>
                     <span className="chat-loading-spinner" aria-hidden="true" />
                   </div>
                 )}
@@ -2293,7 +2320,7 @@ function Chat() {
                   <div className="moments-load-more-error" role="alert">
                     <span>{momentsLoadMoreError}</span>
                     <button type="button" className="moments-retry" onClick={() => void loadMoments()}>
-                      Retry
+                      {t('chat.retry')}
                     </button>
                   </div>
                 )}
@@ -2307,7 +2334,7 @@ function Chat() {
           <button
             type="button"
             className="moment-delete-backdrop"
-            aria-label="Cancel deletion"
+            aria-label={t('chat.cancelDeletion')}
             disabled={deletingMomentId !== null}
             onClick={() => setDeleteMomentId(null)}
           />
@@ -2325,9 +2352,9 @@ function Chat() {
                 <path d="M19 6l-1 14H6L5 6" />
               </svg>
             </div>
-            <h3 id="moment-delete-title">Delete this moment?</h3>
+            <h3 id="moment-delete-title">{t('chat.deleteMomentTitle')}</h3>
             <p id="moment-delete-description">
-              This post and its uploaded media will be permanently removed.
+              {t('chat.deleteMomentDescription')}
             </p>
             <div className="moment-delete-actions">
               <button
@@ -2336,7 +2363,7 @@ function Chat() {
                 disabled={deletingMomentId !== null}
                 onClick={() => setDeleteMomentId(null)}
               >
-                Cancel
+                {t('chat.cancel')}
               </button>
               <button
                 type="button"
@@ -2347,7 +2374,7 @@ function Chat() {
                 {deletingMomentId !== null && (
                   <span className="moment-delete-spinner" aria-hidden="true" />
                 )}
-                {deletingMomentId !== null ? 'Deleting' : 'Delete'}
+                {deletingMomentId !== null ? t('chat.deleting') : t('chat.delete')}
               </button>
             </div>
           </div>
