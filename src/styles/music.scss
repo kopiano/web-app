@@ -2107,8 +2107,8 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   gap: clamp(2.5rem, 5vw, 6.5rem);
   overflow: hidden;
   isolation: isolate;
-  border: 1px solid rgba(255, 255, 255, 0.64);
-  border-radius: var(--library-hero-radius);
+  // border: 1px solid rgba(255, 255, 255, 0.64);
+  border-radius: 3rem;
   background: #282c32;
   box-shadow:
     0 2.2rem 6rem rgba(38, 42, 52, 0.2),

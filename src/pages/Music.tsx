@@ -640,16 +640,18 @@ function Music() {
     const handleEnded = () => {
       if (playMode === 'single') {
         audio.currentTime = 0;
-        void audio.play();
+        resetProgress();
+        void audio.play().catch((error) => {
+          console.error('Audio repeat playback failed', error);
+          setIsPlaying(false);
+        });
         return;
       }
-      setIsPlaying(false);
-      audio.currentTime = 0;
-      resetProgress();
+      goToTrack(1);
     };
     audio.addEventListener('ended', handleEnded);
     return () => audio.removeEventListener('ended', handleEnded);
-  }, [playMode, resetProgress]);
+  }, [goToTrack, playMode, resetProgress]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
