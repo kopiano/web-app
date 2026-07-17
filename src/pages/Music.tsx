@@ -216,34 +216,6 @@ function Music() {
     void playTrack(currentTracks[nextIndex]);
   }, [currentIndex, playMode, playTrack]);
 
-  const refreshMusic = useCallback(async () => {
-    const activeTrackId = audioRef.current?.dataset.trackId || tracksRef.current[currentIndex]?.id;
-    const music = await getMusic();
-    setTracks((current) => music.map((track) => {
-      const loaded = current.find((item) => item.id === track.id && item.detailsLoaded);
-      return loaded
-        ? {
-            ...loaded,
-            ...track,
-            duration: loaded.duration,
-            bitrate: loaded.bitrate,
-            sampleRate: loaded.sampleRate,
-            audioUrl: loaded.audioUrl,
-            originalUrl: loaded.originalUrl,
-            format: loaded.format,
-            originalFormat: loaded.originalFormat,
-            size: loaded.size,
-            originalSize: loaded.originalSize,
-            detailsLoaded: true,
-          }
-        : track;
-    }));
-    if (activeTrackId) {
-      const nextIndex = music.findIndex((track) => track.id === activeTrackId);
-      if (nextIndex >= 0) setCurrentIndex(nextIndex);
-    }
-  }, [currentIndex]);
-
   useEffect(() => {
     document.body.classList.add('music-route');
     document.documentElement.classList.add('music-route');
@@ -811,15 +783,6 @@ function Music() {
             <p>{visibleTracks.length} songs</p>
           </div>
           <div className="music-section-actions">
-            <button
-              type="button"
-              className="music-refresh-button"
-              onClick={() => void refreshMusic().catch((error) => console.error('Failed to refresh music', error))}
-              aria-label="Refresh music"
-              title="Refresh music"
-            >
-              <RefreshCw size={16} />
-            </button>
             <button type="button" className="view-all" onClick={() => setActiveView('playlist')}>
               See more <ChevronRight size={15} />
             </button>
