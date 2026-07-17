@@ -768,7 +768,7 @@ $chat-margin-left: 100px;
 .msg-text {
     margin-bottom: 3px;
     font-size: 14px;
-    letter-spacing: 0;
+    letter-spacing: 0.3px;
     font-family: -apple-system;
     white-space: pre-wrap;
 }
@@ -787,14 +787,15 @@ $chat-margin-left: 100px;
     border-radius: 2px;
     background: currentColor;
     opacity: 0.7;
+    display: none;      // important
     animation: typing-caret 0.9s ease-in-out infinite;
 }
 
 .msg-char {
     display: inline-block;
-    opacity: 1;
-    transform: none;
-    animation: none;
+    opacity: 0;
+    will-change: opacity;
+    animation: message-char-in 0.18s ease-out var(--char-delay) both;
 }
 
 .msg-time {
@@ -826,11 +827,9 @@ $chat-margin-left: 100px;
 @keyframes message-char-in {
     from {
         opacity: 0;
-        transform: translateX(2px);
     }
     to {
         opacity: 1;
-        transform: translateX(0);
     }
 }
 
