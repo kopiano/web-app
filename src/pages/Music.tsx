@@ -17,6 +17,7 @@ import {
   Volume1,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent } from 'react';
 import { useSelector } from 'react-redux';
@@ -30,6 +31,8 @@ import {
   normalizeMusicEvent,
   updateMusicFavorite,
   uploadMusic,
+  MusicDuplicateError,
+  type MusicDuplicateMatch,
   type MusicTrack,
 } from '@/api/music';
 import type { RootState } from '@/store/store';
@@ -37,6 +40,11 @@ import '@/styles/music.scss';
 
 type View = 'home' | 'playlist' | 'favorites';
 type PlayMode = 'sequential' | 'shuffle' | 'single';
+type PendingDuplicateUpload = {
+  files: File[];
+  kind: 'exact' | 'similar';
+  matches: MusicDuplicateMatch[];
+};
 
 const EMPTY_TRACK: MusicTrack = {
   id: '',
@@ -60,16 +68,16 @@ const EMPTY_TRACK: MusicTrack = {
   detailsLoaded: true,
 };
 
-const navItems: Array<{ id: View; label: string; icon: typeof Home }> = [
-  { id: 'home', label: 'Home', icon: Home },
-  { id: 'playlist', label: 'Playlist', icon: ListMusic },
-  { id: 'favorites', label: 'Favorites', icon: Heart },
+const navItems: Array<{ id: View; labelKey: string; icon: typeof Home }> = [
+  { id: 'home', labelKey: 'music.home', icon: Home },
+  { id: 'playlist', labelKey: 'music.playlist', icon: ListMusic },
+  { id: 'favorites', labelKey: 'music.favorites', icon: Heart },
 ];
 
-const playModeLabels: Record<PlayMode, string> = {
-  sequential: 'List repeat',
-  shuffle: 'Shuffle',
-  single: 'Repeat one',
+const playModeLabelKeys: Record<PlayMode, string> = {
+  sequential: 'music.listRepeat',
+  shuffle: 'music.shuffle',
+  single: 'music.repeatOne',
 };
 
 const formatTime = (seconds: number) => {
@@ -87,6 +95,8 @@ function Music() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMusicLoaded, setIsMusicLoaded] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [duplicateAction, setDuplicateAction] = useState<'confirm' | 'ignore' | ''>('');
+  const [pendingDuplicateUpload, setPendingDuplicateUpload] = useState<PendingDuplicateUpload | null>(null);
   const [openTrackMenuId, setOpenTrackMenuId] = useState('');
   const [deletingTrackId, setDeletingTrackId] = useState('');
   const [removingTrackId, setRemovingTrackId] = useState('');
@@ -96,7 +106,13 @@ function Music() {
   const [volume, setVolume] = useState(68);
   const [lastVolume, setLastVolume] = useState(68);
   const [playMode, setPlayMode] = useState<PlayMode>('sequential');
-  const currentTrack = tracks[currentIndex] ?? EMPTY_TRACK;
+  const emptyTrack = useMemo(() => ({
+    ...EMPTY_TRACK,
+    title: t('music.emptyTrackTitle'),
+    artist: t('music.emptyTrackArtist'),
+    album: t('music.emptyTrackAlbum'),
+  }), [t]);
+  const currentTrack = tracks[currentIndex] ?? emptyTrack;
   const featuredCandidates = useMemo(
     () => tracks.filter((track) => track.processingStatus === 'ready'),
     [tracks],
@@ -105,10 +121,16 @@ function Music() {
   const featuredTrack = featuredCandidates.find((track) => track.id === featuredTrackId)
     ?? featuredCandidates[0]
     ?? tracks[0]
-    ?? EMPTY_TRACK;
+    ?? emptyTrack;
   const featuredTrackNumber = tracks.findIndex((track) => track.id === featuredTrack.id) + 1;
   const isFeaturedPlaying = playbackTrackId === featuredTrack.id && isPlaying;
   const hasPlayableTracks = tracks.some((track) => track.processingStatus === 'ready');
+  const duplicateUploadCount = pendingDuplicateUpload
+    ? Math.min(
+      Math.max(1, pendingDuplicateUpload.matches.length),
+      pendingDuplicateUpload.files.length,
+    )
+    : 0;
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLInputElement>(null);
   const progressFillRef = useRef<HTMLDivElement>(null);
@@ -244,6 +266,15 @@ function Music() {
   }, [openTrackMenuId]);
 
   useEffect(() => {
+    if (!pendingDuplicateUpload || isUploading) return;
+    const closeDialog = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPendingDuplicateUpload(null);
+    };
+    document.addEventListener('keydown', closeDialog);
+    return () => document.removeEventListener('keydown', closeDialog);
+  }, [isUploading, pendingDuplicateUpload]);
+
+  useEffect(() => {
     let cancelled = false;
     getMusic()
       .then((music) => {
@@ -273,6 +304,9 @@ function Music() {
 
     const mergeTrack = (updated: MusicTrack) => {
       setTracks((current) => {
+        if (updated.processingStatus === 'failed') {
+          return current.filter((track) => track.id !== updated.id);
+        }
         const exists = current.some((track) => track.id === updated.id);
         return exists
           ? current.map((track) => track.id === updated.id ? { ...track, ...updated } : track)
@@ -620,40 +654,130 @@ function Music() {
     event.currentTarget.style.setProperty('--tilt-y', '0deg');
   };
 
+  const mergeUploadedTracks = useCallback((created: MusicTrack[]) => {
+    const activeTrackId = audioRef.current?.dataset.trackId || tracksRef.current[currentIndex]?.id || '';
+    const createdIds = new Set(created.map((track) => track.id));
+    const refreshed = [
+      ...created,
+      ...tracksRef.current.filter((track) => !createdIds.has(track.id)),
+    ];
+    const refreshedCurrentIndex = refreshed.findIndex((track) => track.id === activeTrackId);
+    tracksRef.current = refreshed;
+    setTracks(refreshed);
+    if (refreshedCurrentIndex >= 0) {
+      setCurrentIndex(refreshedCurrentIndex);
+    } else if (!activeTrackId) {
+      const firstPlayableIndex = refreshed.findIndex(
+        (track) => track.processingStatus === 'ready',
+      );
+      setCurrentIndex(Math.max(0, firstPlayableIndex));
+      setIsPlaying(false);
+      resetProgress();
+    }
+    setActiveView('playlist');
+  }, [currentIndex, resetProgress]);
+
+  const notifyUploadError = useCallback((error: unknown) => {
+    console.error('Failed to upload music', error);
+    setTracks((current) => current.filter((track) => track.processingStatus !== 'failed'));
+    window.dispatchEvent(new CustomEvent('app:notification', {
+      detail: {
+        message: error instanceof MusicDuplicateError && error.kind === 'exact'
+          ? t('music.exactDuplicate')
+          : error instanceof Error
+            ? error.message
+            : t('music.uploadFailed'),
+        type: 'error',
+      },
+    }));
+  }, [t]);
+
   const handleAddMusic = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!requireMusicAccount()) {
       event.target.value = '';
       return;
     }
     const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
     if (!files.length) return;
     setIsUploading(true);
     try {
-      const created = await uploadMusic(files);
-      const activeTrackId = audioRef.current?.dataset.trackId || currentTrack.id;
-      const createdIds = new Set(created.map((track) => track.id));
-      const refreshed = [
-        ...created,
-        ...tracksRef.current.filter((track) => !createdIds.has(track.id)),
-      ];
-      const refreshedCurrentIndex = refreshed.findIndex((track) => track.id === activeTrackId);
-      setTracks(refreshed);
-      if (refreshedCurrentIndex >= 0) {
-        setCurrentIndex(refreshedCurrentIndex);
-      } else if (!activeTrackId) {
-        const firstPlayableIndex = refreshed.findIndex(
-          (track) => track.processingStatus === 'ready',
-        );
-        setCurrentIndex(Math.max(0, firstPlayableIndex));
-        setIsPlaying(false);
-        resetProgress();
-      }
-      setActiveView('playlist');
+      mergeUploadedTracks(await uploadMusic(files));
     } catch (error) {
-      console.error('Failed to upload music', error);
+      if (error instanceof MusicDuplicateError) {
+        setPendingDuplicateUpload({
+          files,
+          kind: error.kind,
+          matches: error.matches,
+        });
+      } else {
+        notifyUploadError(error);
+      }
     } finally {
       setIsUploading(false);
-      event.target.value = '';
+    }
+  };
+
+  const confirmDuplicateUpload = async () => {
+    if (
+      !pendingDuplicateUpload
+      || pendingDuplicateUpload.kind !== 'similar'
+      || isUploading
+    ) return;
+    const upload = pendingDuplicateUpload;
+    setDuplicateAction('confirm');
+    setIsUploading(true);
+    try {
+      mergeUploadedTracks(await uploadMusic(upload.files, { allowSimilar: true }));
+      setPendingDuplicateUpload(null);
+    } catch (error) {
+      setPendingDuplicateUpload(null);
+      notifyUploadError(error);
+    } finally {
+      setIsUploading(false);
+      setDuplicateAction('');
+    }
+  };
+
+  const uploadWithoutDuplicates = async () => {
+    if (!pendingDuplicateUpload || isUploading) return;
+    const upload = pendingDuplicateUpload;
+    const created: MusicTrack[] = [];
+    let skippedCount = 0;
+    let firstUploadError: unknown = null;
+
+    setDuplicateAction('ignore');
+    setIsUploading(true);
+    try {
+      for (const file of upload.files) {
+        try {
+          created.push(...await uploadMusic([file]));
+        } catch (error) {
+          if (error instanceof MusicDuplicateError) {
+            skippedCount += 1;
+          } else if (!firstUploadError) {
+            firstUploadError = error;
+          }
+        }
+      }
+
+      if (created.length > 0) mergeUploadedTracks(created);
+      setPendingDuplicateUpload(null);
+
+      window.dispatchEvent(new CustomEvent('app:notification', {
+        detail: {
+          message: t('music.ignoreDuplicateResult', {
+            uploadedCount: created.length,
+            skippedCount,
+          }),
+          type: created.length > 0 ? 'success' : 'warning',
+        },
+      }));
+
+      if (firstUploadError) notifyUploadError(firstUploadError);
+    } finally {
+      setIsUploading(false);
+      setDuplicateAction('');
     }
   };
 
@@ -675,21 +799,24 @@ function Music() {
       <div className="music-ambient music-ambient-one" />
       <div className="music-ambient music-ambient-two" />
 
-      <aside className="music-sidebar" aria-label="Music navigation">
+      <aside className="music-sidebar" aria-label={t('music.navigation')}>
         <nav className="music-side-nav">
-          {navItems.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              className={`music-nav-item${activeView === id ? ' is-active' : ''}`}
-              onClick={() => setActiveView(id)}
-              aria-current={activeView === id ? 'page' : undefined}
-              aria-label={label}
-              // title={label}
-            >
-              <Icon size={24} strokeWidth={1.8} />
-            </button>
-          ))}
+          {navItems.map(({ id, labelKey, icon: Icon }) => {
+            const label = t(labelKey);
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`music-nav-item${activeView === id ? ' is-active' : ''}`}
+                onClick={() => setActiveView(id)}
+                aria-current={activeView === id ? 'page' : undefined}
+                aria-label={label}
+                // title={label}
+              >
+                <Icon size={24} strokeWidth={1.8} />
+              </button>
+            );
+          })}
         </nav>
         <span className="music-sidebar-divider" aria-hidden="true" />
         <button
@@ -701,7 +828,7 @@ function Music() {
           disabled={isUploading}
           aria-busy={isUploading}
           aria-disabled={!currentUser || isUploading}
-          aria-label="Add music"
+          aria-label={t('music.addMusic')}
           title={currentUser ? undefined : t('music.signInRequired')}
         >
           <Plus size={23} strokeWidth={1.8} />
@@ -710,7 +837,7 @@ function Music() {
           ref={addMusicInputRef}
           className="music-add-input"
           type="file"
-          accept=".mp3,.m4a,.aac,.flac,.wav,.ogg,.opus,audio/*"
+          accept=".mp3,.m4a,.aac,.flac,.wav,.ogg,.opus,.ncm,audio/*"
           multiple
           onChange={handleAddMusic}
           tabIndex={-1}
@@ -720,12 +847,12 @@ function Music() {
       <div className="music-content">
         <header className="music-heading">
           <div>
-            <span className="music-eyebrow">YOUR PRIVATE COLLECTION</span>
+            <span className="music-eyebrow">{t('music.collectionEyebrow')}</span>
           </div>
         </header>
 
         {!isMusicLoaded ? (
-          <div className="music-feature-card is-loading" aria-label="Loading music" aria-busy="true">
+          <div className="music-feature-card is-loading" aria-label={t('music.loadingMusic')} aria-busy="true">
             <LoaderCircle size={24} aria-hidden="true" />
           </div>
         ) : tracks.length ? (
@@ -753,7 +880,10 @@ function Music() {
                 className={`music-album-play${isFeaturedPlaying ? ' is-playing' : ''}`}
                 type="button"
                 disabled={featuredTrack.processingStatus !== 'ready'}
-                aria-label={isFeaturedPlaying ? `Pause ${featuredTrack.title}` : `Play ${featuredTrack.title}`}
+                aria-label={t(
+                  isFeaturedPlaying ? 'music.pauseTrack' : 'music.playTrack',
+                  { title: featuredTrack.title },
+                )}
                 onClick={() => {
                   if (isFeaturedPlaying) {
                     setIsPlaying(false);
@@ -768,7 +898,7 @@ function Music() {
                   <Play className="music-album-play-start" size={16} fill="currentColor" />
                   <Pause className="music-album-play-pause" size={16} fill="currentColor" />
                 </span>
-                <span>{isFeaturedPlaying ? 'Pause album' : 'Play album'}</span>
+                <span>{t(isFeaturedPlaying ? 'music.pauseAlbum' : 'music.playAlbum')}</span>
               </button>
             </div>
             <div className="music-feature-index">
@@ -779,18 +909,24 @@ function Music() {
 
         <div className="music-section-heading">
           <div>
-            <h2>{activeView === 'favorites' ? 'Your favorites' : activeView === 'playlist' ? 'All Albums' : 'Trending Albums'}</h2>
-            <p>{visibleTracks.length} songs</p>
+            <h2>{t(
+              activeView === 'favorites'
+                ? 'music.yourFavorites'
+                : activeView === 'playlist'
+                  ? 'music.allAlbums'
+                  : 'music.trendingAlbums',
+            )}</h2>
+            <p>{t('music.songCount', { count: visibleTracks.length })}</p>
           </div>
           <div className="music-section-actions">
             <button type="button" className="view-all" onClick={() => setActiveView('playlist')}>
-              See more <ChevronRight size={15} />
+              {t('music.seeMore')} <ChevronRight size={15} />
             </button>
           </div>
         </div>
 
         {!isMusicLoaded ? (
-          <div className="music-list-loading" aria-label="Loading music list" aria-busy="true">
+          <div className="music-list-loading" aria-label={t('music.loadingMusicList')} aria-busy="true">
             <LoaderCircle size={22} aria-hidden="true" />
           </div>
         ) : visibleTracks.length ? (
@@ -823,7 +959,7 @@ function Music() {
                     <button
                       type="button"
                       className="music-card-menu-trigger"
-                      aria-label={`More options for ${track.title}`}
+                      aria-label={t('music.moreOptions', { title: track.title })}
                       aria-haspopup="menu"
                       aria-expanded={openTrackMenuId === track.id}
                       onClick={() => setOpenTrackMenuId((current) => current === track.id ? '' : track.id)}
@@ -843,7 +979,7 @@ function Music() {
                         {deletingTrackId === track.id
                           ? <LoaderCircle size={16} aria-hidden="true" />
                           : <Trash2 size={16} aria-hidden="true" />}
-                        <span>{deletingTrackId === track.id ? 'Deleting' : 'Delete'}</span>
+                        <span>{t(deletingTrackId === track.id ? 'music.deleting' : 'music.delete')}</span>
                       </button>
                     </div>
                   </div>
@@ -854,8 +990,8 @@ function Music() {
                         : <CircleAlert size={18} aria-hidden="true" />}
                       <span>
                         {track.processingStatus === 'processing'
-                          ? 'Preparing audio'
-                          : track.processingError || 'Processing failed'}
+                          ? t('music.preparingAudio')
+                          : track.processingError || t('music.processingFailed')}
                       </span>
                     </div>
                   )}
@@ -870,7 +1006,10 @@ function Music() {
                       className="music-card-play"
                       type="button"
                       disabled={!isReady}
-                      aria-label={`${isCurrent && isPlaying ? 'Pause' : 'Play'} ${track.title}`}
+                      aria-label={t(
+                        isCurrent && isPlaying ? 'music.pauseTrack' : 'music.playTrack',
+                        { title: track.title },
+                      )}
                       onClick={(event) => {
                         event.stopPropagation();
                         if (isCurrent && isPlaying) setIsPlaying(false);
@@ -891,8 +1030,8 @@ function Music() {
         ) : (
           <div className="music-empty-state">
             <Heart size={25} />
-            <h3>{tracks.length ? 'Your favorites are waiting.' : 'Your music library is empty.'}</h3>
-            <p>{tracks.length ? 'Tap the heart on a track to keep it close.' : 'Add music to start your private collection.'}</p>
+            <h3>{t(tracks.length ? 'music.emptyFavoritesTitle' : 'music.emptyLibraryTitle')}</h3>
+            <p>{t(tracks.length ? 'music.emptyFavoritesDescription' : 'music.emptyLibraryDescription')}</p>
             <button
               type="button"
               className={currentUser ? undefined : 'is-restricted'}
@@ -902,14 +1041,14 @@ function Music() {
                 if (requireMusicAccount()) addMusicInputRef.current?.click();
               }}
             >
-              Add music
+              {t('music.addMusic')}
             </button>
           </div>
         )}
       </div>
 
       {isMusicLoaded && tracks.length > 0 && (
-        <div className="music-player" aria-label="Music player">
+        <div className="music-player" aria-label={t('music.player')}>
         <div className="music-now-playing">
           <div className={`music-cover-disc${isPlaying ? ' is-spinning' : ''}`}>
             <img src={currentTrack.cover || bg0} alt="" />
@@ -924,17 +1063,17 @@ function Music() {
         </div>
 
         <div className="music-transport">
-          <button type="button" disabled={!hasPlayableTracks} onClick={() => goToTrack(-1)} aria-label="Previous track"><SkipBack size={19} fill="currentColor" /></button>
+          <button type="button" disabled={!hasPlayableTracks} onClick={() => goToTrack(-1)} aria-label={t('music.previousTrack')}><SkipBack size={19} fill="currentColor" /></button>
           <button
             type="button"
             className="music-main-play"
             disabled={!hasPlayableTracks}
             onClick={toggleCurrentPlayback}
-            aria-label={isPlaying ? 'Pause' : 'Play'}
+            aria-label={t(isPlaying ? 'music.pause' : 'music.play')}
           >
             {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
           </button>
-          <button type="button" disabled={!hasPlayableTracks} onClick={() => goToTrack(1)} aria-label="Next track"><SkipForward size={19} fill="currentColor" /></button>
+          <button type="button" disabled={!hasPlayableTracks} onClick={() => goToTrack(1)} aria-label={t('music.nextTrack')}><SkipForward size={19} fill="currentColor" /></button>
         </div>
 
         <div className={`music-timeline${isPlaying ? ' is-playing' : ''}`}>
@@ -959,7 +1098,7 @@ function Music() {
                 if (elapsedLabelRef.current) elapsedLabelRef.current.textContent = formatTime(nextElapsed);
                 syncProgressVisual(nextElapsed, currentTrack.duration);
               }}
-              aria-label="Track progress"
+              aria-label={t('music.trackProgress')}
             />
           </div>
           <span>{formatTime(currentTrack.duration)}</span>
@@ -971,7 +1110,7 @@ function Music() {
           disabled={!currentTrack.id}
           aria-disabled={!currentUser || !currentTrack.id}
           onClick={() => toggleFavorite(currentTrack.id)}
-          aria-label={currentTrack.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          aria-label={t(currentTrack.isFavorite ? 'music.removeFromFavorites' : 'music.addToFavorites')}
           title={currentUser ? undefined : t('music.signInRequired')}
         >
           <Heart size={16} fill={currentTrack.isFavorite ? 'currentColor' : 'none'} />
@@ -986,7 +1125,7 @@ function Music() {
             if (mode === 'shuffle') return 'single';
             return 'sequential';
           })}
-          aria-label={`Playback mode: ${playModeLabels[playMode]}`}
+          aria-label={t('music.playbackMode', { mode: t(playModeLabelKeys[playMode]) })}
           // title={playModeLabels[playMode]}
         >
           <span className={`music-mode-icon${playMode === 'single' ? ' is-single' : ''}`} aria-hidden="true">
@@ -1000,7 +1139,7 @@ function Music() {
         </button>
 
         <div className="music-volume">
-          <button type="button" onClick={toggleMute} aria-label={volume === 0 ? 'Unmute' : 'Mute'}>
+          <button type="button" onClick={toggleMute} aria-label={t(volume === 0 ? 'music.unmute' : 'music.mute')}>
             <VolumeIcon size={19} />
           </button>
           <input
@@ -1009,10 +1148,122 @@ function Music() {
             max="100"
             value={volume}
             onChange={(event) => setVolume(Number(event.target.value))}
-            aria-label="Volume"
+            aria-label={t('music.volume')}
             style={{ '--range-progress': `${volume}%` } as CSSProperties}
           />
         </div>
+        </div>
+      )}
+      {pendingDuplicateUpload && (
+        <div className="music-duplicate-overlay" role="presentation">
+          <button
+            type="button"
+            className="music-duplicate-backdrop"
+            aria-label={t('music.cancelUpload')}
+            disabled={isUploading}
+            onClick={() => setPendingDuplicateUpload(null)}
+          />
+          <section
+            className="music-duplicate-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="music-duplicate-title"
+            aria-describedby="music-duplicate-description"
+          >
+            <button
+              type="button"
+              className="music-duplicate-close"
+              aria-label={t('music.cancelUpload')}
+              disabled={isUploading}
+              onClick={() => setPendingDuplicateUpload(null)}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+            <div className="music-duplicate-heading">
+              <span className="music-duplicate-icon" aria-hidden="true">
+                <CircleAlert size={22} />
+              </span>
+              <div>
+                <h2 id="music-duplicate-title">
+                  {t(
+                    pendingDuplicateUpload.kind === 'exact'
+                      ? 'music.exactDuplicateTitle'
+                      : 'music.possibleDuplicate',
+                  )}
+                </h2>
+                <p id="music-duplicate-description">
+                  {t(
+                    pendingDuplicateUpload.kind === 'exact'
+                      ? 'music.exactDuplicateDescription'
+                      : 'music.duplicateDescription',
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="music-duplicate-guidance">
+              <div className="music-duplicate-policy">
+                {pendingDuplicateUpload.kind === 'similar' && (
+                  <p>
+                    <strong>{t('music.keepBothLabel')}</strong>
+                    {t('music.duplicatePolicy')}
+                  </p>
+                )}
+                <p>
+                  <strong>{t('music.ignoreDuplicatesLabel')}</strong>
+                  {t('music.ignoreDuplicatePolicy')}
+                </p>
+              </div>
+              <div
+                className="music-duplicate-summary"
+                aria-label={t('music.duplicateUploadSummary', {
+                  duplicateCount: duplicateUploadCount,
+                  uploadCount: pendingDuplicateUpload.files.length,
+                })}
+              >
+                <strong>
+                  <span>{duplicateUploadCount}</span>
+                  <i aria-hidden="true">/</i>
+                  <span>{pendingDuplicateUpload.files.length}</span>
+                </strong>
+                <span>{t('music.duplicateRatioLabel')}</span>
+              </div>
+            </div>
+            {pendingDuplicateUpload.matches.length > 0 && (
+              <div className="music-duplicate-list">
+                {pendingDuplicateUpload.matches.map((match) => (
+                  <div className="music-duplicate-match" key={match.id}>
+                    <div>
+                      <strong>{match.title}</strong>
+                      <span>{match.artist} · {match.album}</span>
+                    </div>
+                    <time>{formatTime(match.duration)}</time>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className={`music-duplicate-actions${pendingDuplicateUpload.kind === 'exact' ? ' is-exact' : ''}`}>
+              {pendingDuplicateUpload.kind === 'similar' && (
+                <button
+                  type="button"
+                  className="music-duplicate-confirm"
+                  disabled={isUploading}
+                  onClick={() => void confirmDuplicateUpload()}
+                >
+                  {duplicateAction === 'confirm' && <LoaderCircle size={16} aria-hidden="true" />}
+                  {t(duplicateAction === 'confirm' ? 'music.uploading' : 'music.keepBoth')}
+                </button>
+              )}
+              <button
+                type="button"
+                className="music-duplicate-cancel"
+                disabled={isUploading}
+                onClick={() => void uploadWithoutDuplicates()}
+              >
+                {duplicateAction === 'ignore' && <LoaderCircle size={16} aria-hidden="true" />}
+                {t(duplicateAction === 'ignore' ? 'music.checkingDuplicates' : 'music.ignoreDuplicates')}
+              </button>
+            </div>
+          </section>
         </div>
       )}
     </main>

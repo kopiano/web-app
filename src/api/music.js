@@ -63,18 +63,59 @@ function normalizeMusicListItem(track) {
 export function getMusic() {
   return request.get('/music/list').then(response => {
     if (!Array.isArray(response.data)) throw new Error('Invalid music response')
-    return response.data.map(normalizeMusicListItem)
+    return response.data
+      .map(normalizeMusicListItem)
+      .filter(track => track.processingStatus !== 'failed')
   })
 }
 
-export function uploadMusic(files) {
+export class MusicDuplicateError extends Error {
+  constructor(message, kind, matches = []) {
+    super(message)
+    this.name = 'MusicDuplicateError'
+    this.kind = kind
+    this.matches = matches
+  }
+}
+
+export function uploadMusic(files, options = {}) {
   const formData = new FormData()
   files.forEach(file => formData.append('files', file, file.name))
+  if (options.allowSimilar) formData.append('allow_similar', 'true')
 
-  return request.post('/music/upload', formData, { timeout: 0 }).then(response => {
-    if (!Array.isArray(response.data)) throw new Error('Invalid music upload response')
-    return response.data.map(normalizeMusicListItem)
-  })
+  return request.post('/music/upload', formData, { timeout: 0 })
+    .then(response => {
+      if (!Array.isArray(response.data)) throw new Error('Invalid music upload response')
+      return response.data.map(normalizeMusicListItem)
+    })
+    .catch(error => {
+      const message = error?.response?.data?.message
+      const conflict = error?.response?.data?.data
+      if (
+        error?.response?.status === 409
+        && (conflict?.kind === 'exact' || conflict?.kind === 'similar')
+      ) {
+        const matches = Array.isArray(conflict.matches)
+          ? conflict.matches.map(match => ({
+            id: match.id || '',
+            title: match.title || 'Untitled',
+            artist: match.artist || 'Unknown Artist',
+            album: match.album || 'Unknown Album',
+            duration: Math.max(0, Number(match.duration_ms) / 1000) || 0,
+          }))
+          : []
+        throw new MusicDuplicateError(
+          typeof message === 'string' && message.trim() ? message : 'Duplicate music detected.',
+          conflict.kind,
+          matches,
+        )
+      }
+      throw new Error(
+        typeof message === 'string' && message.trim()
+          ? message
+          : 'Music upload failed. Please try again.',
+      )
+    })
 }
 
 export function getMusicTrack(id) {
