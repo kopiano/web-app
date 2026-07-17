@@ -47,7 +47,6 @@ function normalizeMusic(track, detailsLoaded = false) {
 function normalizeMusicListItem(track) {
   return {
     ...normalizeMusic(track),
-    duration: 0,
     bitrate: 0,
     sampleRate: 0,
     audioUrl: '',
@@ -60,12 +59,24 @@ function normalizeMusicListItem(track) {
   }
 }
 
-export function getMusic() {
-  return request.get('/music/list').then(response => {
-    if (!Array.isArray(response.data)) throw new Error('Invalid music response')
-    return response.data
-      .map(normalizeMusicListItem)
-      .filter(track => track.processingStatus !== 'failed')
+export function getMusic({ page = 1, pageSize = 10, favorite } = {}) {
+  const params = {
+    page: Math.max(1, Number(page) || 1),
+    page_size: Math.min(50, Math.max(1, Number(pageSize) || 10)),
+  }
+  if (typeof favorite === 'boolean') params.favorite = favorite
+
+  return request.get('/music/list', { params }).then(response => {
+    const data = response.data
+    if (!data || !Array.isArray(data.items)) throw new Error('Invalid music response')
+    return {
+      items: data.items.map(normalizeMusicListItem),
+      page: Math.max(1, Number(data.page) || params.page),
+      pageSize: Math.max(1, Number(data.page_size) || params.page_size),
+      total: Math.max(0, Number(data.total) || 0),
+      totalPages: Math.max(0, Number(data.total_pages) || 0),
+      totalDuration: Math.max(0, Number(data.total_duration_ms) / 1000 || 0),
+    }
   })
 }
 

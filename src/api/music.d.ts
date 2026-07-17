@@ -33,7 +33,20 @@ export class MusicDuplicateError extends Error {
   matches: MusicDuplicateMatch[];
 }
 
-export function getMusic(): Promise<MusicTrack[]>;
+export type MusicPage = {
+  items: MusicTrack[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  totalDuration: number;
+};
+
+export function getMusic(options?: {
+  page?: number;
+  pageSize?: number;
+  favorite?: boolean;
+}): Promise<MusicPage>;
 export function uploadMusic(
   files: File[],
   options?: { allowSimilar?: boolean },

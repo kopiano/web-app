@@ -2719,6 +2719,13 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
 
 .music-library-table {
   min-width: 0;
+  transition: opacity 0.18s ease;
+}
+
+.music-library-table.is-loading,
+.music-card-grid.is-loading {
+  pointer-events: none;
+  opacity: 0.62;
 }
 
 .music-library-table-head,
@@ -2999,6 +3006,19 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   color: rgba(23, 25, 30, 0.46);
   font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
+}
+
+.music-library-page-loader {
+  color: rgba(23, 25, 30, 0.48);
+  opacity: 0;
+  animation: music-spin 0.8s linear infinite;
+  animation-play-state: paused;
+  transition: opacity 0.16s ease;
+}
+
+.music-library-page-loader.is-visible {
+  opacity: 1;
+  animation-play-state: running;
 }
 
 .music-library-pagination button {

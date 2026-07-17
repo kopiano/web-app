@@ -87,9 +87,33 @@ const playModeLabelKeys: Record<PlayMode, string> = {
 };
 
 const CURRENT_MUSIC_TRACK_KEY = 'music_current_track_id';
+const CURRENT_MUSIC_TRACK_META_KEY = 'music_current_track_meta';
 const ACTIVE_MUSIC_VIEW_KEY = 'music_active_view';
 const MUSIC_LIBRARY_LAYOUT_KEY = 'music_library_layout';
 const MUSIC_ADD_PARTICLE_COUNT = 60;
+const MUSIC_ADD_PARTICLE_COLORS = [
+  '#ff5f7e',
+  '#ff9f43',
+  '#ffd166',
+  '#48d597',
+  '#38bdf8',
+  '#7c83fd',
+  '#c084fc',
+  '#f472b6',
+];
+const MUSIC_ADD_PARTICLES = Array.from({ length: MUSIC_ADD_PARTICLE_COUNT }, (_, particleIndex) => {
+  const angle = ((Math.PI * 2 * particleIndex) / MUSIC_ADD_PARTICLE_COUNT) - (Math.PI / 2);
+  const distance = 2.1 + ((particleIndex % 5) * 0.28);
+  return {
+    key: particleIndex,
+    style: {
+      '--particle-x': `${(Math.cos(angle) * distance).toFixed(3)}rem`,
+      '--particle-y': `${(Math.sin(angle) * distance).toFixed(3)}rem`,
+      animationDelay: '0s',
+      backgroundColor: MUSIC_ADD_PARTICLE_COLORS[particleIndex % MUSIC_ADD_PARTICLE_COLORS.length],
+    } as CSSProperties,
+  };
+});
 
 const getStoredMusicView = (): View => {
   try {
@@ -106,6 +130,59 @@ const getStoredLibraryLayout = (): LibraryLayout => {
   } catch {
     return 'list';
   }
+};
+
+const getStoredCurrentTrack = (): MusicTrack | null => {
+  try {
+    const value = window.localStorage.getItem(CURRENT_MUSIC_TRACK_META_KEY);
+    if (!value) return null;
+    const track = JSON.parse(value) as Partial<MusicTrack>;
+    if (typeof track.id !== 'string' || !track.id) return null;
+    return {
+      ...EMPTY_TRACK,
+      ...track,
+      id: track.id,
+      title: typeof track.title === 'string' ? track.title : EMPTY_TRACK.title,
+      artist: typeof track.artist === 'string' ? track.artist : EMPTY_TRACK.artist,
+      album: typeof track.album === 'string' ? track.album : EMPTY_TRACK.album,
+      audioUrl: '',
+      originalUrl: '',
+      detailsLoaded: false,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const mergeMusicTrack = (existing: MusicTrack | undefined, incoming: MusicTrack) => {
+  if (!existing) return incoming;
+  if (!existing.detailsLoaded) return { ...existing, ...incoming };
+  return {
+    ...existing,
+    ...incoming,
+    bitrate: existing.bitrate,
+    sampleRate: existing.sampleRate,
+    audioUrl: existing.audioUrl,
+    originalUrl: existing.originalUrl,
+    format: existing.format,
+    originalFormat: existing.originalFormat,
+    size: existing.size,
+    originalSize: existing.originalSize,
+    detailsLoaded: true,
+  };
+};
+
+const mergeMusicTracks = (current: MusicTrack[], incoming: MusicTrack[]) => {
+  if (!incoming.length) return current;
+  const incomingById = new Map(incoming.map((track) => [track.id, track]));
+  const merged = current.map((track) => {
+    const update = incomingById.get(track.id);
+    if (!update) return track;
+    incomingById.delete(track.id);
+    return mergeMusicTrack(track, update);
+  });
+  incomingById.forEach((track) => merged.push(track));
+  return merged;
 };
 
 const formatTime = (seconds: number) => {
@@ -138,11 +215,20 @@ function Music() {
   const [activeView, setActiveView] = useState<View>(getStoredMusicView);
   const [libraryLayout, setLibraryLayout] = useState<LibraryLayout>(getStoredLibraryLayout);
   const [libraryPage, setLibraryPage] = useState(1);
-  const [tracks, setTracks] = useState<MusicTrack[]>([]);
+  const [tracks, setTracks] = useState<MusicTrack[]>(() => {
+    const storedTrack = getStoredCurrentTrack();
+    return storedTrack ? [storedTrack] : [];
+  });
+  const [pageTracks, setPageTracks] = useState<MusicTrack[]>([]);
+  const [musicTotal, setMusicTotal] = useState(0);
+  const [musicTotalDuration, setMusicTotalDuration] = useState(0);
+  const [musicPageCount, setMusicPageCount] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playbackTrackId, setPlaybackTrackId] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMusicLoaded, setIsMusicLoaded] = useState(false);
+  const [isMusicPageLoading, setIsMusicPageLoading] = useState(false);
+  const [musicRefreshKey, setMusicRefreshKey] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [duplicateAction, setDuplicateAction] = useState<'confirm' | 'ignore' | ''>('');
   const [pendingDuplicateUpload, setPendingDuplicateUpload] = useState<PendingDuplicateUpload | null>(null);
@@ -164,29 +250,27 @@ function Music() {
   }), [t]);
   const currentTrack = tracks[currentIndex] ?? emptyTrack;
   const featuredCandidates = useMemo(
-    () => tracks.filter((track) => track.processingStatus === 'ready'),
-    [tracks],
+    () => pageTracks.filter((track) => track.processingStatus === 'ready'),
+    [pageTracks],
   );
-  const featuredCandidateIds = featuredCandidates.map((track) => track.id).join('|');
+  const featuredCandidateIds = useMemo(
+    () => featuredCandidates.map((track) => track.id).join('|'),
+    [featuredCandidates],
+  );
   const featuredTrack = featuredCandidates.find((track) => track.id === featuredTrackId)
     ?? featuredCandidates[0]
-    ?? tracks[0]
+    ?? pageTracks[0]
     ?? emptyTrack;
-  const featuredTrackNumber = tracks.findIndex((track) => track.id === featuredTrack.id) + 1;
+  const featuredTrackNumber = pageTracks.findIndex((track) => track.id === featuredTrack.id) + 1;
   const isFeaturedPlaying = playbackTrackId === featuredTrack.id && isPlaying;
-  const hasPlayableTracks = tracks.some((track) => track.processingStatus === 'ready');
+  const hasPlayableTracks = tracks.some((track) => track.processingStatus === 'ready')
+    || pageTracks.some((track) => track.processingStatus === 'ready');
   const libraryPageSize = libraryLayout === 'list' ? 10 : 8;
-  const libraryPageCount = Math.max(1, Math.ceil(tracks.length / libraryPageSize));
-  const libraryTracks = useMemo(
-    () => tracks.slice(
-      (libraryPage - 1) * libraryPageSize,
-      libraryPage * libraryPageSize,
-    ),
-    [libraryPage, libraryPageSize, tracks],
-  );
+  const libraryPageCount = Math.max(1, musicPageCount);
+  const libraryTracks = pageTracks;
   const libraryOwner = currentUser?.name || currentUser?.username || t('music.guestListener');
   const libraryDuration = useMemo(() => {
-    const totalSeconds = tracks.reduce((sum, track) => sum + Math.max(0, track.duration || 0), 0);
+    const totalSeconds = musicTotalDuration;
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = Math.floor(totalSeconds % 60);
@@ -195,7 +279,7 @@ function Music() {
       minutes ? t('music.durationMinutes', { count: minutes }) : '',
       seconds || (!hours && !minutes) ? t('music.durationSeconds', { count: seconds }) : '',
     ].filter(Boolean).join(' ');
-  }, [t, tracks]);
+  }, [musicTotalDuration, t]);
   const sectionTitleKey = activeView === 'favorites'
     ? 'music.yourFavorites'
     : activeView === 'playlist'
@@ -218,8 +302,11 @@ function Music() {
   const featuredTrackIdRef = useRef('');
   const detailRequestsRef = useRef(new Map<string, Promise<MusicTrack>>());
   const playRequestRef = useRef(0);
+  const musicPageRequestRef = useRef(0);
   const favoriteBurstTimeoutRef = useRef<number | undefined>(undefined);
+  const pageTracksRef = useRef<MusicTrack[]>([]);
   tracksRef.current = tracks;
+  pageTracksRef.current = pageTracks;
 
   const requireMusicAccount = useCallback(() => {
     if (currentUser) return true;
@@ -242,13 +329,7 @@ function Music() {
     syncProgressVisual(0, 1);
   }, [syncProgressVisual]);
 
-  const visibleTracks = useMemo(() => {
-    if (activeView === 'favorites') {
-      return tracks.filter((track) => track.isFavorite);
-    }
-    return tracks;
-  }, [activeView, tracks]);
-  const sectionTracks = activeView === 'home' ? visibleTracks.slice(0, 4) : visibleTracks;
+  const sectionTracks = pageTracks;
 
   const loadTrackDetails = useCallback(async (trackId: string) => {
     const current = tracksRef.current.find((track) => track.id === trackId);
@@ -261,7 +342,14 @@ function Music() {
     }
     try {
       const detailed = await request;
-      setTracks((items) => items.map((item) => (
+      setTracks((items) => {
+        const updated = items.map((item) => (
+          item.id === trackId ? { ...item, ...detailed } : item
+        ));
+        tracksRef.current = updated;
+        return updated;
+      });
+      setPageTracks((items) => items.map((item) => (
         item.id === trackId ? { ...item, ...detailed } : item
       )));
       return detailed;
@@ -294,7 +382,11 @@ function Music() {
   }, [loadTrackDetails, resetProgress]);
 
   const goToTrack = useCallback((direction: 1 | -1) => {
-    const currentTracks = tracksRef.current;
+    const visibleQueue = pageTracksRef.current;
+    const currentTracks = visibleQueue.some((track) => track.id === currentTrack.id)
+      ? visibleQueue
+      : tracksRef.current;
+    const queueCurrentIndex = currentTracks.findIndex((track) => track.id === currentTrack.id);
     const playableIndexes = currentTracks.reduce<number[]>((indexes, track, index) => {
       if (track.processingStatus === 'ready') indexes.push(index);
       return indexes;
@@ -302,19 +394,19 @@ function Music() {
     if (!playableIndexes.length) return;
     let nextIndex: number;
     if (playMode === 'shuffle') {
-      const candidates = playableIndexes.filter((index) => index !== currentIndex);
+      const candidates = playableIndexes.filter((index) => index !== queueCurrentIndex);
       nextIndex = candidates.length
         ? candidates[Math.floor(Math.random() * candidates.length)]
         : playableIndexes[0];
     } else {
-      const playablePosition = playableIndexes.indexOf(currentIndex);
+      const playablePosition = playableIndexes.indexOf(queueCurrentIndex);
       const nextPosition = playablePosition < 0
         ? direction === 1 ? 0 : playableIndexes.length - 1
         : (playablePosition + direction + playableIndexes.length) % playableIndexes.length;
       nextIndex = playableIndexes[nextPosition];
     }
     void playTrack(currentTracks[nextIndex]);
-  }, [currentIndex, playMode, playTrack]);
+  }, [currentTrack.id, playMode, playTrack]);
 
   useEffect(() => {
     document.body.classList.add('music-route');
@@ -359,39 +451,59 @@ function Music() {
   }, [isUploading, pendingDuplicateUpload]);
 
   useEffect(() => {
-    let cancelled = false;
-    getMusic()
-      .then((music) => {
-        if (!cancelled) {
-          const storedTrackId = window.localStorage.getItem(CURRENT_MUSIC_TRACK_KEY);
-          const storedTrackIndex = storedTrackId
-            ? music.findIndex((track) => track.id === storedTrackId)
-            : -1;
-          const firstPlayableIndex = music.findIndex(
-            (track) => track.processingStatus === 'ready',
-          );
-          const restoredIndex = storedTrackIndex >= 0
-            ? storedTrackIndex
-            : Math.max(0, firstPlayableIndex);
+    const requestId = musicPageRequestRef.current + 1;
+    musicPageRequestRef.current = requestId;
+    const requestedPage = activeView === 'playlist' ? libraryPage : 1;
+    const requestedPageSize = activeView === 'home'
+      ? 4
+      : activeView === 'favorites'
+        ? 8
+        : libraryPageSize;
 
-          tracksRef.current = music;
-          setTracks(music);
-          setCurrentIndex(restoredIndex);
-          if (!music.length) {
-            window.localStorage.removeItem(CURRENT_MUSIC_TRACK_KEY);
-          }
+    setIsMusicPageLoading(true);
+    getMusic({
+      page: requestedPage,
+      pageSize: requestedPageSize,
+      favorite: activeView === 'favorites' ? true : undefined,
+    })
+      .then((music) => {
+        if (requestId !== musicPageRequestRef.current) return;
+        if (
+          activeView === 'playlist'
+          && music.totalPages > 0
+          && requestedPage > music.totalPages
+        ) {
+          setMusicTotal(music.total);
+          setMusicTotalDuration(music.totalDuration);
+          setMusicPageCount(music.totalPages);
+          setLibraryPage(music.totalPages);
+          return;
         }
+
+        const cachedById = new Map(tracksRef.current.map((track) => [track.id, track]));
+        const visibleItems = music.items.map((track) => (
+          mergeMusicTrack(cachedById.get(track.id), track)
+        ));
+        const mergedTracks = mergeMusicTracks(tracksRef.current, music.items);
+        tracksRef.current = mergedTracks;
+        setTracks(mergedTracks);
+        setPageTracks(visibleItems);
+        setMusicTotal(music.total);
+        setMusicTotalDuration(music.totalDuration);
+        setMusicPageCount(music.totalPages);
       })
       .catch((error) => {
-        console.error('Failed to load music', error);
+        if (requestId === musicPageRequestRef.current) {
+          console.error('Failed to load music', error);
+        }
       })
       .finally(() => {
-        if (!cancelled) setIsMusicLoaded(true);
+        if (requestId === musicPageRequestRef.current) {
+          setIsMusicLoaded(true);
+          setIsMusicPageLoading(false);
+        }
       });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  }, [activeView, libraryPage, libraryPageSize, musicRefreshKey]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -403,22 +515,27 @@ function Music() {
 
     const mergeTrack = (updated: MusicTrack) => {
       setTracks((current) => {
+        const next = updated.processingStatus === 'failed'
+          ? current.filter((track) => track.id !== updated.id)
+          : mergeMusicTracks(current, [updated]);
+        tracksRef.current = next;
+        return next;
+      });
+      setPageTracks((current) => {
         if (updated.processingStatus === 'failed') {
           return current.filter((track) => track.id !== updated.id);
         }
-        const exists = current.some((track) => track.id === updated.id);
-        return exists
-          ? current.map((track) => track.id === updated.id ? { ...track, ...updated } : track)
-          : [updated, ...current];
+        return current.map((track) => (
+          track.id === updated.id ? mergeMusicTrack(track, updated) : track
+        ));
       });
+      setMusicRefreshKey((key) => key + 1);
     };
 
     const reconcileProcessingTracks = () => {
-      tracksRef.current
-        .filter((track) => track.processingStatus === 'processing')
-        .forEach((track) => {
-          void getMusicTrack(track.id).then(mergeTrack).catch(() => {});
-        });
+      if (tracksRef.current.some((track) => track.processingStatus === 'processing')) {
+        setMusicRefreshKey((key) => key + 1);
+      }
     };
 
     const connect = () => {
@@ -484,7 +601,17 @@ function Music() {
 
   useEffect(() => {
     if (!currentTrack.id) return;
-    window.localStorage.setItem(CURRENT_MUSIC_TRACK_KEY, currentTrack.id);
+    try {
+      window.localStorage.setItem(CURRENT_MUSIC_TRACK_KEY, currentTrack.id);
+      window.localStorage.setItem(CURRENT_MUSIC_TRACK_META_KEY, JSON.stringify({
+        ...currentTrack,
+        audioUrl: '',
+        originalUrl: '',
+        detailsLoaded: false,
+      }));
+    } catch {
+      // Playback remains available when storage is unavailable.
+    }
   }, [currentTrack.id]);
 
   useEffect(() => {
@@ -504,15 +631,13 @@ function Music() {
   }, [libraryLayout]);
 
   useEffect(() => {
-    setLibraryPage((page) => Math.min(page, libraryPageCount));
-  }, [libraryPageCount]);
+    if (activeView === 'playlist') {
+      setLibraryPage((page) => Math.min(page, libraryPageCount));
+    }
+  }, [activeView, libraryPageCount]);
 
   useEffect(() => {
-    setLibraryPage(1);
-  }, [libraryLayout]);
-
-  useEffect(() => {
-    const candidates = tracksRef.current.filter((track) => track.processingStatus === 'ready');
+    const candidates = pageTracksRef.current.filter((track) => track.processingStatus === 'ready');
     if (!candidates.length) {
       featuredTrackIdRef.current = '';
       setFeaturedTrackId('');
@@ -529,7 +654,7 @@ function Music() {
 
     if (candidates.length < 2) return;
     const interval = window.setInterval(() => {
-      const readyTracks = tracksRef.current.filter((track) => track.processingStatus === 'ready');
+      const readyTracks = pageTracksRef.current.filter((track) => track.processingStatus === 'ready');
       const currentId = featuredTrackIdRef.current;
       const currentFeaturedTrack = readyTracks.find((track) => track.id === currentId);
       const alternatives = readyTracks.filter((track) => track.id !== currentId);
@@ -671,9 +796,22 @@ function Music() {
 
   const toggleFavorite = async (trackId: string) => {
     if (!requireMusicAccount()) return;
-    const track = tracks.find((item) => item.id === trackId);
+    const track = tracks.find((item) => item.id === trackId)
+      ?? pageTracks.find((item) => item.id === trackId);
     if (!track) return;
     const nextFavorite = !track.isFavorite;
+    const updateFavoriteState = (favorite: boolean) => {
+      setTracks((current) => {
+        const next = current.map((item) => (
+          item.id === trackId ? { ...item, isFavorite: favorite } : item
+        ));
+        tracksRef.current = next;
+        return next;
+      });
+      setPageTracks((current) => current.map((item) => (
+        item.id === trackId ? { ...item, isFavorite: favorite } : item
+      )));
+    };
     if (favoriteBurstTimeoutRef.current !== undefined) {
       window.clearTimeout(favoriteBurstTimeoutRef.current);
     }
@@ -686,19 +824,16 @@ function Music() {
     } else {
       setFavoriteBurstId('');
     }
-    setTracks((current) => current.map((item) => (
-      item.id === trackId ? { ...item, isFavorite: nextFavorite } : item
-    )));
+    updateFavoriteState(nextFavorite);
     try {
       const persisted = await updateMusicFavorite(trackId, nextFavorite);
-      setTracks((current) => current.map((item) => (
-        item.id === trackId ? { ...item, isFavorite: persisted } : item
-      )));
+      updateFavoriteState(persisted);
+      if (activeView === 'favorites') {
+        setMusicRefreshKey((key) => key + 1);
+      }
     } catch (error) {
       console.error('Failed to update favorite', error);
-      setTracks((current) => current.map((item) => (
-        item.id === trackId ? { ...item, isFavorite: track.isFavorite } : item
-      )));
+      updateFavoriteState(track.isFavorite);
     }
   };
 
@@ -728,6 +863,7 @@ function Music() {
     detailRequestsRef.current.delete(trackId);
     tracksRef.current = remainingTracks;
     setTracks(remainingTracks);
+    setPageTracks((current) => current.filter((track) => track.id !== trackId));
 
     if (!remainingTracks.length) {
       window.localStorage.removeItem(CURRENT_MUSIC_TRACK_KEY);
@@ -764,6 +900,7 @@ function Music() {
       setRemovingTrackId(trackId);
       await new Promise((resolve) => window.setTimeout(resolve, 240));
       removeDeletedTrack(trackId);
+      setMusicRefreshKey((key) => key + 1);
     } catch (error) {
       console.error('Failed to delete music', error);
     } finally {
@@ -817,12 +954,15 @@ function Music() {
       setIsPlaying(false);
       resetProgress();
     }
+    setLibraryPage(1);
     setActiveView('playlist');
+    setMusicRefreshKey((key) => key + 1);
   }, [currentIndex, resetProgress]);
 
   const notifyUploadError = useCallback((error: unknown) => {
     console.error('Failed to upload music', error);
     setTracks((current) => current.filter((track) => track.processingStatus !== 'failed'));
+    setPageTracks((current) => current.filter((track) => track.processingStatus !== 'failed'));
     window.dispatchEvent(new CustomEvent('app:notification', {
       detail: {
         message: error instanceof MusicDuplicateError && error.kind === 'exact'
@@ -943,7 +1083,8 @@ function Music() {
     }
     const selectedTrack = currentTrack.processingStatus === 'ready'
       ? currentTrack
-      : tracks.find((track) => track.processingStatus === 'ready');
+      : pageTracks.find((track) => track.processingStatus === 'ready')
+        ?? tracks.find((track) => track.processingStatus === 'ready');
     if (selectedTrack) void playTrack(selectedTrack);
   };
 
@@ -1047,7 +1188,7 @@ function Music() {
                 <p>
                   {t('music.likedSongsSummary', {
                     owner: libraryOwner,
-                    count: tracks.length,
+                    count: musicTotal,
                     duration: libraryDuration,
                   })}
                 </p>
@@ -1073,7 +1214,10 @@ function Music() {
                 <button
                   type="button"
                   className={libraryLayout === 'list' ? 'is-active' : ''}
-                  onClick={() => setLibraryLayout('list')}
+                  onClick={() => {
+                    setLibraryPage(1);
+                    setLibraryLayout('list');
+                  }}
                   aria-pressed={libraryLayout === 'list'}
                   aria-label={t('music.listView')}
                   title={t('music.listView')}
@@ -1083,7 +1227,10 @@ function Music() {
                 <button
                   type="button"
                   className={libraryLayout === 'cards' ? 'is-active' : ''}
-                  onClick={() => setLibraryLayout('cards')}
+                  onClick={() => {
+                    setLibraryPage(1);
+                    setLibraryLayout('cards');
+                  }}
                   aria-pressed={libraryLayout === 'cards'}
                   aria-label={t('music.cardView')}
                   title={t('music.cardView')}
@@ -1097,10 +1244,15 @@ function Music() {
               <div className="music-list-loading" aria-label={t('music.loadingMusicList')} aria-busy="true">
                 <LoaderCircle size={22} aria-hidden="true" />
               </div>
-            ) : tracks.length ? (
+            ) : musicTotal > 0 ? (
               <>
                 {libraryLayout === 'list' ? (
-                  <div className="music-library-table" role="table" aria-label={t('music.likedSongs')}>
+                  <div
+                    className={`music-library-table${isMusicPageLoading ? ' is-loading' : ''}`}
+                    role="table"
+                    aria-label={t('music.likedSongs')}
+                    aria-busy={isMusicPageLoading}
+                  >
                     <div className="music-library-table-head" role="row">
                       <span role="columnheader">#</span>
                       <span role="columnheader">{t('music.title')}</span>
@@ -1180,28 +1332,9 @@ function Music() {
                               </span>
                               {favoriteBurstId === track.id && (
                                 <span className="music-library-add-particles" aria-hidden="true">
-                                  {Array.from({ length: MUSIC_ADD_PARTICLE_COUNT }, (_, particleIndex) => {
-                                    const angle = ((Math.PI * 2 * particleIndex) / MUSIC_ADD_PARTICLE_COUNT) - (Math.PI / 2);
-                                    const distance = 2.1 + ((particleIndex % 5) * 0.28);
-                                    const colors = [
-                                      '#ff5f7e',
-                                      '#ff9f43',
-                                      '#ffd166',
-                                      '#48d597',
-                                      '#38bdf8',
-                                      '#7c83fd',
-                                      '#c084fc',
-                                      '#f472b6',
-                                    ];
-                                    const style = {
-                                      '--particle-x': `${(Math.cos(angle) * distance).toFixed(3)}rem`,
-                                      '--particle-y': `${(Math.sin(angle) * distance).toFixed(3)}rem`,
-                                      animationDelay: '0s',
-                                      backgroundColor: colors[particleIndex % colors.length],
-                                    } as CSSProperties;
-
-                                    return <i key={particleIndex} style={style} />;
-                                  })}
+                                  {MUSIC_ADD_PARTICLES.map((particle) => (
+                                    <i key={particle.key} style={particle.style} />
+                                  ))}
                                 </span>
                               )}
                             </button>
@@ -1242,7 +1375,10 @@ function Music() {
                     </div>
                   </div>
                 ) : (
-                  <div className="music-card-grid music-library-card-grid">
+                  <div
+                    className={`music-card-grid music-library-card-grid${isMusicPageLoading ? ' is-loading' : ''}`}
+                    aria-busy={isMusicPageLoading}
+                  >
                     {libraryTracks.map((track, index) => {
                       const isCurrent = track.id === currentTrack.id;
                       const isReady = track.processingStatus === 'ready';
@@ -1341,18 +1477,29 @@ function Music() {
 
                 <nav className="music-library-pagination" aria-label={t('music.pagination')}>
                   <span>{libraryPage} / {libraryPageCount}</span>
+                  <LoaderCircle
+                    className={`music-library-page-loader${isMusicPageLoading ? ' is-visible' : ''}`}
+                    size={18}
+                    aria-hidden="true"
+                  />
                   <button
                     type="button"
-                    disabled={libraryPage <= 1}
-                    onClick={() => setLibraryPage((page) => Math.max(1, page - 1))}
+                    disabled={isMusicPageLoading || libraryPage <= 1}
+                    onClick={() => {
+                      setIsMusicPageLoading(true);
+                      setLibraryPage((page) => Math.max(1, page - 1));
+                    }}
                     aria-label={t('music.previousPage')}
                   >
                     <ChevronLeft size={20} />
                   </button>
                   <button
                     type="button"
-                    disabled={libraryPage >= libraryPageCount}
-                    onClick={() => setLibraryPage((page) => Math.min(libraryPageCount, page + 1))}
+                    disabled={isMusicPageLoading || libraryPage >= libraryPageCount}
+                    onClick={() => {
+                      setIsMusicPageLoading(true);
+                      setLibraryPage((page) => Math.min(libraryPageCount, page + 1));
+                    }}
                     aria-label={t('music.nextPage')}
                   >
                     <ChevronRight size={20} />
@@ -1373,7 +1520,7 @@ function Music() {
           <div className="music-feature-card is-loading" aria-label={t('music.loadingMusic')} aria-busy="true">
             <LoaderCircle size={24} aria-hidden="true" />
           </div>
-        ) : tracks.length ? (
+        ) : pageTracks.length ? (
           <article
             className="music-feature-card"
             style={{
@@ -1420,7 +1567,7 @@ function Music() {
               </button>
             </div>
             <div className="music-feature-index">
-              {`${String(Math.max(1, featuredTrackNumber)).padStart(2, '0')} - ${String(tracks.length).padStart(2, '0')}`}
+              {`${String(Math.max(1, featuredTrackNumber)).padStart(2, '0')} - ${String(musicTotal).padStart(2, '0')}`}
             </div>
           </article>
         ) : null}
@@ -1428,7 +1575,7 @@ function Music() {
         <div className="music-section-heading">
           <div>
             <h2>{t(sectionTitleKey)}</h2>
-            <p>{t('music.songCount', { count: visibleTracks.length })}</p>
+            <p>{t('music.songCount', { count: musicTotal })}</p>
           </div>
           <div className="music-section-actions">
             {activeView === 'home' && (
@@ -1452,7 +1599,7 @@ function Music() {
             <LoaderCircle size={22} aria-hidden="true" />
           </div>
         ) : sectionTracks.length ? (
-          <div className="music-card-grid">
+          <div className={`music-card-grid${isMusicPageLoading ? ' is-loading' : ''}`} aria-busy={isMusicPageLoading}>
             {sectionTracks.map((track, index) => {
               const isCurrent = track.id === currentTrack.id;
               const isReady = track.processingStatus === 'ready';
@@ -1552,8 +1699,8 @@ function Music() {
         ) : (
           <div className="music-empty-state">
             <Heart size={25} />
-            <h3>{t(tracks.length ? 'music.emptyFavoritesTitle' : 'music.emptyLibraryTitle')}</h3>
-            <p>{t(tracks.length ? 'music.emptyFavoritesDescription' : 'music.emptyLibraryDescription')}</p>
+            <h3>{t(activeView === 'favorites' ? 'music.emptyFavoritesTitle' : 'music.emptyLibraryTitle')}</h3>
+            <p>{t(activeView === 'favorites' ? 'music.emptyFavoritesDescription' : 'music.emptyLibraryDescription')}</p>
             <button
               type="button"
               className={currentUser ? undefined : 'is-restricted'}
