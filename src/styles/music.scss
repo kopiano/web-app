@@ -151,6 +151,14 @@
   );
 }
 
+.music-side-nav:has(.music-nav-item:nth-child(4).is-active) {
+  --music-nav-slider-y: calc(
+    var(--music-nav-item-size) + var(--music-nav-gap) +
+    var(--music-nav-item-size) + var(--music-nav-gap) +
+    var(--music-nav-item-size) + var(--music-nav-gap)
+  );
+}
+
 .music-nav-item {
   position: relative;
   width: var(--music-nav-item-size);
@@ -286,6 +294,7 @@
   min-width: 0;
   width: min(100%, 112rem);
   margin: 0 auto;
+
   padding-right: 60px;
 }
 
@@ -2092,6 +2101,221 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   width: 100%;
 }
 
+.music-user-library {
+  min-width: 0;
+}
+
+.music-user-library-heading {
+  margin-bottom: clamp(2.4rem, 4vw, 4.2rem);
+}
+
+.music-user-library-heading h1 {
+  margin: 0;
+  color: #17191e;
+  font-family: 'Bellefair', serif;
+  font-size: clamp(4rem, 6vw, 7rem);
+  font-weight: 400;
+  line-height: 0.92;
+  letter-spacing: 0;
+}
+
+.music-user-library-heading p {
+  margin: 1rem 0 0;
+  color: rgba(23, 25, 30, 0.70);
+  font-size: 15px;
+  // line-height: 1.5;
+  padding-left: 10px;
+}
+
+.music-user-library-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(1.5rem, 1.5vw, 1.6rem);
+}
+
+.music-user-playlist-card {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 3 / 1;
+  padding: clamp(0.7rem, 1vw, 1rem) clamp(1rem, 1.35vw, 1.4rem);
+  display: flex;
+  align-items: center;
+  gap: clamp(0.85rem, 1.2vw, 1.25rem);
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 3rem;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.68), rgba(245, 248, 251, 0.42)),
+    rgba(255, 255, 255, 0.42);
+  box-shadow:
+    0 1.2rem 3rem rgba(41, 48, 58, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(18px) saturate(120%);
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  animation: music-user-playlist-in 0.58s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--library-card-delay, 0ms);
+  transition:
+    transform 0.36s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s ease,
+    box-shadow 0.36s ease;
+}
+
+.music-user-playlist-card::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  right: -10%;
+  bottom: -70%;
+  width: 48%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(134, 188, 167, 0.15);
+  filter: blur(1.2rem);
+  transition: transform 0.45s ease;
+}
+
+.music-user-playlist-card:hover {
+  transform: translateY(-0.35rem);
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 1.8rem 4rem rgba(41, 48, 58, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.music-user-playlist-card:hover::after {
+  transform: translate3d(-1rem, -0.4rem, 0) scale(1.12);
+}
+
+.music-user-playlist-avatar {
+  flex: 0 0 clamp(4.5rem, 5vw, 5.8rem);
+  width: clamp(4.5rem, 5vw, 5.8rem);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  border-radius: 50%;
+  color: rgba(23, 25, 30, 0.7);
+  background: linear-gradient(145deg, #dfe9e5, #f5dce6);
+  box-shadow:
+    0 0.7rem 1.8rem rgba(43, 51, 61, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+}
+
+.music-user-playlist-avatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.music-user-playlist-avatar span {
+  font-size: clamp(1.35rem, 1.8vw, 1.8rem);
+  font-weight: 700;
+}
+
+.music-user-playlist-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.music-user-playlist-copy strong,
+.music-user-playlist-copy span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-user-playlist-copy strong {
+  color: #202328;
+  font-size: clamp(17px, 1.35vw, 1.35rem);
+  font-weight: 650;
+  line-height: 1.18;
+}
+
+.music-user-playlist-copy span {
+  margin-top: 0.3rem;
+  color: rgba(23, 25, 30, 0.8);
+  font-size: 15px;
+  // line-height: 1.3;
+}
+
+.music-user-playlist-copy small {
+  margin-top: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: rgba(43, 43, 43, 0.821);
+  font-size: 15px;
+  // line-height: 1;
+}
+
+.music-user-playlist-copy small svg {
+  flex: 0 0 auto;
+  color: #4e8a72;
+}
+
+.music-user-library-loading,
+.music-user-library-empty {
+  min-height: 24rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+}
+
+.music-user-library-loading {
+  color: rgba(23, 25, 30, 0.52);
+}
+
+.music-user-library-loading svg {
+  animation: music-spin 0.85s linear infinite;
+}
+
+.music-user-library-empty {
+  padding: 3rem;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 3rem;
+  color: rgba(23, 25, 30, 0.48);
+  background: rgba(255, 255, 255, 0.28);
+  text-align: center;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.music-user-library-empty h2 {
+  margin: 1.1rem 0 0;
+  color: #24272c;
+  font-size: 1.65rem;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.music-user-library-empty p {
+  max-width: 34rem;
+  margin: 0.65rem 0 0;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+@keyframes music-user-playlist-in {
+  from {
+    opacity: 0;
+    transform: translateY(1rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .music-library {
   min-width: 0;
 }
@@ -3263,7 +3487,21 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   }
 }
 
+@media (max-width: 1180px) {
+  .music-user-library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 860px) {
+  .music-user-library-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .music-user-playlist-card {
+    min-height: 10rem;
+  }
+
   .music-library-hero {
     min-height: 20rem;
     grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
@@ -3295,6 +3533,44 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
 }
 
 @media (max-width: 680px) {
+  .music-user-library-heading {
+    margin-bottom: 2.5rem;
+  }
+
+  .music-user-library-heading h1 {
+    font-size: 4rem;
+  }
+
+  .music-user-library-heading p {
+    margin-top: 0.75rem;
+    font-size: 1rem;
+  }
+
+  .music-user-playlist-card {
+    min-height: 9rem;
+    padding: 0.8rem 1.25rem;
+    gap: 1rem;
+  }
+
+  .music-user-playlist-avatar {
+    flex-basis: 6.5rem;
+    width: 6.5rem;
+  }
+
+  .music-user-playlist-copy strong {
+    font-size: 1.45rem;
+  }
+
+  .music-user-playlist-copy span {
+    margin-top: 0.3rem;
+    font-size: 0.95rem;
+  }
+
+  .music-user-playlist-copy small {
+    margin-top: 0.6rem;
+    font-size: 0.84rem;
+  }
+
   .music-library-hero {
     min-height: 33rem;
     padding: 2.4rem 1.6rem;
@@ -3406,7 +3682,9 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   .music-library-hero.is-playing .music-library-platter::after,
   .music-library-hero.is-playing .music-library-status-light,
   .music-library-hero.is-playing .music-library-waves i,
-  .music-library-equalizer i {
+  .music-library-equalizer i,
+  .music-user-playlist-card,
+  .music-user-library-loading svg {
     animation: none;
   }
 
@@ -3426,7 +3704,9 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   .music-processing-status.is-processing svg,
   .music-card-play:disabled svg,
   .music-feature-cover-transition,
-  .music-duplicate-dialog {
+  .music-duplicate-dialog,
+  .music-user-playlist-card,
+  .music-user-playlist-card::after {
     transition: none;
     animation: none;
   }

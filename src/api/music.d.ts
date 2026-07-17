@@ -42,11 +42,28 @@ export type MusicPage = {
   totalDuration: number;
 };
 
+export type MusicUserLibrary = {
+  collection: 'uploads' | 'favorites';
+  userId: string;
+  username: string;
+  avatar: string;
+  playlistName: string;
+  trackCount: number;
+  totalDuration: number;
+};
+
 export function getMusic(options?: {
   page?: number;
   pageSize?: number;
   favorite?: boolean;
 }): Promise<MusicPage>;
+export function getMyMusic(options?: {
+  page?: number;
+  pageSize?: number;
+  collection?: 'uploads' | 'favorites' | 'library';
+  userId?: string;
+}): Promise<MusicPage>;
+export function getMusicLibrary(): Promise<MusicUserLibrary[]>;
 export function uploadMusic(
   files: File[],
   options?: { allowSimilar?: boolean },

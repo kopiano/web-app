@@ -80,6 +80,50 @@ export function getMusic({ page = 1, pageSize = 10, favorite } = {}) {
   })
 }
 
+export function getMyMusic({
+  page = 1,
+  pageSize = 10,
+  collection = 'uploads',
+  userId = '',
+} = {}) {
+  const params = {
+    page: Math.max(1, Number(page) || 1),
+    page_size: Math.min(50, Math.max(1, Number(pageSize) || 10)),
+    collection: ['uploads', 'favorites', 'library'].includes(collection)
+      ? collection
+      : 'uploads',
+  }
+  if (userId) params.user_id = userId
+
+  return request.get('/music', { params }).then(response => {
+    const data = response.data
+    if (!data || !Array.isArray(data.items)) throw new Error('Invalid music response')
+    return {
+      items: data.items.map(normalizeMusicListItem),
+      page: Math.max(1, Number(data.page) || params.page),
+      pageSize: Math.max(1, Number(data.page_size) || params.page_size),
+      total: Math.max(0, Number(data.total) || 0),
+      totalPages: Math.max(0, Number(data.total_pages) || 0),
+      totalDuration: Math.max(0, Number(data.total_duration_ms) / 1000 || 0),
+    }
+  })
+}
+
+export function getMusicLibrary() {
+  return request.get('/music/library').then(response => {
+    if (!Array.isArray(response.data)) throw new Error('Invalid music library response')
+    return response.data.map(library => ({
+      collection: library.collection === 'favorites' ? 'favorites' : 'uploads',
+      userId: library.user_id || '',
+      username: library.username || 'Unknown User',
+      avatar: resolveAssetUrl(library.avatar),
+      playlistName: library.playlist_name || 'Daily Mix',
+      trackCount: Math.max(0, Number(library.track_count) || 0),
+      totalDuration: Math.max(0, Number(library.total_duration_ms) / 1000 || 0),
+    }))
+  })
+}
+
 export class MusicDuplicateError extends Error {
   constructor(message, kind, matches = []) {
     super(message)

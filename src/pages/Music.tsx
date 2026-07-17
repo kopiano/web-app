@@ -7,9 +7,11 @@ import {
   Heart,
   Home,
   LayoutGrid,
+  Library,
   ListMusic,
   LoaderCircle,
   MoreHorizontal,
+  Music2,
   Pause,
   Play,
   Plus,
@@ -31,6 +33,8 @@ import playlistDiscArt from '@/assets/images/bg-8.webp';
 import {
   deleteMusicTrack,
   getMusic,
+  getMusicLibrary,
+  getMyMusic,
   getMusicTrack,
   musicWebSocketUrl,
   normalizeMusicEvent,
@@ -39,11 +43,12 @@ import {
   MusicDuplicateError,
   type MusicDuplicateMatch,
   type MusicTrack,
+  type MusicUserLibrary,
 } from '@/api/music';
 import type { RootState } from '@/store/store';
 import '@/styles/music.scss';
 
-type View = 'home' | 'playlist' | 'favorites';
+type View = 'home' | 'library' | 'playlist' | 'favorites';
 type PlayMode = 'sequential' | 'shuffle' | 'single';
 type LibraryLayout = 'list' | 'cards';
 type PendingDuplicateUpload = {
@@ -76,6 +81,7 @@ const EMPTY_TRACK: MusicTrack = {
 
 const navItems: Array<{ id: View; labelKey: string; icon: typeof Home }> = [
   { id: 'home', labelKey: 'music.home', icon: Home },
+  { id: 'library', labelKey: 'music.library', icon: Library },
   { id: 'playlist', labelKey: 'music.playlist', icon: ListMusic },
   { id: 'favorites', labelKey: 'music.favorites', icon: Heart },
 ];
@@ -118,7 +124,9 @@ const MUSIC_ADD_PARTICLES = Array.from({ length: MUSIC_ADD_PARTICLE_COUNT }, (_,
 const getStoredMusicView = (): View => {
   try {
     const storedView = window.localStorage.getItem(ACTIVE_MUSIC_VIEW_KEY);
-    return storedView === 'playlist' || storedView === 'favorites' ? storedView : 'home';
+    return storedView === 'library' || storedView === 'playlist' || storedView === 'favorites'
+      ? storedView
+      : 'home';
   } catch {
     return 'home';
   }
@@ -212,7 +220,9 @@ const formatDateAdded = (value: string, locale: string) => {
 function Music() {
   const { t, i18n } = useTranslation();
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  const authInitialized = useSelector((state: RootState) => state.auth.initialized);
   const [activeView, setActiveView] = useState<View>(getStoredMusicView);
+  const [collectionUserId, setCollectionUserId] = useState('');
   const [libraryLayout, setLibraryLayout] = useState<LibraryLayout>(getStoredLibraryLayout);
   const [libraryPage, setLibraryPage] = useState(1);
   const [tracks, setTracks] = useState<MusicTrack[]>(() => {
@@ -223,6 +233,10 @@ function Music() {
   const [musicTotal, setMusicTotal] = useState(0);
   const [musicTotalDuration, setMusicTotalDuration] = useState(0);
   const [musicPageCount, setMusicPageCount] = useState(0);
+  const [userLibraries, setUserLibraries] = useState<MusicUserLibrary[]>([]);
+  const [isUserLibraryLoaded, setIsUserLibraryLoaded] = useState(false);
+  const [isUserLibraryLoading, setIsUserLibraryLoading] = useState(false);
+  const [userLibraryLoadFailed, setUserLibraryLoadFailed] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playbackTrackId, setPlaybackTrackId] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -268,7 +282,24 @@ function Music() {
   const libraryPageSize = libraryLayout === 'list' ? 10 : 8;
   const libraryPageCount = Math.max(1, musicPageCount);
   const libraryTracks = pageTracks;
-  const libraryOwner = currentUser?.name || currentUser?.username || t('music.guestListener');
+  const isCollectionView = activeView === 'playlist' || activeView === 'favorites';
+  const activeCollection = activeView === 'favorites' ? 'favorites' : 'uploads';
+  const collectionOwnerId = collectionUserId || currentUser?.id || '';
+  const activeCollectionLibrary = userLibraries.find(
+    (library) => (
+      library.userId === collectionOwnerId
+      && library.collection === activeCollection
+    ),
+  );
+  const collectionTitle = activeCollectionLibrary?.playlistName
+    || t(activeView === 'favorites' ? 'music.likedSongs' : 'music.myMusic');
+  const libraryOwner = activeCollectionLibrary?.username
+    || currentUser?.name
+    || currentUser?.username
+    || t('music.guestListener');
+  const isViewingOwnCollection = Boolean(
+    currentUser?.id && collectionOwnerId === currentUser.id,
+  );
   const libraryDuration = useMemo(() => {
     const totalSeconds = musicTotalDuration;
     const hours = Math.floor(totalSeconds / 3600);
@@ -280,11 +311,9 @@ function Music() {
       seconds || (!hours && !minutes) ? t('music.durationSeconds', { count: seconds }) : '',
     ].filter(Boolean).join(' ');
   }, [musicTotalDuration, t]);
-  const sectionTitleKey = activeView === 'favorites'
-    ? 'music.yourFavorites'
-    : activeView === 'playlist'
-      ? 'music.allAlbums'
-      : 'music.trendingAlbums';
+  const sectionTitleKey = activeView === 'playlist'
+    ? 'music.allAlbums'
+    : 'music.trendingAlbums';
   const duplicateUploadCount = pendingDuplicateUpload
     ? Math.min(
       Math.max(1, pendingDuplicateUpload.matches.length),
@@ -303,6 +332,8 @@ function Music() {
   const detailRequestsRef = useRef(new Map<string, Promise<MusicTrack>>());
   const playRequestRef = useRef(0);
   const musicPageRequestRef = useRef(0);
+  const musicScopeRef = useRef('');
+  const userLibraryRequestRef = useRef(0);
   const favoriteBurstTimeoutRef = useRef<number | undefined>(undefined);
   const pageTracksRef = useRef<MusicTrack[]>([]);
   tracksRef.current = tracks;
@@ -417,6 +448,10 @@ function Music() {
     };
   }, []);
 
+  useEffect(() => {
+    setCollectionUserId(currentUser?.id || '');
+  }, [currentUser?.id]);
+
   useEffect(() => () => {
     if (favoriteBurstTimeoutRef.current !== undefined) {
       window.clearTimeout(favoriteBurstTimeoutRef.current);
@@ -451,25 +486,66 @@ function Music() {
   }, [isUploading, pendingDuplicateUpload]);
 
   useEffect(() => {
+    if (activeView === 'library') {
+      musicPageRequestRef.current += 1;
+      setIsMusicPageLoading(false);
+      return;
+    }
+    if (!authInitialized) return;
+    if (activeView === 'favorites' && !currentUser) {
+      musicPageRequestRef.current += 1;
+      musicScopeRef.current = 'favorites:guest';
+      setPageTracks([]);
+      setMusicTotal(0);
+      setMusicTotalDuration(0);
+      setMusicPageCount(0);
+      setIsMusicLoaded(true);
+      setIsMusicPageLoading(false);
+      return;
+    }
+
+    const requestedScope = `${activeView}:${collectionOwnerId || 'guest'}`;
+    if (musicScopeRef.current !== requestedScope) {
+      musicScopeRef.current = requestedScope;
+      setPageTracks([]);
+      setMusicTotal(0);
+      setMusicTotalDuration(0);
+      setMusicPageCount(0);
+      setIsMusicLoaded(false);
+    }
+
     const requestId = musicPageRequestRef.current + 1;
     musicPageRequestRef.current = requestId;
-    const requestedPage = activeView === 'playlist' ? libraryPage : 1;
+    const requestedPage = isCollectionView ? libraryPage : 1;
     const requestedPageSize = activeView === 'home'
       ? 4
-      : activeView === 'favorites'
-        ? 8
-        : libraryPageSize;
+      : libraryPageSize;
 
     setIsMusicPageLoading(true);
-    getMusic({
-      page: requestedPage,
-      pageSize: requestedPageSize,
-      favorite: activeView === 'favorites' ? true : undefined,
-    })
+    const musicRequest = activeView === 'playlist' && currentUser
+      ? getMyMusic({
+        page: requestedPage,
+        pageSize: requestedPageSize,
+        collection: 'uploads',
+        userId: collectionOwnerId,
+      })
+      : activeView === 'favorites' && currentUser
+        ? getMyMusic({
+          page: requestedPage,
+          pageSize: requestedPageSize,
+          collection: 'favorites',
+          userId: collectionOwnerId,
+        })
+        : getMusic({
+          page: requestedPage,
+          pageSize: requestedPageSize,
+        });
+
+    musicRequest
       .then((music) => {
         if (requestId !== musicPageRequestRef.current) return;
         if (
-          activeView === 'playlist'
+          isCollectionView
           && music.totalPages > 0
           && requestedPage > music.totalPages
         ) {
@@ -503,7 +579,50 @@ function Music() {
           setIsMusicPageLoading(false);
         }
       });
-  }, [activeView, libraryPage, libraryPageSize, musicRefreshKey]);
+  }, [
+    activeView,
+    authInitialized,
+    collectionOwnerId,
+    currentUser?.id,
+    isCollectionView,
+    libraryPage,
+    libraryPageSize,
+    musicRefreshKey,
+  ]);
+
+  useEffect(() => {
+    if (activeView !== 'library') return;
+    if (!authInitialized) return;
+    if (!currentUser) {
+      userLibraryRequestRef.current += 1;
+      setUserLibraries([]);
+      setIsUserLibraryLoaded(true);
+      setIsUserLibraryLoading(false);
+      setUserLibraryLoadFailed(false);
+      return;
+    }
+
+    const requestId = userLibraryRequestRef.current + 1;
+    userLibraryRequestRef.current = requestId;
+    setIsUserLibraryLoading(true);
+    setUserLibraryLoadFailed(false);
+
+    getMusicLibrary()
+      .then((libraries) => {
+        if (requestId !== userLibraryRequestRef.current) return;
+        setUserLibraries(libraries);
+      })
+      .catch((error) => {
+        if (requestId !== userLibraryRequestRef.current) return;
+        console.error('Failed to load music libraries', error);
+        setUserLibraryLoadFailed(true);
+      })
+      .finally(() => {
+        if (requestId !== userLibraryRequestRef.current) return;
+        setIsUserLibraryLoaded(true);
+        setIsUserLibraryLoading(false);
+      });
+  }, [activeView, authInitialized, currentUser?.id, musicRefreshKey]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -631,10 +750,10 @@ function Music() {
   }, [libraryLayout]);
 
   useEffect(() => {
-    if (activeView === 'playlist') {
+    if (isCollectionView) {
       setLibraryPage((page) => Math.min(page, libraryPageCount));
     }
-  }, [activeView, libraryPageCount]);
+  }, [isCollectionView, libraryPageCount]);
 
   useEffect(() => {
     const candidates = pageTracksRef.current.filter((track) => track.processingStatus === 'ready');
@@ -828,7 +947,7 @@ function Music() {
     try {
       const persisted = await updateMusicFavorite(trackId, nextFavorite);
       updateFavoriteState(persisted);
-      if (activeView === 'favorites') {
+      if (activeView === 'favorites' && isViewingOwnCollection) {
         setMusicRefreshKey((key) => key + 1);
       }
     } catch (error) {
@@ -1103,7 +1222,13 @@ function Music() {
                 key={id}
                 type="button"
                 className={`music-nav-item${activeView === id ? ' is-active' : ''}`}
-                onClick={() => setActiveView(id)}
+                onClick={() => {
+                  if (id !== activeView) setLibraryPage(1);
+                  if (id === 'playlist' || id === 'favorites') {
+                    setCollectionUserId(currentUser?.id || '');
+                  }
+                  setActiveView(id);
+                }}
                 aria-current={activeView === id ? 'page' : undefined}
                 aria-label={label}
                 // title={label}
@@ -1140,13 +1265,87 @@ function Music() {
       </aside>
 
       <div className="music-content">
-        <header className="music-heading">
-          <div>
-            <span className="music-eyebrow">{t('music.collectionEyebrow')}</span>
-          </div>
-        </header>
+        {activeView !== 'library' && !isCollectionView && (
+          <header className="music-heading">
+            <div>
+              <span className="music-eyebrow">{t('music.collectionEyebrow')}</span>
+            </div>
+          </header>
+        )}
 
-        {activeView === 'playlist' ? (
+        {activeView === 'library' ? (
+          <div className="music-user-library" aria-labelledby="music-user-library-title">
+            <header className="music-user-library-heading">
+              <h1 id="music-user-library-title">{t('music.yourLibrary')}</h1>
+              <p>{t('music.yourLibraryDescription')}</p>
+            </header>
+
+            {!currentUser ? (
+              <div className="music-user-library-empty">
+                <Library size={26} aria-hidden="true" />
+                <h2>{t('music.librarySignInTitle')}</h2>
+                <p>{t('music.librarySignInDescription')}</p>
+              </div>
+            ) : !isUserLibraryLoaded || isUserLibraryLoading ? (
+              <div
+                className="music-user-library-loading"
+                aria-label={t('music.loadingLibraries')}
+                aria-busy="true"
+              >
+                <LoaderCircle size={24} aria-hidden="true" />
+              </div>
+            ) : userLibraryLoadFailed ? (
+              <div className="music-user-library-empty">
+                <CircleAlert size={25} aria-hidden="true" />
+                <h2>{t('music.libraryLoadFailed')}</h2>
+                <p>{t('music.libraryLoadFailedDescription')}</p>
+              </div>
+            ) : userLibraries.length ? (
+              <div className="music-user-library-grid">
+                {userLibraries.map((library, index) => (
+                  <button
+                    type="button"
+                    className="music-user-playlist-card"
+                    key={`${library.userId}:${library.collection}`}
+                    style={{ '--library-card-delay': `${index * 55}ms` } as CSSProperties}
+                    onClick={() => {
+                      setLibraryPage(1);
+                      setCollectionUserId(library.userId);
+                      setActiveView(library.collection === 'favorites' ? 'favorites' : 'playlist');
+                    }}
+                    aria-label={t('music.userPlaylistLabel', {
+                      playlist: library.playlistName,
+                      username: library.username,
+                      count: library.trackCount,
+                    })}
+                  >
+                    <div className="music-user-playlist-avatar" aria-hidden="true">
+                      {library.avatar ? (
+                        <img src={library.avatar} alt="" />
+                      ) : (
+                        <span>{library.username.trim().charAt(0).toUpperCase() || '?'}</span>
+                      )}
+                    </div>
+                    <div className="music-user-playlist-copy">
+                      <strong>{library.playlistName}</strong>
+                      <span>{library.username}</span>
+                      <small>
+                        <Music2 size={14} strokeWidth={1.9} aria-hidden="true" />
+                        {t('music.trackCount', { count: library.trackCount })}
+                      </small>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="music-user-library-empty">
+                <Library size={26} aria-hidden="true" />
+                <h2>{t('music.noPlaylists')}</h2>
+                <p>{t('music.noPlaylistsDescription')}</p>
+              </div>
+            )}
+          </div>
+        ) : isCollectionView ? (
           <div className="music-library" aria-labelledby="music-library-title">
             <article
               className={`music-library-hero${isPlaying ? ' is-playing' : ''}`}
@@ -1184,7 +1383,7 @@ function Music() {
                 </span>
               </button>
               <div className="music-library-hero-copy">
-                <h1 id="music-library-title">{t('music.likedSongs')}</h1>
+                <h1 id="music-library-title">{collectionTitle}</h1>
                 <p>
                   {t('music.likedSongsSummary', {
                     owner: libraryOwner,
@@ -1250,7 +1449,7 @@ function Music() {
                   <div
                     className={`music-library-table${isMusicPageLoading ? ' is-loading' : ''}`}
                     role="table"
-                    aria-label={t('music.likedSongs')}
+                    aria-label={collectionTitle}
                     aria-busy={isMusicPageLoading}
                   >
                     <div className="music-library-table-head" role="row">
@@ -1339,36 +1538,58 @@ function Music() {
                               )}
                             </button>
                             <span className="music-library-duration" role="cell">{formatTime(track.duration)}</span>
-                            <div
-                              className={`music-card-actions music-library-row-actions${openTrackMenuId === track.id ? ' is-open' : ''}`}
-                            >
-                              <button
-                                type="button"
-                                className="music-library-more"
-                                aria-label={t('music.moreOptions', { title: track.title })}
-                                aria-haspopup="menu"
-                                aria-expanded={openTrackMenuId === track.id}
-                                onClick={() => setOpenTrackMenuId((current) => current === track.id ? '' : track.id)}
+                            {(activeView === 'favorites' || isViewingOwnCollection) && (
+                              <div
+                                className={`music-card-actions music-library-row-actions${openTrackMenuId === track.id ? ' is-open' : ''}`}
                               >
-                                <MoreHorizontal size={20} />
-                              </button>
-                              <div className="music-card-menu" role="menu">
                                 <button
                                   type="button"
-                                  role="menuitem"
-                                  className={`music-card-delete${currentUser ? '' : ' is-restricted'}`}
-                                  disabled={Boolean(deletingTrackId)}
-                                  aria-disabled={!currentUser || Boolean(deletingTrackId)}
-                                  title={currentUser ? undefined : t('music.signInRequired')}
-                                  onClick={() => void handleDeleteTrack(track.id)}
+                                  className="music-library-more"
+                                  aria-label={t('music.moreOptions', { title: track.title })}
+                                  aria-haspopup="menu"
+                                  aria-expanded={openTrackMenuId === track.id}
+                                  onClick={() => setOpenTrackMenuId((current) => current === track.id ? '' : track.id)}
                                 >
-                                  {deletingTrackId === track.id
-                                    ? <LoaderCircle size={16} aria-hidden="true" />
-                                    : <Trash2 size={16} aria-hidden="true" />}
-                                  <span>{t(deletingTrackId === track.id ? 'music.deleting' : 'music.delete')}</span>
+                                  <MoreHorizontal size={20} />
                                 </button>
+                                <div className="music-card-menu" role="menu">
+                                  {activeView === 'favorites' ? (
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="music-card-delete"
+                                      onClick={() => void toggleFavorite(track.id)}
+                                    >
+                                      <Heart
+                                        size={16}
+                                        fill={track.isFavorite ? 'currentColor' : 'none'}
+                                        aria-hidden="true"
+                                      />
+                                      <span>
+                                        {t(track.isFavorite
+                                          ? 'music.removeFromFavorites'
+                                          : 'music.addToFavorites')}
+                                      </span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className={`music-card-delete${currentUser ? '' : ' is-restricted'}`}
+                                      disabled={Boolean(deletingTrackId)}
+                                      aria-disabled={!currentUser || Boolean(deletingTrackId)}
+                                      title={currentUser ? undefined : t('music.signInRequired')}
+                                      onClick={() => void handleDeleteTrack(track.id)}
+                                    >
+                                      {deletingTrackId === track.id
+                                        ? <LoaderCircle size={16} aria-hidden="true" />
+                                        : <Trash2 size={16} aria-hidden="true" />}
+                                      <span>{t(deletingTrackId === track.id ? 'music.deleting' : 'music.delete')}</span>
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1400,37 +1621,59 @@ function Music() {
                             }
                           }}
                         >
-                          <div
-                            className={`music-card-actions${openTrackMenuId === track.id ? ' is-open' : ''}`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              className="music-card-menu-trigger"
-                              aria-label={t('music.moreOptions', { title: track.title })}
-                              aria-haspopup="menu"
-                              aria-expanded={openTrackMenuId === track.id}
-                              onClick={() => setOpenTrackMenuId((current) => current === track.id ? '' : track.id)}
+                          {(activeView === 'favorites' || isViewingOwnCollection) && (
+                            <div
+                              className={`music-card-actions${openTrackMenuId === track.id ? ' is-open' : ''}`}
+                              onClick={(event) => event.stopPropagation()}
                             >
-                              <MoreHorizontal size={20} />
-                            </button>
-                            <div className="music-card-menu" role="menu">
                               <button
                                 type="button"
-                                role="menuitem"
-                                className={`music-card-delete${currentUser ? '' : ' is-restricted'}`}
-                                disabled={Boolean(deletingTrackId)}
-                                aria-disabled={!currentUser || Boolean(deletingTrackId)}
-                                title={currentUser ? undefined : t('music.signInRequired')}
-                                onClick={() => void handleDeleteTrack(track.id)}
+                                className="music-card-menu-trigger"
+                                aria-label={t('music.moreOptions', { title: track.title })}
+                                aria-haspopup="menu"
+                                aria-expanded={openTrackMenuId === track.id}
+                                onClick={() => setOpenTrackMenuId((current) => current === track.id ? '' : track.id)}
                               >
-                                {deletingTrackId === track.id
-                                  ? <LoaderCircle size={16} aria-hidden="true" />
-                                  : <Trash2 size={16} aria-hidden="true" />}
-                                <span>{t(deletingTrackId === track.id ? 'music.deleting' : 'music.delete')}</span>
+                                <MoreHorizontal size={20} />
                               </button>
+                              <div className="music-card-menu" role="menu">
+                                {activeView === 'favorites' ? (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="music-card-delete"
+                                    onClick={() => void toggleFavorite(track.id)}
+                                  >
+                                    <Heart
+                                      size={16}
+                                      fill={track.isFavorite ? 'currentColor' : 'none'}
+                                      aria-hidden="true"
+                                    />
+                                    <span>
+                                      {t(track.isFavorite
+                                        ? 'music.removeFromFavorites'
+                                        : 'music.addToFavorites')}
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className={`music-card-delete${currentUser ? '' : ' is-restricted'}`}
+                                    disabled={Boolean(deletingTrackId)}
+                                    aria-disabled={!currentUser || Boolean(deletingTrackId)}
+                                    title={currentUser ? undefined : t('music.signInRequired')}
+                                    onClick={() => void handleDeleteTrack(track.id)}
+                                  >
+                                    {deletingTrackId === track.id
+                                      ? <LoaderCircle size={16} aria-hidden="true" />
+                                      : <Trash2 size={16} aria-hidden="true" />}
+                                    <span>{t(deletingTrackId === track.id ? 'music.deleting' : 'music.delete')}</span>
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
+                          )}
                           {!isReady && (
                             <div className={`music-processing-status is-${track.processingStatus}`}>
                               {track.processingStatus === 'processing'
@@ -1509,8 +1752,8 @@ function Music() {
             ) : (
               <div className="music-empty-state">
                 <Heart size={25} />
-                <h3>{t('music.emptyLibraryTitle')}</h3>
-                <p>{t('music.emptyLibraryDescription')}</p>
+                <h3>{t(activeView === 'favorites' ? 'music.emptyFavoritesTitle' : 'music.emptyLibraryTitle')}</h3>
+                <p>{t(activeView === 'favorites' ? 'music.emptyFavoritesDescription' : 'music.emptyLibraryDescription')}</p>
               </div>
             )}
           </div>
@@ -1699,8 +1942,8 @@ function Music() {
         ) : (
           <div className="music-empty-state">
             <Heart size={25} />
-            <h3>{t(activeView === 'favorites' ? 'music.emptyFavoritesTitle' : 'music.emptyLibraryTitle')}</h3>
-            <p>{t(activeView === 'favorites' ? 'music.emptyFavoritesDescription' : 'music.emptyLibraryDescription')}</p>
+            <h3>{t('music.emptyLibraryTitle')}</h3>
+            <p>{t('music.emptyLibraryDescription')}</p>
             <button
               type="button"
               className={currentUser ? undefined : 'is-restricted'}
