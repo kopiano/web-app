@@ -2123,6 +2123,14 @@ $chat-margin-left: 100px;
     transform: scale(0.92);
 }
 
+.card-action-btn.guest-restricted {
+    cursor: not-allowed;
+}
+
+.card-action-btn.guest-restricted:active {
+    transform: none;
+}
+
 .card-action-btn.liked {
     color: #f91880;
 }

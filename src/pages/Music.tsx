@@ -19,6 +19,8 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent } from 'react';
+import { useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import bg0 from '@/assets/images/bg-0.webp';
 import {
   deleteMusicTrack,
@@ -30,6 +32,7 @@ import {
   uploadMusic,
   type MusicTrack,
 } from '@/api/music';
+import type { RootState } from '@/store/store';
 import '@/styles/music.scss';
 
 type View = 'home' | 'playlist' | 'favorites';
@@ -75,6 +78,8 @@ const formatTime = (seconds: number) => {
 };
 
 function Music() {
+  const { t } = useTranslation();
+  const currentUser = useSelector((state: RootState) => state.auth.user);
   const [activeView, setActiveView] = useState<View>('home');
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -114,7 +119,16 @@ function Music() {
   const tracksRef = useRef<MusicTrack[]>([]);
   const featuredTrackIdRef = useRef('');
   const detailRequestsRef = useRef(new Map<string, Promise<MusicTrack>>());
+  const playRequestRef = useRef(0);
   tracksRef.current = tracks;
+
+  const requireMusicAccount = useCallback(() => {
+    if (currentUser) return true;
+    window.dispatchEvent(new CustomEvent('app:notification', {
+      detail: { message: t('music.signInRequired'), type: 'warning' },
+    }));
+    return false;
+  }, [currentUser, t]);
 
   const syncProgressVisual = useCallback((value: number, duration: number) => {
     const progress = duration > 0 ? Math.min((value / duration) * 100, 100) : 0;
@@ -158,13 +172,18 @@ function Music() {
 
   const playTrack = useCallback(async (track: MusicTrack) => {
     if (track.processingStatus !== 'ready') return;
+    const playRequest = playRequestRef.current + 1;
+    playRequestRef.current = playRequest;
     let playableTrack = track;
     try {
       playableTrack = await loadTrackDetails(track.id);
     } catch (error) {
-      console.error('Failed to load music details', error);
+      if (playRequest === playRequestRef.current) {
+        console.error('Failed to load music details', error);
+      }
       return;
     }
+    if (playRequest !== playRequestRef.current) return;
     if (!playableTrack.audioUrl) return;
     const index = tracksRef.current.findIndex((item) => item.id === track.id);
     if (index < 0) return;
@@ -273,6 +292,7 @@ function Music() {
   }, []);
 
   useEffect(() => {
+    if (!currentUser) return;
     let socket: WebSocket | null = null;
     let connectTimer: number | undefined;
     let reconnectTimer: number | undefined;
@@ -341,7 +361,7 @@ function Music() {
         currentSocket.close(1000, 'Music closed');
       }
     };
-  }, []);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (currentIndex >= tracks.length && tracks.length) {
@@ -439,36 +459,30 @@ function Music() {
   }, [currentTrack.audioUrl, currentTrack.id, isPlaying, playbackTrackId]);
 
   useEffect(() => {
+    const audio = audioRef.current;
     if (
-      !isPlaying
+      !audio
+      || !isPlaying
       || !playbackTrackId
       || playbackTrackId !== currentTrack.id
-      || !currentTrack.id
-      || !currentTrack.audioUrl
+      || audio.dataset.trackId !== currentTrack.id
     ) return;
-    const currentTracks = tracksRef.current;
-    const readyIndexes = currentTracks.reduce<number[]>((indexes, track, index) => {
-      if (track.processingStatus === 'ready') indexes.push(index);
-      return indexes;
-    }, []);
-    const position = readyIndexes.indexOf(currentIndex);
-    if (position < 0 || readyIndexes.length < 2) return;
-    const nextTrack = currentTracks[readyIndexes[(position + 1) % readyIndexes.length]];
-
-    void loadTrackDetails(nextTrack.id).catch(() => {});
-  }, [currentIndex, currentTrack.audioUrl, currentTrack.id, isPlaying, loadTrackDetails, playbackTrackId]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !isPlaying) return;
     let frameId = 0;
 
     const updateProgress = () => {
-      const duration = Number.isFinite(audio.duration) ? audio.duration : currentTrack.duration;
-      const nextElapsed = Math.min(audio.currentTime, duration || currentTrack.duration);
+      if (
+        playbackTrackId !== currentTrack.id
+        || audio.dataset.trackId !== currentTrack.id
+      ) return;
+
+      const mediaDuration = Number.isFinite(audio.duration) && audio.duration > 0
+        ? audio.duration
+        : 0;
+      const visualDuration = mediaDuration || currentTrack.duration;
+      const nextElapsed = Math.min(audio.currentTime, visualDuration);
       const nextSecond = Math.floor(nextElapsed);
       elapsedRef.current = nextElapsed;
-      syncProgressVisual(nextElapsed, duration || currentTrack.duration);
+      syncProgressVisual(nextElapsed, visualDuration);
 
       if (nextSecond !== renderedSecondRef.current) {
         renderedSecondRef.current = nextSecond;
@@ -480,7 +494,7 @@ function Music() {
 
     frameId = window.requestAnimationFrame(updateProgress);
     return () => window.cancelAnimationFrame(frameId);
-  }, [currentTrack.duration, isPlaying, syncProgressVisual]);
+  }, [currentTrack.duration, currentTrack.id, isPlaying, playbackTrackId, syncProgressVisual]);
 
   useEffect(() => {
     syncProgressVisual(elapsedRef.current, currentTrack.duration);
@@ -495,11 +509,13 @@ function Music() {
         void audio.play();
         return;
       }
-      goToTrack(1);
+      setIsPlaying(false);
+      audio.currentTime = 0;
+      resetProgress();
     };
     audio.addEventListener('ended', handleEnded);
     return () => audio.removeEventListener('ended', handleEnded);
-  }, [goToTrack, playMode]);
+  }, [playMode, resetProgress]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -518,6 +534,7 @@ function Music() {
   }, [currentTrack, goToTrack, hasPlayableTracks, isPlaying, playTrack]);
 
   const toggleFavorite = async (trackId: string) => {
+    if (!requireMusicAccount()) return;
     const track = tracks.find((item) => item.id === trackId);
     if (!track) return;
     const nextFavorite = !track.isFavorite;
@@ -554,6 +571,7 @@ function Music() {
       audio.load();
     }
     if (deletesPlayback) {
+      playRequestRef.current += 1;
       setPlaybackTrackId('');
       setIsPlaying(false);
       resetProgress();
@@ -585,6 +603,10 @@ function Music() {
   }, [currentIndex, playbackTrackId, resetProgress]);
 
   const handleDeleteTrack = useCallback(async (trackId: string) => {
+    if (!requireMusicAccount()) {
+      setOpenTrackMenuId('');
+      return;
+    }
     if (deletingTrackId) return;
     setDeletingTrackId(trackId);
     setOpenTrackMenuId('');
@@ -599,7 +621,7 @@ function Music() {
       setDeletingTrackId('');
       setRemovingTrackId('');
     }
-  }, [deletingTrackId, removeDeletedTrack]);
+  }, [deletingTrackId, removeDeletedTrack, requireMusicAccount]);
 
   const toggleMute = () => {
     if (volume > 0) {
@@ -627,6 +649,10 @@ function Music() {
   };
 
   const handleAddMusic = async (event: ChangeEvent<HTMLInputElement>) => {
+    if (!requireMusicAccount()) {
+      event.target.value = '';
+      return;
+    }
     const files = Array.from(event.target.files ?? []);
     if (!files.length) return;
     setIsUploading(true);
@@ -696,12 +722,15 @@ function Music() {
         <span className="music-sidebar-divider" aria-hidden="true" />
         <button
           type="button"
-          className="music-add-button"
-          onClick={() => addMusicInputRef.current?.click()}
+          className={`music-add-button${currentUser ? '' : ' is-restricted'}`}
+          onClick={() => {
+            if (requireMusicAccount()) addMusicInputRef.current?.click();
+          }}
           disabled={isUploading}
           aria-busy={isUploading}
+          aria-disabled={!currentUser || isUploading}
           aria-label="Add music"
-          // title={isUploading ? 'Uploading and converting music' : 'Add music'}
+          title={currentUser ? undefined : t('music.signInRequired')}
         >
           <Plus size={23} strokeWidth={1.8} />
         </button>
@@ -842,8 +871,10 @@ function Music() {
                       <button
                         type="button"
                         role="menuitem"
-                        className="music-card-delete"
+                        className={`music-card-delete${currentUser ? '' : ' is-restricted'}`}
                         disabled={Boolean(deletingTrackId)}
+                        aria-disabled={!currentUser || Boolean(deletingTrackId)}
+                        title={currentUser ? undefined : t('music.signInRequired')}
                         onClick={() => void handleDeleteTrack(track.id)}
                       >
                         {deletingTrackId === track.id
@@ -899,7 +930,17 @@ function Music() {
             <Heart size={25} />
             <h3>{tracks.length ? 'Your favorites are waiting.' : 'Your music library is empty.'}</h3>
             <p>{tracks.length ? 'Tap the heart on a track to keep it close.' : 'Add music to start your private collection.'}</p>
-            <button type="button" onClick={() => addMusicInputRef.current?.click()}>Add music</button>
+            <button
+              type="button"
+              className={currentUser ? undefined : 'is-restricted'}
+              aria-disabled={!currentUser}
+              title={currentUser ? undefined : t('music.signInRequired')}
+              onClick={() => {
+                if (requireMusicAccount()) addMusicInputRef.current?.click();
+              }}
+            >
+              Add music
+            </button>
           </div>
         )}
       </div>
@@ -963,10 +1004,12 @@ function Music() {
 
         <button
           type="button"
-          className={`music-player-favorite${currentTrack.isFavorite ? ' is-favorite' : ''}`}
+          className={`music-player-favorite${currentTrack.isFavorite ? ' is-favorite' : ''}${currentUser ? '' : ' is-restricted'}`}
           disabled={!currentTrack.id}
+          aria-disabled={!currentUser || !currentTrack.id}
           onClick={() => toggleFavorite(currentTrack.id)}
           aria-label={currentTrack.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          title={currentUser ? undefined : t('music.signInRequired')}
         >
           <Heart size={16} fill={currentTrack.isFavorite ? 'currentColor' : 'none'} />
           {/* <span>Favorites</span> */}

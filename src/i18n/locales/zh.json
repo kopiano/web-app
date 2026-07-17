@@ -17,7 +17,11 @@
     "groups": "群聊",
     "contacts": "用户",
     "post": "发布",
+    "signInRequired": "需要登录后才能使用",
     "online": "在线",
     "offline": "离线"
+  },
+  "music": {
+    "signInRequired": "登录后才能上传、收藏或删除音乐"
   }
 }

@@ -17,7 +17,11 @@
     "groups": "Groups",
     "contacts": "Contacts",
     "post": "Post",
+    "signInRequired": "Please sign in to use this feature",
     "online": "Online",
     "offline": "Offline"
+  },
+  "music": {
+    "signInRequired": "Please sign in to upload, favorite, or delete music"
   }
 }

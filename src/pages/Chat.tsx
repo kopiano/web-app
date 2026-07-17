@@ -652,7 +652,6 @@ function Chat() {
   useEffect(() => {
     if (
       !authInitialized
-      || !currentUser
       || activeTab !== 'moments'
       || momentsInitialized
       || momentsLoading
@@ -1301,6 +1300,10 @@ function Chat() {
   }
 
   async function toggleLike(postId: string) {
+    if (!currentUser) {
+      notify(t('chat.signInRequired'), 'warning');
+      return;
+    }
     if (momentLikeRequestsRef.current.has(postId)) return;
     const current = moments.find(m => m.id === postId);
     if (!current) return;
@@ -1369,7 +1372,11 @@ function Chat() {
 
   async function handleCommentSubmit(postId: string) {
     const text = commentTexts[postId]?.trim();
-    if (!text || !currentUser || momentCommentRequestsRef.current.has(postId)) return;
+    if (!currentUser) {
+      notify(t('chat.signInRequired'), 'warning');
+      return;
+    }
+    if (!text || momentCommentRequestsRef.current.has(postId)) return;
     const temporaryId = `temporary:${crypto.randomUUID()}`;
     momentCommentRequestsRef.current.add(postId);
     setMoments(p => p.map(m =>
@@ -1417,6 +1424,10 @@ function Chat() {
   }
 
   function toggleCommentInput(postId: string) {
+    if (!currentUser) {
+      notify(t('chat.signInRequired'), 'warning');
+      return;
+    }
     setShowCommentInput(p => ({ ...p, [postId]: !p[postId] }));
     setCommentEmojiPost(null);
   }
@@ -1865,8 +1876,10 @@ function Chat() {
                 </div>
                 <button
                   className="moment-submit"
-                  disabled={momentPublishing || (!momentText.trim() && !momentFile)}
+                  disabled={!currentUser || momentPublishing || (!momentText.trim() && !momentFile)}
                   onClick={handleMomentPublish}
+                  aria-label={currentUser ? t('chat.post') : 'Sign in to post'}
+                  title={currentUser ? undefined : 'Sign in to post'}
                 >
                   {momentPublishing && <span className="moment-submit-spinner" aria-hidden="true" />}
                   {momentPublishing ? 'Posting' : t('chat.post')}
@@ -2118,7 +2131,12 @@ function Chat() {
                       </div>
                     )}
                     <div className="card-actions">
-                      <button className={`card-action-btn heart-btn${post.liked ? ' liked' : ''}`} onClick={() => toggleLike(post.id)}>
+                      <button
+                        className={`card-action-btn heart-btn${post.liked ? ' liked' : ''}${currentUser ? '' : ' guest-restricted'}`}
+                        onClick={() => toggleLike(post.id)}
+                        aria-disabled={!currentUser}
+                        title={currentUser ? undefined : t('chat.signInRequired')}
+                      >
                         <span className={`heart-icon${post.liked ? ' liked' : ''}`}>
                           <svg width="20" height="20" viewBox="0 0 24 24" fill={post.liked ? '#f91880' : 'none'} stroke={post.liked ? '#f91880' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -2160,7 +2178,12 @@ function Chat() {
                         </span>
                         <span className="action-label">{post.likes}</span>
                       </button>
-                      <button className={`card-action-btn comment-action-btn${showCommentInput[post.id] ? ' comment-active' : ''}`} onClick={() => toggleCommentInput(post.id)}>
+                      <button
+                        className={`card-action-btn comment-action-btn${showCommentInput[post.id] ? ' comment-active' : ''}${currentUser ? '' : ' guest-restricted'}`}
+                        onClick={() => toggleCommentInput(post.id)}
+                        aria-disabled={!currentUser}
+                        title={currentUser ? undefined : t('chat.signInRequired')}
+                      >
                         <span className="action-svg">
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />

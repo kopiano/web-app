@@ -1,6 +1,20 @@
 import request from './request'
 import { resolveAssetUrl } from '@/lib/avatar'
 
+function normalizeMusicCoverUrl(coverUrl) {
+  const resolved = resolveAssetUrl(coverUrl)
+  if (!resolved) return ''
+
+  try {
+    const pathname = new URL(resolved, window.location.origin).pathname.toLowerCase()
+    if (/\.(?:aac|flac|m4a|mp3|ogg|opus|wav|wma)$/.test(pathname)) return ''
+  } catch {
+    return ''
+  }
+
+  return resolved
+}
+
 function normalizeMusic(track, detailsLoaded = false) {
   const processingStatus = ['processing', 'ready', 'failed'].includes(track.processing_status)
     ? track.processing_status
@@ -15,7 +29,7 @@ function normalizeMusic(track, detailsLoaded = false) {
     duration: Number.isFinite(duration) ? Math.max(0, duration / 1000) : 0,
     bitrate: Number(track.bitrate) || 0,
     sampleRate: Number(track.sample_rate) || 0,
-    cover: resolveAssetUrl(track.cover_url),
+    cover: normalizeMusicCoverUrl(track.cover_url),
     audioUrl: resolveAssetUrl(track.audio_url),
     originalUrl: resolveAssetUrl(track.original_url),
     format: track.format || '',
@@ -47,7 +61,7 @@ function normalizeMusicListItem(track) {
 }
 
 export function getMusic() {
-  return request.get('/music').then(response => {
+  return request.get('/music/list').then(response => {
     if (!Array.isArray(response.data)) throw new Error('Invalid music response')
     return response.data.map(normalizeMusicListItem)
   })
