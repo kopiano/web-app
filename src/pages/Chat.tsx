@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { Maximize2, X } from 'lucide-react';
 import { resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar';
 import { getMessageHistory, sendImageMessage, sendMessage } from '@/api/chat';
 import {
@@ -452,6 +453,7 @@ function Chat() {
   const [momentPublishing, setMomentPublishing] = useState(false);
   const [momentUploadProgress, setMomentUploadProgress] = useState<MomentUploadProgress | null>(null);
   const [openMomentMenuId, setOpenMomentMenuId] = useState<string | null>(null);
+  const [previewMomentImage, setPreviewMomentImage] = useState<string | null>(null);
   const [deleteMomentId, setDeleteMomentId] = useState<string | null>(null);
   const [deletingMomentId, setDeletingMomentId] = useState<string | null>(null);
   const [completedProcessingMoments, setCompletedProcessingMoments] = useState<Set<string>>(
@@ -617,17 +619,27 @@ function Chat() {
   }, [openMomentMenuId]);
 
   useEffect(() => {
-    if (openMomentMenuId === null && deleteMomentId === null) return;
+    if (openMomentMenuId === null && deleteMomentId === null && previewMomentImage === null) return;
 
     const closeMomentOverlays = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || deletingMomentId !== null) return;
       setOpenMomentMenuId(null);
       setDeleteMomentId(null);
+      setPreviewMomentImage(null);
     };
 
     document.addEventListener('keydown', closeMomentOverlays);
     return () => document.removeEventListener('keydown', closeMomentOverlays);
-  }, [openMomentMenuId, deleteMomentId, deletingMomentId]);
+  }, [openMomentMenuId, deleteMomentId, deletingMomentId, previewMomentImage]);
+
+  useEffect(() => {
+    if (previewMomentImage === null) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [previewMomentImage]);
 
   useEffect(() => {
     if (currentUser) {
@@ -1990,9 +2002,21 @@ function Chat() {
                     </div>
                     {post.text && <div className="card-text">{post.text}</div>}
                     {post.media && post.mediaType === 'image' && (
-                      <div className="card-media-wrap">
-                        <img src={post.media} alt="" className="card-media" />
-                      </div>
+                      <button
+                        type="button"
+                        className="card-media-wrap moment-image-wrap"
+                        aria-label={t('chat.viewImage')}
+                        onClick={() => setPreviewMomentImage(post.media || null)}
+                      >
+                        <img
+                          src={post.media}
+                          alt={t('chat.momentImagePreview')}
+                          className="card-media moment-image"
+                        />
+                        <span className="moment-image-expand" aria-hidden="true">
+                          <Maximize2 size={17} strokeWidth={1.9} />
+                        </span>
+                      </button>
                     )}
                     {post.mediaType === 'video' && (
                       post.processingStatus === 'processing'
@@ -2329,6 +2353,32 @@ function Chat() {
           </div>
         </div>
       </div>
+      {previewMomentImage && (
+        <div
+          className="moment-image-preview-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('chat.momentImagePreview')}
+        >
+          <button
+            type="button"
+            className="moment-image-preview-backdrop"
+            aria-label={t('chat.closeImagePreview')}
+            onClick={() => setPreviewMomentImage(null)}
+          />
+          <div className="moment-image-preview-content">
+            <img src={previewMomentImage} alt={t('chat.momentImagePreview')} />
+            <button
+              type="button"
+              className="moment-image-preview-close"
+              aria-label={t('chat.closeImagePreview')}
+              onClick={() => setPreviewMomentImage(null)}
+            >
+              <X size={22} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      )}
       {deleteMomentId && (
         <div className="moment-delete-overlay" role="presentation">
           <button
