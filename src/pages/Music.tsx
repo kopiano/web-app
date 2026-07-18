@@ -76,6 +76,10 @@ type StoredProDialogState = {
   paymentCurrency: PaymentCurrency;
   billingCycle: BillingCycle;
 };
+type StoredPlaybackProgress = {
+  trackId: string;
+  elapsed: number;
+};
 type PendingDuplicateUpload = {
   files: File[];
   kind: 'exact' | 'similar';
@@ -119,6 +123,7 @@ const playModeLabelKeys: Record<PlayMode, string> = {
 
 const CURRENT_MUSIC_TRACK_KEY = 'music_current_track_id';
 const CURRENT_MUSIC_TRACK_META_KEY = 'music_current_track_meta';
+const CURRENT_MUSIC_PROGRESS_KEY = 'music_current_track_progress';
 const ACTIVE_MUSIC_VIEW_KEY = 'music_active_view';
 const MUSIC_LIBRARY_LAYOUT_KEY = 'music_library_layout';
 const MUSIC_PRO_DIALOG_STATE_KEY = 'music_pro_dialog_state';
@@ -223,6 +228,22 @@ const getStoredCurrentTrack = (): MusicTrack | null => {
   }
 };
 
+const getStoredPlaybackProgress = (): StoredPlaybackProgress | null => {
+  try {
+    const value = window.localStorage.getItem(CURRENT_MUSIC_PROGRESS_KEY);
+    if (!value) return null;
+    const progress = JSON.parse(value) as Partial<StoredPlaybackProgress>;
+    if (typeof progress.trackId !== 'string' || !progress.trackId) return null;
+    if (typeof progress.elapsed !== 'number' || !Number.isFinite(progress.elapsed)) return null;
+    return {
+      trackId: progress.trackId,
+      elapsed: Math.max(0, progress.elapsed),
+    };
+  } catch {
+    return null;
+  }
+};
+
 const mergeMusicTrack = (existing: MusicTrack | undefined, incoming: MusicTrack) => {
   if (!existing) return incoming;
   if (!existing.detailsLoaded) return { ...existing, ...incoming };
@@ -293,6 +314,7 @@ function Music() {
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const authInitialized = useSelector((state: RootState) => state.auth.initialized);
   const [storedProDialog] = useState(getStoredProDialogState);
+  const [storedPlaybackProgress] = useState(getStoredPlaybackProgress);
   const [activeView, setActiveView] = useState<View>(getStoredMusicView);
   const [collectionUserId, setCollectionUserId] = useState('');
   const [libraryLayout, setLibraryLayout] = useState<LibraryLayout>(getStoredLibraryLayout);
@@ -430,8 +452,12 @@ function Music() {
   const progressRef = useRef<HTMLInputElement>(null);
   const progressFillRef = useRef<HTMLDivElement>(null);
   const elapsedLabelRef = useRef<HTMLSpanElement>(null);
-  const elapsedRef = useRef(0);
-  const renderedSecondRef = useRef(0);
+  const initialElapsed = storedPlaybackProgress?.trackId === currentTrack.id
+    ? storedPlaybackProgress.elapsed
+    : 0;
+  const elapsedRef = useRef(initialElapsed);
+  const renderedSecondRef = useRef(Math.floor(initialElapsed));
+  const storedPlaybackProgressRef = useRef(storedPlaybackProgress);
   const addMusicInputRef = useRef<HTMLInputElement>(null);
   const tracksRef = useRef<MusicTrack[]>([]);
   const featuredTrackIdRef = useRef('');
@@ -534,13 +560,33 @@ function Music() {
     if (progressFillRef.current) progressFillRef.current.style.width = `${progress}%`;
   }, []);
 
-  const resetProgress = useCallback(() => {
-    elapsedRef.current = 0;
-    renderedSecondRef.current = 0;
-    if (progressRef.current) progressRef.current.value = '0';
-    if (elapsedLabelRef.current) elapsedLabelRef.current.textContent = formatTime(0);
-    syncProgressVisual(0, 1);
+  const setProgressPosition = useCallback((value: number, duration: number) => {
+    const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
+    const safeValue = Math.max(0, safeDuration > 0 ? Math.min(value, safeDuration) : value);
+    elapsedRef.current = safeValue;
+    renderedSecondRef.current = Math.floor(safeValue);
+    if (progressRef.current) progressRef.current.value = String(safeValue);
+    if (elapsedLabelRef.current) elapsedLabelRef.current.textContent = formatTime(safeValue);
+    syncProgressVisual(safeValue, safeDuration);
   }, [syncProgressVisual]);
+
+  const persistPlaybackProgress = useCallback((trackId: string, elapsed: number) => {
+    if (!trackId || !Number.isFinite(elapsed)) return;
+    const progress = {
+      trackId,
+      elapsed: Math.max(0, elapsed),
+    };
+    storedPlaybackProgressRef.current = progress;
+    try {
+      window.localStorage.setItem(CURRENT_MUSIC_PROGRESS_KEY, JSON.stringify(progress));
+    } catch {
+      // Playback remains available when storage is unavailable.
+    }
+  }, []);
+
+  const resetProgress = useCallback(() => {
+    setProgressPosition(0, 1);
+  }, [setProgressPosition]);
 
   const sectionTracks = pageTracks;
 
@@ -588,11 +634,16 @@ function Music() {
     if (!playableTrack.audioUrl) return;
     const index = tracksRef.current.findIndex((item) => item.id === track.id);
     if (index < 0) return;
+    const preservesProgress = playbackTrackId === track.id
+      || storedPlaybackProgressRef.current?.trackId === track.id;
     setCurrentIndex(index);
     setPlaybackTrackId(track.id);
-    resetProgress();
+    if (!preservesProgress) {
+      resetProgress();
+      persistPlaybackProgress(track.id, 0);
+    }
     setIsPlaying(true);
-  }, [loadTrackDetails, resetProgress]);
+  }, [loadTrackDetails, persistPlaybackProgress, playbackTrackId, resetProgress]);
 
   const goToTrack = useCallback((direction: 1 | -1) => {
     const visibleQueue = pageTracksRef.current;
@@ -1048,15 +1099,51 @@ function Music() {
       audio.removeAttribute('src');
       delete audio.dataset.trackId;
       audio.load();
-      resetProgress();
+      const storedProgress = storedPlaybackProgressRef.current;
+      if (storedProgress?.trackId === currentTrack.id) {
+        setProgressPosition(storedProgress.elapsed, currentTrack.duration);
+      } else {
+        resetProgress();
+      }
       return;
     }
     if (audio.dataset.trackId !== currentTrack.id) {
+      const storedProgress = storedPlaybackProgressRef.current;
+      const restoredElapsed = storedProgress?.trackId === currentTrack.id
+        ? storedProgress.elapsed
+        : 0;
       audio.dataset.trackId = currentTrack.id;
       audio.src = currentTrack.audioUrl;
-      resetProgress();
+      setProgressPosition(restoredElapsed, currentTrack.duration);
+
+      const restoreAudioPosition = () => {
+        if (audio.dataset.trackId !== currentTrack.id) return;
+        const mediaDuration = Number.isFinite(audio.duration) && audio.duration > 0
+          ? audio.duration
+          : currentTrack.duration;
+        const maxElapsed = mediaDuration > 0 ? Math.max(0, mediaDuration - 0.25) : restoredElapsed;
+        const nextElapsed = Math.min(restoredElapsed, maxElapsed);
+        audio.currentTime = nextElapsed;
+        setProgressPosition(nextElapsed, mediaDuration);
+        persistPlaybackProgress(currentTrack.id, nextElapsed);
+      };
+
+      audio.addEventListener('loadedmetadata', restoreAudioPosition);
+      audio.load();
+      if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
+        restoreAudioPosition();
+      }
+      return () => audio.removeEventListener('loadedmetadata', restoreAudioPosition);
     }
-  }, [currentTrack.audioUrl, currentTrack.id, playbackTrackId, resetProgress]);
+  }, [
+    currentTrack.audioUrl,
+    currentTrack.duration,
+    currentTrack.id,
+    persistPlaybackProgress,
+    playbackTrackId,
+    resetProgress,
+    setProgressPosition,
+  ]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -1106,17 +1193,41 @@ function Music() {
         renderedSecondRef.current = nextSecond;
         if (progressRef.current) progressRef.current.value = String(nextElapsed);
         if (elapsedLabelRef.current) elapsedLabelRef.current.textContent = formatTime(nextElapsed);
+        persistPlaybackProgress(currentTrack.id, nextElapsed);
       }
       frameId = window.requestAnimationFrame(updateProgress);
     };
 
     frameId = window.requestAnimationFrame(updateProgress);
     return () => window.cancelAnimationFrame(frameId);
-  }, [currentTrack.duration, currentTrack.id, isPlaying, playbackTrackId, syncProgressVisual]);
+  }, [
+    currentTrack.duration,
+    currentTrack.id,
+    isPlaying,
+    persistPlaybackProgress,
+    playbackTrackId,
+    syncProgressVisual,
+  ]);
 
   useEffect(() => {
     syncProgressVisual(elapsedRef.current, currentTrack.duration);
   }, [currentTrack.duration, currentTrack.id, syncProgressVisual]);
+
+  useEffect(() => {
+    const persistCurrentPosition = () => {
+      if (!currentTrack.id) return;
+      const audio = audioRef.current;
+      const elapsed = audio?.dataset.trackId === currentTrack.id
+        ? audio.currentTime
+        : elapsedRef.current;
+      persistPlaybackProgress(currentTrack.id, elapsed);
+    };
+    window.addEventListener('pagehide', persistCurrentPosition);
+    return () => {
+      persistCurrentPosition();
+      window.removeEventListener('pagehide', persistCurrentPosition);
+    };
+  }, [currentTrack.id, persistPlaybackProgress]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -1125,6 +1236,7 @@ function Music() {
       if (playMode === 'single') {
         audio.currentTime = 0;
         resetProgress();
+        persistPlaybackProgress(currentTrack.id, 0);
         void audio.play().catch((error) => {
           console.error('Audio repeat playback failed', error);
           setIsPlaying(false);
@@ -1135,7 +1247,7 @@ function Music() {
     };
     audio.addEventListener('ended', handleEnded);
     return () => audio.removeEventListener('ended', handleEnded);
-  }, [goToTrack, playMode, resetProgress]);
+  }, [currentTrack.id, goToTrack, persistPlaybackProgress, playMode, resetProgress]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1217,6 +1329,10 @@ function Music() {
       setPlaybackTrackId('');
       setIsPlaying(false);
       resetProgress();
+    }
+    if (storedPlaybackProgressRef.current?.trackId === trackId) {
+      storedPlaybackProgressRef.current = null;
+      window.localStorage.removeItem(CURRENT_MUSIC_PROGRESS_KEY);
     }
 
     detailRequestsRef.current.delete(trackId);
@@ -2257,10 +2373,8 @@ function Music() {
               onChange={(event) => {
                 const nextElapsed = Number(event.target.value);
                 if (audioRef.current) audioRef.current.currentTime = nextElapsed;
-                elapsedRef.current = nextElapsed;
-                renderedSecondRef.current = Math.floor(nextElapsed);
-                if (elapsedLabelRef.current) elapsedLabelRef.current.textContent = formatTime(nextElapsed);
-                syncProgressVisual(nextElapsed, currentTrack.duration);
+                setProgressPosition(nextElapsed, currentTrack.duration);
+                persistPlaybackProgress(currentTrack.id, nextElapsed);
               }}
               aria-label={t('music.trackProgress')}
             />
