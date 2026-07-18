@@ -1,8 +1,3 @@
-/chat /index.html 200
-/music /index.html 200
-/video /index.html 200
-/oauth/success /index.html 200
-
-# Do not enable this catch-all: missing JavaScript assets must return 404,
-# otherwise browsers reject the index.html fallback as an invalid JS MIME type.
-# /* /index.html 200
+# Cloudflare Pages automatically serves index.html for SPA routes when no
+# top-level 404.html exists. Explicit rewrites to /index.html are avoided
+# because Pages canonicalizes that target to / and changes the browser URL.
