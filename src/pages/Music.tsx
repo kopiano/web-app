@@ -280,8 +280,8 @@ const formatDateAdded = (value: string, locale: string) => {
 
 const hasActiveLibrarySubscription = (user: RootState['auth']['user']) => {
   if (!user) return false;
-  const paidPlan = user.plan?.toLowerCase() === 'pro' || user.plan?.toLowerCase() === 'plus';
-  const activeStatus = (user.subscription_status ?? '').toLowerCase() === 'active';
+  const paidPlan = user.plan?.trim().toLowerCase() === 'pro';
+  const activeStatus = (user.subscription_status ?? '').trim().toLowerCase() === 'active';
   const endTimestamp = user.subscription_end_at
     ? Date.parse(user.subscription_end_at)
     : Number.POSITIVE_INFINITY;

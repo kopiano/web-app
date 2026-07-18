@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/context/ThemeContext';
 import AuthModal from '@/components/ui/AuthModal';
 import nav_logo from '@/assets/images/z-logo.png';
+import avatarFrame from '@/assets/images/avatar-frame.webp';
 import '@/styles/header.scss';
 import '@/styles/header-extras.scss';
 import { useSelector } from 'react-redux';
@@ -104,9 +105,10 @@ export default function Header() {
   const subscriptionEnd = currentUser?.subscription_end_at
     ? Date.parse(currentUser.subscription_end_at)
     : null;
-  const isPro = ['pro', 'plus'].includes(currentUser?.plan?.trim().toLowerCase() || '')
+  const isPro = currentUser?.plan?.trim().toLowerCase() === 'pro'
     && currentUser?.subscription_status?.trim().toLowerCase() === 'active'
     && (subscriptionEnd === null || (Number.isFinite(subscriptionEnd) && subscriptionEnd > notificationNow));
+  const hasProAvatarFrame = isPro;
 
   const handleProfile = () => {
     if (isExternalAccount) return;
@@ -240,23 +242,28 @@ export default function Header() {
 
           {/* User Profile Pill */}
           <button ref={avatarRef} className="user-pill" onClick={() => setProfileOpen(o => !o)}>
-            <div className="user-avatar-box">
-              {currentUser?.avatar || currentUser?.github_id ? (
+            <div className={`user-avatar-shell${hasProAvatarFrame ? ' has-pro-frame' : ''}`}>
+              <div className="user-avatar-box">
+                {currentUser?.avatar || currentUser?.github_id ? (
+                  <img
+                    src={resolveAvatarUrl(currentUser.avatar) || `https://avatars.githubusercontent.com/u/${currentUser.github_id}?v=4`}
+                    alt=""
+                    className="user-avatar-initials"
+                  />
+                ) : (
+                  <span className="user-avatar-initials">{initials}</span>
+                )}
+              </div>
+              {hasProAvatarFrame && (
                 <img
-                  src={resolveAvatarUrl(currentUser.avatar) || `https://avatars.githubusercontent.com/u/${currentUser.github_id}?v=4`}
+                  src={avatarFrame}
                   alt=""
-                  className="user-avatar-initials"
+                  className="user-avatar-frame"
+                  aria-hidden="true"
                 />
-              ) : (
-                <span className="user-avatar-initials">{initials}</span>
               )}
             </div>
             <span className="user-pill-name">{currentUser?.name || t('header.guest')}</span>
-            {isPro && (
-              <span className="user-pro-badge" aria-label="Pro account" title="Pro">
-                PRO
-              </span>
-            )}
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="user-pill-chevron"
               style={{ opacity: 0, transition: 'transform 0.3s ease', transform: profileOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
               <polyline points="6 9 12 15 18 9" />
