@@ -5,4 +5,5 @@ export function createProCheckout(
   paymentMethod?: ProPaymentMethod,
   contactEmail?: string,
   currency?: 'CNY' | 'USD',
-): Promise<string>;
+  billingCycle?: 'monthly' | 'yearly',
+): Promise<{ orderNo: string; status: string }>;

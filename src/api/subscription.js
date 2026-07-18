@@ -5,17 +5,25 @@ export function createProCheckout(
   paymentMethod = 'wechat_pay',
   contactEmail = '',
   currency = 'CNY',
+  billingCycle = 'monthly',
 ) {
   return request.post('/subscription/pro/checkout', {
     return_to: returnTo,
     payment_method: paymentMethod,
     contact_email: contactEmail,
     currency,
+    billing_cycle: billingCycle,
   }).then(response => {
-    const checkoutUrl = response.data?.checkout_url
-    if (typeof checkoutUrl !== 'string' || !checkoutUrl.trim()) {
+    const orderNo = response.data?.order_no
+    const status = response.data?.status
+    if (
+      typeof orderNo !== 'string'
+      || !orderNo.trim()
+      || typeof status !== 'string'
+      || !status.trim()
+    ) {
       throw new Error('Invalid checkout response')
     }
-    return checkoutUrl
+    return { orderNo, status }
   })
 }

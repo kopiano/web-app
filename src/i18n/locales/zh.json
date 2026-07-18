@@ -190,6 +190,7 @@
     "backToProOverview": "返回 Pro 介绍",
     "subscriptionRefreshing": "正在确认你的 Pro 订阅...",
     "subscriptionPending": "支付已完成，但订阅状态仍在同步中。",
+    "paymentRequestCreated": "支付申请 {{orderNo}} 已通知管理员，确认到账后将开通 Pro 权限。",
     "checkSubscriptionAgain": "重新检查",
     "durationHours": "{{count}} 小时",
     "durationMinutes": "{{count}} 分钟",

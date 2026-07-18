@@ -190,6 +190,7 @@
     "backToProOverview": "Back to Pro overview",
     "subscriptionRefreshing": "Confirming your Pro subscription...",
     "subscriptionPending": "Payment is complete, but the subscription update is still pending.",
+    "paymentRequestCreated": "Payment request {{orderNo}} was sent to the administrator for confirmation.",
     "checkSubscriptionAgain": "Check again",
     "durationHours": "{{count}} hr",
     "durationMinutes": "{{count}} min",

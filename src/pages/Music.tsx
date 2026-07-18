@@ -36,8 +36,8 @@ import { useTranslation } from 'react-i18next';
 import QRCode from 'qrcode';
 import bg0 from '@/assets/images/bg-0.webp';
 import playlistDiscArt from '@/assets/images/bg-8.webp';
-import cnyCurrencyIcon from '@/assets/images/CNY.svg';
-import usdCurrencyIcon from '@/assets/images/USD.svg';
+import cnyCurrencyIcon from '@/assets/pay/CNY.svg';
+import usdCurrencyIcon from '@/assets/pay/USD.svg';
 import wechatPayMonthlyQr from '@/assets/pay/WechatPay_month.webp';
 import alipayMonthlyQr from '@/assets/pay/Alipay_month.webp';
 import unionPayMonthlyQr from '@/assets/pay/UnionPay_month.webp';
@@ -493,13 +493,14 @@ function Music() {
         paymentMethod,
         normalizedEmail,
         paymentCurrency,
+        billingCycle,
       );
       const methodColors: Record<PaymentMethod, string> = {
         wechat_pay: '#55a947',
         alipay: '#1677ff',
         union_pay: '#d9272e',
       };
-      const qrDataUrl = await QRCode.toDataURL(checkoutUrl, {
+      const qrDataUrl = await QRCode.toDataURL(checkoutUrl.orderNo, {
         width: 360,
         margin: 2,
         errorCorrectionLevel: 'M',
@@ -510,6 +511,12 @@ function Music() {
       });
       setDisplayedPaymentMethod(paymentMethod);
       setPaymentQrUrl(qrDataUrl);
+      window.dispatchEvent(new CustomEvent('app:notification', {
+        detail: {
+          message: t('music.paymentRequestCreated', { orderNo: checkoutUrl.orderNo }),
+          type: 'success',
+        },
+      }));
     } catch (error: any) {
       const message = error?.response?.data?.message;
       setUpgradeError(
@@ -520,7 +527,7 @@ function Music() {
     } finally {
       setIsStartingCheckout(false);
     }
-  }, [isStartingCheckout, paymentCurrency, paymentEmail, paymentMethod, t]);
+  }, [billingCycle, isStartingCheckout, paymentCurrency, paymentEmail, paymentMethod, t]);
 
   const syncProgressVisual = useCallback((value: number, duration: number) => {
     const progress = duration > 0 ? Math.min((value / duration) * 100, 100) : 0;
