@@ -246,6 +246,10 @@
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+.user-avatar-shell.has-pro-frame {
+  filter: drop-shadow(0 10px 20px rgba(50, 50, 50, 0.877));
+}
+
 .user-avatar-box {
   width: 30px;
   height: 30px;
