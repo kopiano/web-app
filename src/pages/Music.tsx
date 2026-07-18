@@ -2208,7 +2208,7 @@ function Music() {
         )}
       </div>
 
-      {isMusicLoaded && tracks.length > 0 && (
+      {tracks.length > 0 && (
         <div className="music-player" aria-label={t('music.player')}>
         <div className="music-now-playing">
           <div className={`music-cover-disc${isPlaying ? ' is-spinning' : ''}`}>
