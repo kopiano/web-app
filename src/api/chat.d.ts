@@ -63,7 +63,29 @@ export interface MessageHistoryQuery {
   limit?: number;
 }
 
+export interface CreateGroupInput {
+  name: string;
+  member_ids: string[];
+  avatar: string;
+}
+
+export interface CreateGroupResult {
+  group_id: string;
+  name: string;
+  avatar?: string | null;
+  member_count: number;
+}
+
+export interface AddGroupMembersResult {
+  added_count: number;
+}
+
 export function getMessageUserInfo(): Promise<ChatApiContact[]>;
 export function sendMessage(input: SendMessageInput): Promise<ChatApiMessage>;
 export function sendImageMessage(input: SendImageMessageInput): Promise<ChatApiMessage>;
 export function getMessageHistory(query: MessageHistoryQuery): Promise<ChatApiMessage[]>;
+export function createGroup(input: CreateGroupInput): Promise<CreateGroupResult>;
+export function addGroupMembers(
+  groupId: string,
+  memberIds: string[],
+): Promise<AddGroupMembersResult>;

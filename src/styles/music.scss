@@ -27,6 +27,9 @@
   gap: clamp(3rem, 5vw, 7rem);
   overflow: hidden;
   isolation: isolate;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 
 .music-page::before {

@@ -3,9 +3,25 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Maximize2, X } from 'lucide-react';
-import { resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar';
-import { getMessageHistory, sendImageMessage, sendMessage } from '@/api/chat';
+import {
+  ArrowRight,
+  Camera,
+  Check,
+  Maximize2,
+  Plus,
+  Search,
+  Share2,
+  Users,
+  X,
+} from 'lucide-react';
+import { defaultAvatarDataUrl, resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar';
+import {
+  addGroupMembers,
+  createGroup,
+  getMessageHistory,
+  sendImageMessage,
+  sendMessage,
+} from '@/api/chat';
 import {
   createMoment,
   createMomentComment,
@@ -19,6 +35,7 @@ import {
 import HlsVideo from '@/components/HlsVideo';
 import type {
   ChatApiMessage,
+  ChatApiMember,
   ChatMessageEvent,
   SendImageMessageInput,
   SendMessageInput,
@@ -37,7 +54,7 @@ interface Contact {
   lastMsg: string;
   time: string;
   online?: boolean;
-  members?: unknown[];
+  members?: ChatApiMember[];
 }
 
 interface Message {
@@ -98,10 +115,53 @@ const EMOJIS = [
 
 const ACTIVE_CONTACT_KEY = 'chat_active_contact';
 const ACTIVE_TAB_KEY = 'chat_tab';
+const SHARE_GROUP_DRAFT_KEY = 'chat_group_share_draft';
+const CREATE_GROUP_DRAFT_KEY = 'chat_create_group_draft';
 const WEBSOCKET_HEARTBEAT_INTERVAL_MS = 25_000;
 const CONTACT_PRESENCE_REFRESH_INTERVAL_MS = 30_000;
 const MOMENT_IMPRESSION_DELAY_MS = 1_000;
 const MOMENT_IMPRESSION_VISIBILITY_RATIO = 0.6;
+const MAX_VISIBLE_GROUP_AVATARS = 20;
+const MAX_GROUP_AVATAR_BYTES = 5 * 1024 * 1024;
+
+interface ShareCandidate {
+  userId: string;
+  username: string;
+  avatar: string;
+  online: boolean;
+}
+
+interface ShareGroupDraft {
+  open?: boolean;
+  memberIds: string[];
+}
+
+interface CreateGroupDraft {
+  open?: boolean;
+  step: 1 | 2;
+  search: string;
+  memberIds: string[];
+  name: string;
+  avatar: string;
+}
+
+function readLocalDraft<T>(key: string): T | null {
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) as T : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDraft(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 interface MomentImpressionProps {
   enabled: boolean;
@@ -193,8 +253,25 @@ function MomentImpression({
   );
 }
 
-function landscapeAvatar(seed: number) {
-  return `https://picsum.photos/seed/${seed}/100/100`;
+function fallbackAvatar(name: string) {
+  return defaultAvatarDataUrl(name);
+}
+
+async function groupAvatarFileToDataUrl(file: File) {
+  if (!file.type.startsWith('image/') || file.size > MAX_GROUP_AVATAR_BYTES) {
+    throw new Error('invalid-avatar');
+  }
+
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => (
+      typeof reader.result === 'string'
+        ? resolve(reader.result)
+        : reject(new Error('invalid-avatar'))
+    );
+    reader.onerror = () => reject(new Error('invalid-avatar'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function messageWebSocketUrl() {
@@ -285,11 +362,23 @@ function isChatMessageEvent(value: unknown): value is ChatMessageEvent {
 
 /* ── Mock Data ── */
 const contacts: Contact[] = [
-  { id: 'mock:group:1', name: 'Project Team', type: 'group', avatar: landscapeAvatar(101), lastMsg: 'See you tomorrow', time: '11:30' },
-  { id: 'mock:user:2', name: 'Alice', type: 'user', avatar: landscapeAvatar(202), lastMsg: 'Got it', time: '10:15', online: true },
-  { id: 'mock:user:3', name: 'Bob', type: 'user', avatar: landscapeAvatar(303), lastMsg: 'I fixed the code last night', time: 'Yesterday', online: false },
-  { id: 'mock:user:4', name: 'Catherine', type: 'user', avatar: landscapeAvatar(404), lastMsg: 'Photo', time: 'Yesterday', online: true },
-  { id: 'mock:user:5', name: 'David', type: 'user', avatar: landscapeAvatar(505), lastMsg: 'Sure', time: 'Monday', online: false },
+  {
+    id: 'mock:group:1',
+    name: 'Project Team',
+    type: 'group',
+    avatar: fallbackAvatar('Project Team'),
+    lastMsg: 'See you tomorrow',
+    time: '11:30',
+    members: [
+      { user_id: 'mock:user:2', username: 'Alice', avatar: fallbackAvatar('Alice'), online: true },
+      { user_id: 'mock:user:3', username: 'Bob', avatar: fallbackAvatar('Bob'), online: false },
+      { user_id: 'mock:user:4', username: 'Catherine', avatar: fallbackAvatar('Catherine'), online: true },
+    ],
+  },
+  { id: 'mock:user:2', name: 'Alice', type: 'user', avatar: fallbackAvatar('Alice'), lastMsg: 'Got it', time: '10:15', online: true },
+  { id: 'mock:user:3', name: 'Bob', type: 'user', avatar: fallbackAvatar('Bob'), lastMsg: 'I fixed the code last night', time: 'Yesterday', online: false },
+  { id: 'mock:user:4', name: 'Catherine', type: 'user', avatar: fallbackAvatar('Catherine'), lastMsg: 'Photo', time: 'Yesterday', online: true },
+  { id: 'mock:user:5', name: 'David', type: 'user', avatar: fallbackAvatar('David'), lastMsg: 'Sure', time: 'Monday', online: false },
 ];
 
 const mockMessages: Record<string, Message[]> = {
@@ -333,9 +422,8 @@ function momentTimeLabel(value: string, language: string, t: TFunction) {
   });
 }
 
-function momentFallbackAvatar(seed: string) {
-  const value = Array.from(seed).reduce((total, character) => total + character.charCodeAt(0), 0);
-  return landscapeAvatar(value || 1);
+function momentFallbackAvatar(name: string) {
+  return fallbackAvatar(name);
 }
 
 function formatUploadBytes(bytes: number) {
@@ -370,7 +458,7 @@ function toMomentPost(item: MomentApiItem): MomentPost {
     id: item.id,
     authorId: item.user_id,
     name: item.username,
-    avatar: resolveAvatarUrl(item.avatar) || momentFallbackAvatar(item.user_id),
+    avatar: resolveAvatarUrl(item.avatar) || momentFallbackAvatar(item.username),
     text: item.content || '',
     media: media ? resolveAssetUrl(media.url) : undefined,
     mediaType: media?.type,
@@ -433,11 +521,22 @@ function Chat() {
   const currentUserAvatar = resolveAvatarUrl(currentUser?.avatar)
     || (currentUser?.github_id
       ? `https://avatars.githubusercontent.com/u/${currentUser.github_id}?v=4`
-      : landscapeAvatar(0));
+      : fallbackAvatar(currentUserName));
   const [activeTab, setActiveTab] = useState<'chat' | 'moments'>(() => {
     return localStorage.getItem(ACTIVE_TAB_KEY) === 'moments' ? 'moments' : 'chat';
   });
   const [activeContact, setActiveContact] = useState('mock:group:1');
+  const [isMemberShareOpen, setIsMemberShareOpen] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+  const [sharingMembers, setSharingMembers] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [createGroupStep, setCreateGroupStep] = useState<1 | 2>(1);
+  const [groupSearch, setGroupSearch] = useState('');
+  const [createMemberIds, setCreateMemberIds] = useState<Set<string>>(new Set());
+  const [groupName, setGroupName] = useState('');
+  const [groupAvatar, setGroupAvatar] = useState('');
+  const [groupCreating, setGroupCreating] = useState(false);
+  const [groupCreateError, setGroupCreateError] = useState('');
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<Record<string, Message[]>>(mockMessages);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -473,6 +572,7 @@ function Chat() {
   const momentImageRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const groupAvatarInputRef = useRef<HTMLInputElement>(null);
   const msgListRef = useRef<HTMLDivElement>(null);
   const msgEndRef = useRef<HTMLDivElement>(null);
   const lastScrolledConversationRef = useRef('');
@@ -491,6 +591,7 @@ function Chat() {
   const commentInputRefs = useRef(new Map<string, HTMLInputElement>());
   const processingFailureNotifiedRef = useRef(new Set<string>());
   const processingCompletionTimersRef = useRef(new Map<string, number>());
+  const restoredGroupDialogDraftsRef = useRef(new Set<string>());
   const momentLikeRequestsRef = useRef(new Set<string>());
   const momentCommentRequestsRef = useRef(new Set<string>());
   const visibleContacts = useMemo<Contact[]>(
@@ -502,6 +603,69 @@ function Chat() {
     [activeContact, visibleContacts],
   );
   const activeConversationId = activeContactInfo?.id || '';
+  const activeGroupMembers = useMemo(
+    () => activeContactInfo?.type === 'group' ? activeContactInfo.members || [] : [],
+    [activeContactInfo],
+  );
+  const existingGroupMemberIds = useMemo(
+    () => new Set(activeGroupMembers.map(member => member.user_id)),
+    [activeGroupMembers],
+  );
+  const shareCandidates = useMemo<ShareCandidate[]>(() => {
+    const candidates = new Map<string, ShareCandidate>();
+
+    visibleContacts
+      .filter(contact => contact.type === 'user')
+      .forEach(contact => {
+        candidates.set(contact.id.replace(/^user:/, ''), {
+          userId: contact.id.replace(/^user:/, ''),
+          username: contact.name,
+          avatar: contact.avatar,
+          online: Boolean(contact.online),
+        });
+      });
+
+    activeGroupMembers.forEach(member => {
+      candidates.set(member.user_id, {
+        userId: member.user_id,
+        username: member.username,
+        avatar: resolveAvatarUrl(member.avatar) || fallbackAvatar(member.username),
+        online: member.online,
+      });
+    });
+
+    return Array.from(candidates.values()).sort((a, b) => {
+      const memberOrder = Number(existingGroupMemberIds.has(b.userId))
+        - Number(existingGroupMemberIds.has(a.userId));
+      return memberOrder || a.username.localeCompare(b.username);
+    });
+  }, [activeGroupMembers, existingGroupMemberIds, visibleContacts]);
+  const createGroupCandidates = useMemo<ShareCandidate[]>(
+    () => visibleContacts
+      .filter(contact => (
+        contact.type === 'user'
+        && contact.id.replace(/^user:/, '') !== currentUser?.id
+      ))
+      .map(contact => ({
+        userId: contact.id.replace(/^user:/, ''),
+        username: contact.name,
+        avatar: contact.avatar,
+        online: Boolean(contact.online),
+      }))
+      .sort((a, b) => a.username.localeCompare(b.username)),
+    [currentUser?.id, visibleContacts],
+  );
+  const selectedCreateMembers = useMemo(
+    () => createGroupCandidates.filter(candidate => createMemberIds.has(candidate.userId)),
+    [createGroupCandidates, createMemberIds],
+  );
+  const filteredCreateGroupCandidates = useMemo(() => {
+    const search = groupSearch.trim().toLocaleLowerCase();
+    if (!search) return createGroupCandidates;
+    return createGroupCandidates.filter(candidate => (
+      candidate.username.toLocaleLowerCase().includes(search)
+    ));
+  }, [createGroupCandidates, groupSearch]);
   const isConversationLoading = Boolean(
     currentUser
       && !activeContactInfo
@@ -631,6 +795,24 @@ function Chat() {
     document.addEventListener('keydown', closeMomentOverlays);
     return () => document.removeEventListener('keydown', closeMomentOverlays);
   }, [openMomentMenuId, deleteMomentId, deletingMomentId, previewMomentImage]);
+
+  useEffect(() => {
+    if (!isMemberShareOpen && !isCreateGroupOpen) return;
+
+    const closeGroupDialogs = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || sharingMembers || groupCreating) return;
+      if (isMemberShareOpen) closeMemberShareDialog();
+      if (isCreateGroupOpen) closeCreateGroupDialog();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', closeGroupDialogs);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', closeGroupDialogs);
+    };
+  }, [groupCreating, isCreateGroupOpen, isMemberShareOpen, sharingMembers]);
 
   useEffect(() => {
     if (previewMomentImage === null) return;
@@ -1027,6 +1209,225 @@ function Chat() {
       localStorage.setItem(`${ACTIVE_CONTACT_KEY}:${currentUser.id}`, contactId);
     }
   }
+
+  function shareDraftKey() {
+    if (!currentUser || activeContactInfo?.type !== 'group') return '';
+    return `${SHARE_GROUP_DRAFT_KEY}:${currentUser.id}:${activeContactInfo.id.replace(/^group:/, '')}`;
+  }
+
+  function createGroupDraftKey() {
+    return currentUser ? `${CREATE_GROUP_DRAFT_KEY}:${currentUser.id}` : '';
+  }
+
+  function openMemberShareDialog() {
+    const key = shareDraftKey();
+    const draft = key ? readLocalDraft<ShareGroupDraft>(key) : null;
+    const candidateIds = new Set(shareCandidates.map(candidate => candidate.userId));
+    setSelectedMemberIds(new Set(
+      (draft?.memberIds || []).filter(memberId => (
+        candidateIds.has(memberId) && !existingGroupMemberIds.has(memberId)
+      )),
+    ));
+    setIsMemberShareOpen(true);
+  }
+
+  function persistMemberShareDraft(open: boolean) {
+    const key = shareDraftKey();
+    if (!key) return;
+    writeLocalDraft(key, {
+      open,
+      memberIds: Array.from(selectedMemberIds),
+    } satisfies ShareGroupDraft);
+  }
+
+  function closeMemberShareDialog() {
+    if (sharingMembers) return;
+    const key = shareDraftKey();
+    if (key) localStorage.removeItem(key);
+    setIsMemberShareOpen(false);
+    setSelectedMemberIds(new Set());
+  }
+
+  function openCreateGroupDialog() {
+    const key = createGroupDraftKey();
+    const draft = key ? readLocalDraft<CreateGroupDraft>(key) : null;
+    const candidateIds = new Set(createGroupCandidates.map(candidate => candidate.userId));
+    const memberIds = (draft?.memberIds || []).filter(memberId => candidateIds.has(memberId));
+    setCreateGroupStep(draft?.step === 2 && memberIds.length > 0 ? 2 : 1);
+    setGroupSearch(draft?.search || '');
+    setCreateMemberIds(new Set(memberIds));
+    setGroupName(draft?.name || '');
+    setGroupAvatar(draft?.avatar || '');
+    setGroupCreateError('');
+    setIsCreateGroupOpen(true);
+  }
+
+  function persistCreateGroupDraft(open: boolean) {
+    const key = createGroupDraftKey();
+    if (!key) return;
+    const draft = {
+      open,
+      step: createGroupStep,
+      search: groupSearch,
+      memberIds: Array.from(createMemberIds),
+      name: groupName,
+      avatar: groupAvatar,
+    } satisfies CreateGroupDraft;
+    if (!writeLocalDraft(key, draft) && groupAvatar) {
+      writeLocalDraft(key, { ...draft, avatar: '' });
+    }
+  }
+
+  function closeCreateGroupDialog() {
+    if (groupCreating) return;
+    const key = createGroupDraftKey();
+    if (key) localStorage.removeItem(key);
+    setIsCreateGroupOpen(false);
+    setCreateGroupStep(1);
+    setGroupSearch('');
+    setCreateMemberIds(new Set());
+    setGroupName('');
+    setGroupAvatar('');
+    setGroupCreateError('');
+  }
+
+  function toggleCreateGroupMember(userId: string) {
+    setCreateMemberIds(current => {
+      const next = new Set(current);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+    setGroupCreateError('');
+  }
+
+  async function handleGroupAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setGroupAvatar(await groupAvatarFileToDataUrl(file));
+      setGroupCreateError('');
+    } catch {
+      setGroupCreateError(t('chat.invalidGroupAvatar'));
+    } finally {
+      event.target.value = '';
+    }
+  }
+
+  async function handleCreateGroup() {
+    const trimmedName = groupName.trim();
+    if (!trimmedName) {
+      setGroupCreateError(t('chat.groupNameRequired'));
+      return;
+    }
+    if (!groupAvatar) {
+      setGroupCreateError(t('chat.groupAvatarRequired'));
+      return;
+    }
+    if (createMemberIds.size === 0) {
+      setGroupCreateError(t('chat.selectGroupMembers'));
+      setCreateGroupStep(1);
+      return;
+    }
+
+    setGroupCreating(true);
+    setGroupCreateError('');
+    try {
+      const result = await createGroup({
+        name: trimmedName,
+        member_ids: Array.from(createMemberIds),
+        avatar: groupAvatar,
+      });
+      await dispatch(refreshContacts()).unwrap();
+      const contactId = `group:${result.group_id}`;
+      selectContact(contactId);
+      setIsCreateGroupOpen(false);
+      const draftKey = createGroupDraftKey();
+      if (draftKey) localStorage.removeItem(draftKey);
+      notify(t('chat.groupCreated'), 'success');
+    } catch {
+      setGroupCreateError(t('chat.createGroupFailed'));
+    } finally {
+      setGroupCreating(false);
+    }
+  }
+
+  async function handleAddGroupMembers() {
+    if (activeContactInfo?.type !== 'group') return;
+    const memberIds = Array.from(selectedMemberIds)
+      .filter(memberId => !existingGroupMemberIds.has(memberId));
+    if (memberIds.length === 0) return;
+
+    setSharingMembers(true);
+    try {
+      const result = await addGroupMembers(
+        activeContactInfo.id.replace(/^group:/, ''),
+        memberIds,
+      );
+      await dispatch(refreshContacts()).unwrap();
+      setIsMemberShareOpen(false);
+      setSelectedMemberIds(new Set());
+      const draftKey = shareDraftKey();
+      if (draftKey) localStorage.removeItem(draftKey);
+      notify(t('chat.membersAdded', { count: result.added_count }), 'success');
+    } catch {
+      notify(t('chat.addMembersFailed'), 'error');
+    } finally {
+      setSharingMembers(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!isMemberShareOpen) return;
+    persistMemberShareDraft(true);
+  }, [
+    activeContactInfo?.id,
+    activeContactInfo?.type,
+    currentUser?.id,
+    isMemberShareOpen,
+    selectedMemberIds,
+  ]);
+
+  useEffect(() => {
+    if (!isCreateGroupOpen) return;
+    persistCreateGroupDraft(true);
+  }, [
+    createGroupStep,
+    createMemberIds,
+    currentUser?.id,
+    groupAvatar,
+    groupName,
+    groupSearch,
+    isCreateGroupOpen,
+  ]);
+
+  useEffect(() => {
+    if (!currentUser || !contactsInitialized || contactsLoading) return;
+
+    const createKey = createGroupDraftKey();
+    if (createKey && !restoredGroupDialogDraftsRef.current.has(createKey)) {
+      restoredGroupDialogDraftsRef.current.add(createKey);
+      const draft = readLocalDraft<CreateGroupDraft>(createKey);
+      if (draft?.open) {
+        openCreateGroupDialog();
+        return;
+      }
+    }
+
+    const memberShareKey = shareDraftKey();
+    if (memberShareKey && !restoredGroupDialogDraftsRef.current.has(memberShareKey)) {
+      restoredGroupDialogDraftsRef.current.add(memberShareKey);
+      const draft = readLocalDraft<ShareGroupDraft>(memberShareKey);
+      if (draft?.open) openMemberShareDialog();
+    }
+  }, [
+    activeContactInfo?.id,
+    activeContactInfo?.type,
+    contactsInitialized,
+    contactsLoading,
+    currentUser?.id,
+  ]);
 
   useLayoutEffect(() => {
     const conversationChanged = lastScrolledConversationRef.current !== activeConversationId;
@@ -1508,7 +1909,20 @@ function Chat() {
           <div className="chat-panel">
             <aside ref={contactsPanelRef} className="contacts-panel">
               <div className="contact-active-indicator" style={{ top: activeIndicatorTop }} />
-              <div className="contact-group-label">{t('chat.groups')}</div>
+              <div className="contact-group-heading">
+                <div className="contact-group-label">{t('chat.groups')}</div>
+                {currentUser && (
+                  <button
+                    type="button"
+                    className="create-group-trigger"
+                    aria-label={t('chat.createGroup')}
+                    // title={t('chat.createGroup')}
+                    onClick={openCreateGroupDialog}
+                  >
+                    <Plus size={16} strokeWidth={2.2} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
               {visibleContacts.filter(c => c.type === 'group').map(c => (
                 <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => selectContact(c.id)}>
                   <div className="contact-avatar">
@@ -1585,6 +1999,41 @@ function Chat() {
                             : t('chat.offline')}
                       </div>
                     </div>
+                    {activeContactInfo.type === 'group' && (
+                      <div className="group-members-toolbar">
+                        <div
+                          className="group-member-stack"
+                          aria-label={t('chat.groupMemberAvatars', { count: activeGroupMembers.length })}
+                        >
+                          {activeGroupMembers.slice(0, MAX_VISIBLE_GROUP_AVATARS).map(member => (
+                            <span
+                              key={member.user_id}
+                              className="group-member-avatar"
+                              // title={member.username}
+                            >
+                              <img
+                                src={resolveAvatarUrl(member.avatar) || fallbackAvatar(member.username)}
+                                alt={member.username}
+                              />
+                              {member.online && <span className="group-member-online" aria-hidden="true" />}
+                            </span>
+                          ))}
+                          {activeGroupMembers.length > MAX_VISIBLE_GROUP_AVATARS && (
+                            <span className="group-member-overflow">
+                              {activeGroupMembers.length - MAX_VISIBLE_GROUP_AVATARS}+
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          className="group-share-button"
+                          aria-label={t('chat.shareGroup')}
+                          onClick={openMemberShareDialog}
+                        >
+                          <Share2 size={16} strokeWidth={2.2} aria-hidden="true" />
+                        </button>
+                      </div>
+                    )}
                   </>
                 ) : (
                   isConversationLoading ? (
@@ -1625,7 +2074,9 @@ function Chat() {
                       <div className="msg-sender">
                         <div className="msg-avatar">
                           <img
-                            src={msg.from === 'me' ? currentUserAvatar : activeContactInfo?.avatar || landscapeAvatar(0)}
+                            src={msg.from === 'me'
+                              ? currentUserAvatar
+                              : activeContactInfo?.avatar || fallbackAvatar(activeContactInfo?.name || '')}
                             alt=""
                             className="avatar-img"
                           />
@@ -1912,7 +2363,7 @@ function Chat() {
                   disabled={!currentUser || momentPublishing || (!momentText.trim() && !momentFile)}
                   onClick={handleMomentPublish}
                   aria-label={currentUser ? t('chat.post') : t('chat.signInToPost')}
-                  title={currentUser ? undefined : t('chat.signInToPost')}
+                  // title={currentUser ? undefined : t('chat.signInToPost')}
                 >
                   {momentPublishing && <span className="moment-submit-spinner" aria-hidden="true" />}
                   {momentPublishing ? t('chat.posting') : t('chat.post')}
@@ -2185,7 +2636,7 @@ function Chat() {
                         onClick={() => toggleLike(post.id)}
                         aria-disabled={!currentUser}
                         aria-label={t('chat.likeMoment')}
-                        title={currentUser ? undefined : t('chat.signInRequired')}
+                        // title={currentUser ? undefined : t('chat.signInRequired')}
                       >
                         <span className={`heart-icon${post.liked ? ' liked' : ''}`}>
                           <svg width="20" height="20" viewBox="0 0 24 24" fill={post.liked ? '#f91880' : 'none'} stroke={post.liked ? '#f91880' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2233,7 +2684,7 @@ function Chat() {
                         onClick={() => toggleCommentInput(post.id)}
                         aria-disabled={!currentUser}
                         aria-label={t('chat.commentOnMoment')}
-                        title={currentUser ? undefined : t('chat.signInRequired')}
+                        // title={currentUser ? undefined : t('chat.signInRequired')}
                       >
                         <span className="action-svg">
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2376,6 +2827,315 @@ function Chat() {
             >
               <X size={22} strokeWidth={2} />
             </button>
+          </div>
+        </div>
+      )}
+      {isMemberShareOpen && activeContactInfo?.type === 'group' && (
+        <div className="group-share-overlay" role="presentation">
+          <button
+            type="button"
+            className="group-share-backdrop"
+            aria-label={t('chat.closeShareDialog')}
+            onClick={closeMemberShareDialog}
+          />
+          <div
+            className="group-share-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="group-share-title"
+            aria-describedby="group-share-description"
+          >
+            <button
+              type="button"
+              className="group-share-close"
+              aria-label={t('chat.closeShareDialog')}
+              onClick={closeMemberShareDialog}
+            >
+              <X size={17} aria-hidden="true" />
+            </button>
+            <div className="group-share-heading">
+              <span className="group-share-icon" aria-hidden="true">
+                <Share2 size={24} strokeWidth={1.8} />
+              </span>
+              <div className="group-share-heading-copy">
+                <p className="group-share-eyebrow">{t('chat.groupMembers')}</p>
+                <h2 id="group-share-title">{t('chat.shareGroupTitle')}</h2>
+                <p id="group-share-description" className="group-share-description">
+                  {t('chat.shareGroupDescription')}
+                </p>
+              </div>
+            </div>
+            <div className="group-share-list">
+              {shareCandidates.map(candidate => {
+                const isExistingMember = existingGroupMemberIds.has(candidate.userId);
+                const isChecked = isExistingMember || selectedMemberIds.has(candidate.userId);
+
+                return (
+                  <label
+                    key={candidate.userId}
+                    className={`group-share-user${isExistingMember ? ' is-existing' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      disabled={isExistingMember}
+                      onChange={() => {
+                        setSelectedMemberIds(current => {
+                          const next = new Set(current);
+                          if (next.has(candidate.userId)) next.delete(candidate.userId);
+                          else next.add(candidate.userId);
+                          return next;
+                        });
+                      }}
+                    />
+                    <span className="group-share-checkbox" aria-hidden="true">
+                      {isChecked && <Check size={13} strokeWidth={3} />}
+                    </span>
+                    <span className="group-share-user-avatar">
+                      <img src={candidate.avatar} alt="" />
+                      {candidate.online && <span aria-hidden="true" />}
+                    </span>
+                    <span className="group-share-username">{candidate.username}</span>
+                    {isExistingMember && (
+                      <span className="group-share-member-label">{t('chat.alreadyMember')}</span>
+                    )}
+                  </label>
+                );
+              })}
+              {shareCandidates.length === 0 && (
+                <p className="group-share-empty">{t('chat.noUsersToShare')}</p>
+              )}
+            </div>
+            <div className="group-share-actions">
+              <button
+                type="button"
+                className="group-dialog-primary"
+                disabled={sharingMembers || selectedMemberIds.size === 0}
+                onClick={() => void handleAddGroupMembers()}
+              >
+                {sharingMembers ? t('chat.addingMembers') : t('chat.addSelectedMembers')}
+                <ArrowRight size={16} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isCreateGroupOpen && currentUser && (
+        <div className="group-share-overlay" role="presentation">
+          <button
+            type="button"
+            className="group-share-backdrop"
+            aria-label={t('chat.closeCreateGroupDialog')}
+            disabled={groupCreating}
+            onClick={closeCreateGroupDialog}
+          />
+          <div
+            className={`group-share-dialog create-group-dialog${
+              createGroupStep === 2 ? ' is-details' : ''
+            }`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-group-title"
+            aria-describedby="create-group-description"
+          >
+            <button
+              type="button"
+              className="group-share-close"
+              aria-label={t('chat.closeCreateGroupDialog')}
+              disabled={groupCreating}
+              onClick={closeCreateGroupDialog}
+            >
+              <X size={17} aria-hidden="true" />
+            </button>
+            <div className="create-group-flow">
+              <section className="create-group-people">
+                <div className="group-share-heading">
+                  <span className="group-share-icon" aria-hidden="true">
+                    <Users size={24} strokeWidth={1.8} />
+                  </span>
+                  <div className="group-share-heading-copy">
+                    <p className="group-share-eyebrow">{t('chat.createGroupEyebrow')}</p>
+                    <h2 id="create-group-title">{t('chat.createGroupTitle')}</h2>
+                    <p id="create-group-description" className="group-share-description">
+                      {t('chat.createGroupDescription')}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedCreateMembers.length > 0 && (
+                  <div className="create-group-selection">
+                    <div
+                      className="group-member-stack create-group-avatar-stack"
+                      aria-label={t('chat.selectedPeople', {
+                        count: selectedCreateMembers.length,
+                      })}
+                    >
+                      {selectedCreateMembers
+                        .slice(0, MAX_VISIBLE_GROUP_AVATARS)
+                        .map(member => (
+                          <span
+                            key={member.userId}
+                            className="group-member-avatar"
+                            // title={member.username}
+                          >
+                            <img src={member.avatar} alt={member.username} />
+                          </span>
+                        ))}
+                      {selectedCreateMembers.length > MAX_VISIBLE_GROUP_AVATARS && (
+                        <span className="group-member-overflow">
+                          {selectedCreateMembers.length - MAX_VISIBLE_GROUP_AVATARS}+
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="create-group-next"
+                      onClick={() => setCreateGroupStep(2)}
+                    >
+                      {t('chat.next')}
+                      <ArrowRight size={16} strokeWidth={2} aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+
+                <label className="create-group-search">
+                  <Search size={16} strokeWidth={1.9} aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={groupSearch}
+                    placeholder={t('chat.searchUsers')}
+                    onChange={event => setGroupSearch(event.target.value)}
+                  />
+                </label>
+
+                <div className="group-share-list create-group-user-list">
+                  {filteredCreateGroupCandidates.map(candidate => {
+                    const isSelected = createMemberIds.has(candidate.userId);
+                    return (
+                      <button
+                        key={candidate.userId}
+                        type="button"
+                        className={`group-share-user create-group-user${
+                          isSelected ? ' is-selected' : ''
+                        }`}
+                        aria-pressed={isSelected}
+                        onClick={() => toggleCreateGroupMember(candidate.userId)}
+                      >
+                        <span className="group-share-user-avatar">
+                          <img src={candidate.avatar} alt="" />
+                          {candidate.online && <span aria-hidden="true" />}
+                        </span>
+                        <span className="group-share-username">{candidate.username}</span>
+                        <span className="create-group-user-check" aria-hidden="true">
+                          {isSelected && <Check size={13} strokeWidth={3} />}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {filteredCreateGroupCandidates.length === 0 && (
+                    <p className="group-share-empty">{t('chat.noMatchingUsers')}</p>
+                  )}
+                </div>
+              </section>
+
+              <section className="create-group-details" aria-hidden={createGroupStep !== 2}>
+                <p className="group-share-eyebrow">{t('chat.groupDetails')}</p>
+                <div className="create-group-details-heading">
+                  <div>
+                    <h3>{t('chat.groupDetails')}</h3>
+                    <p>{t('chat.selectedPeople', { count: selectedCreateMembers.length })}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="create-group-back"
+                    onClick={() => setCreateGroupStep(1)}
+                    aria-label={t('chat.createGroupTitle')}
+                  >
+                    <ArrowRight size={16} strokeWidth={2} aria-hidden="true" />
+                  </button>
+                </div>
+
+                <label className="create-group-field create-group-name-field">
+                  <span>{t('chat.groupName')}</span>
+                  <input
+                    type="text"
+                    maxLength={255}
+                    value={groupName}
+                    placeholder={t('chat.groupNamePlaceholder')}
+                    onChange={event => {
+                      setGroupName(event.target.value);
+                      setGroupCreateError('');
+                    }}
+                  />
+                </label>
+
+                <div className="create-group-action-row">
+                  <div className="create-group-avatar-field">
+                    <span>{t('chat.groupAvatar')}</span>
+                    <button
+                      type="button"
+                      className={`create-group-avatar-upload${groupAvatar ? ' has-image' : ''}`}
+                      onClick={() => groupAvatarInputRef.current?.click()}
+                      aria-label={t('chat.uploadGroupAvatar')}
+                    >
+                      {groupAvatar
+                        ? <img src={groupAvatar} alt="" />
+                        : <Camera size={19} strokeWidth={1.8} aria-hidden="true" />}
+                    </button>
+                  </div>
+                  <input
+                    ref={groupAvatarInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+                    hidden
+                    onChange={event => void handleGroupAvatarChange(event)}
+                  />
+                </div>
+
+                <div className="create-group-members-summary create-group-creator-summary">
+                  <span>{t('chat.groupCreator')}</span>
+                  <div className="create-group-summary-row">
+                    <img src={currentUserAvatar} alt={currentUserName} />
+                    <strong>{currentUserName}</strong>
+                  </div>
+                </div>
+
+                <div className="create-group-members-summary">
+                  <span>{t('chat.selectedMembers')}</span>
+                  <div className="group-member-stack create-group-details-stack">
+                    {selectedCreateMembers
+                      .slice(0, MAX_VISIBLE_GROUP_AVATARS)
+                      .map(member => (
+                        <span
+                          key={member.userId}
+                          className="group-member-avatar"
+                          // title={member.username}
+                        >
+                          <img src={member.avatar} alt={member.username} />
+                        </span>
+                      ))}
+                    {selectedCreateMembers.length > MAX_VISIBLE_GROUP_AVATARS && (
+                      <span className="group-member-overflow">
+                        {selectedCreateMembers.length - MAX_VISIBLE_GROUP_AVATARS}+
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="group-dialog-primary create-group-submit"
+                  disabled={groupCreating}
+                  onClick={() => void handleCreateGroup()}
+                >
+                  {groupCreating ? t('chat.creatingGroup') : t('chat.createGroup')}
+                </button>
+
+                {groupCreateError && (
+                  <p className="create-group-error" role="alert">{groupCreateError}</p>
+                )}
+              </section>
+            </div>
           </div>
         </div>
       )}

@@ -51,3 +51,19 @@ export function getMessageHistory({ chat_type, contact_id, limit = 100 }) {
   historyRequests.set(key, historyRequest)
   return historyRequest
 }
+
+export function createGroup(input) {
+  return request.post('/message/group', input).then(response => {
+    if (response.data && typeof response.data.group_id === 'string') return response.data
+    throw new Error('Invalid create group response')
+  })
+}
+
+export function addGroupMembers(groupId, memberIds) {
+  return request.post(`/message/group/${encodeURIComponent(groupId)}/members`, {
+    member_ids: memberIds,
+  }).then(response => {
+    if (response.data && typeof response.data.added_count === 'number') return response.data
+    throw new Error('Invalid add group members response')
+  })
+}

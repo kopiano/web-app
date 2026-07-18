@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
+import { Camera } from 'lucide-react';
 import type { AuthUser } from '@/store/authSlice';
 import { updateCurrentUserProfile } from '@/store/authSlice';
 import type { AppDispatch } from '@/store/store';
@@ -14,23 +15,6 @@ interface ProfileModalProps {
 
 const AVATAR_SIZE = 512;
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
-
-function makeDefaultAvatar(username: string) {
-  const canvas = document.createElement('canvas');
-  canvas.width = AVATAR_SIZE;
-  canvas.height = AVATAR_SIZE;
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('Unable to create avatar');
-
-  context.fillStyle = '#e8eaf0';
-  context.fillRect(0, 0, AVATAR_SIZE, AVATAR_SIZE);
-  context.fillStyle = '#1f2937';
-  context.font = '700 220px Roboto, sans-serif';
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText(username.trim().charAt(0).toUpperCase() || 'U', AVATAR_SIZE / 2, AVATAR_SIZE / 2 + 8);
-  return canvas.toDataURL('image/webp', 0.9);
-}
 
 async function fileToWebp(file: File) {
   if (!file.type.startsWith('image/')) throw new Error('Please select an image file.');
@@ -94,9 +78,8 @@ export default function ProfileModal({ user, onClose, onSaved }: ProfileModalPro
     setLoading(true);
     setError('');
     try {
-      const nextAvatar = avatar || makeDefaultAvatar(trimmedUsername);
       await dispatch(updateCurrentUserProfile({
-        avatar: nextAvatar,
+        avatar,
         username: trimmedUsername,
         password,
       })).unwrap();
@@ -145,12 +128,14 @@ export default function ProfileModal({ user, onClose, onSaved }: ProfileModalPro
         <form id="profile-form" className="auth-form" onSubmit={handleSave}>
           <div className="profile-avatar-field">
             <button
-              className="profile-avatar-button"
+              className={`profile-avatar-button${preview ? ' has-image' : ''}`}
               type="button"
               onClick={() => fileInputRef.current?.click()}
               aria-label="Change avatar"
             >
-              {preview ? <img src={preview} alt="" /> : <span>{username.trim().charAt(0).toUpperCase() || 'U'}</span>}
+              {preview
+                ? <img src={preview} alt="" />
+                : <Camera size={27} strokeWidth={1.7} aria-hidden="true" />}
               <span className="profile-avatar-edit" aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />

@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { getMessageUserInfo } from '@/api/chat'
-import { resolveAvatarUrl } from '@/lib/avatar'
+import { defaultAvatarDataUrl, resolveAvatarUrl } from '@/lib/avatar'
 
 export interface ChatContact {
   id: string
@@ -99,8 +99,7 @@ function conversationId(contact: ApiContact) {
 }
 
 function fallbackAvatar(contact: ApiContact) {
-  const seed = contact.user_id || contact.group_id || contact.username
-  return `https://picsum.photos/seed/contact-${encodeURIComponent(seed)}/100/100`
+  return defaultAvatarDataUrl(contact.username)
 }
 
 function formatContact(contact: ApiContact): ChatContact | null {
@@ -112,7 +111,7 @@ function formatContact(contact: ApiContact): ChatContact | null {
     name: contact.username,
     type: contact.chat_type === 'public' ? 'group' : 'user',
     avatar: resolveAvatarUrl(contact.avatar) || fallbackAvatar(contact),
-    lastMsg: contact.content || 'No messages yet',
+    lastMsg: contact.content || '',
     time: formatLatestMessageTime(contact.last_message_time || null),
     lastMessageTime: contact.last_message_time || null,
     online: contact.online ?? undefined,

@@ -1489,7 +1489,7 @@ function Music() {
           aria-busy={isUploading}
           aria-disabled={!currentUser || isUploading}
           aria-label={t('music.addMusic')}
-          title={currentUser ? undefined : t('music.signInRequired')}
+          // title={currentUser ? undefined : t('music.signInRequired')}
         >
           <Plus size={23} strokeWidth={1.8} />
         </button>
@@ -1666,7 +1666,7 @@ function Music() {
                   }}
                   aria-pressed={libraryLayout === 'list'}
                   aria-label={t('music.listView')}
-                  title={t('music.listView')}
+                  // title={t('music.listView')}
                 >
                   <ListMusic size={20} />
                 </button>
@@ -1679,7 +1679,7 @@ function Music() {
                   }}
                   aria-pressed={libraryLayout === 'cards'}
                   aria-label={t('music.cardView')}
-                  title={t('music.cardView')}
+                  // title={t('music.cardView')}
                 >
                   <LayoutGrid size={19} />
                 </button>
@@ -1768,7 +1768,7 @@ function Music() {
                               type="button"
                               className={`music-library-favorite${track.isFavorite ? ' is-favorite' : ''}`}
                               aria-disabled={!currentUser}
-                              title={currentUser ? undefined : t('music.signInRequired')}
+                              // title={currentUser ? undefined : t('music.signInRequired')}
                               onClick={() => void toggleFavorite(track.id)}
                               aria-label={t(track.isFavorite ? 'music.removeFromFavorites' : 'music.addToFavorites')}
                             >
@@ -1825,7 +1825,7 @@ function Music() {
                                       className={`music-card-delete${currentUser ? '' : ' is-restricted'}`}
                                       disabled={Boolean(deletingTrackId)}
                                       aria-disabled={!currentUser || Boolean(deletingTrackId)}
-                                      title={currentUser ? undefined : t('music.signInRequired')}
+                                      // title={currentUser ? undefined : t('music.signInRequired')}
                                       onClick={() => void handleDeleteTrack(track.id)}
                                     >
                                       {deletingTrackId === track.id
@@ -1909,7 +1909,7 @@ function Music() {
                                     className={`music-card-delete${currentUser ? '' : ' is-restricted'}`}
                                     disabled={Boolean(deletingTrackId)}
                                     aria-disabled={!currentUser || Boolean(deletingTrackId)}
-                                    title={currentUser ? undefined : t('music.signInRequired')}
+                                    // title={currentUser ? undefined : t('music.signInRequired')}
                                     onClick={() => void handleDeleteTrack(track.id)}
                                   >
                                     {deletingTrackId === track.id
@@ -2132,7 +2132,7 @@ function Music() {
                         className={`music-card-delete${currentUser ? '' : ' is-restricted'}`}
                         disabled={Boolean(deletingTrackId)}
                         aria-disabled={!currentUser || Boolean(deletingTrackId)}
-                        title={currentUser ? undefined : t('music.signInRequired')}
+                        // title={currentUser ? undefined : t('music.signInRequired')}
                         onClick={() => void handleDeleteTrack(track.id)}
                       >
                         {deletingTrackId === track.id
@@ -2195,7 +2195,7 @@ function Music() {
               type="button"
               className={currentUser ? undefined : 'is-restricted'}
               aria-disabled={!currentUser}
-              title={currentUser ? undefined : t('music.signInRequired')}
+              // title={currentUser ? undefined : t('music.signInRequired')}
               onClick={() => {
                 if (requireMusicAccount()) addMusicInputRef.current?.click();
               }}
@@ -2216,7 +2216,10 @@ function Music() {
             <span />
           </div>
           <div className="music-track-meta">
-            <strong className="music-player-title" title={currentTrack.title}>
+              <strong
+                className="music-player-title"
+                // title={currentTrack.title}
+              >
               <span>{currentTrack.title}</span>
             </strong>
             <span>{currentTrack.artist}</span>

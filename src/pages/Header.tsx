@@ -101,6 +101,12 @@ export default function Header() {
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const isExternalAccount = currentUser?.github_id !== null && currentUser?.github_id !== undefined;
   const initials = currentUser?.name?.trim().charAt(0).toUpperCase() || 'G';
+  const subscriptionEnd = currentUser?.subscription_end_at
+    ? Date.parse(currentUser.subscription_end_at)
+    : null;
+  const isPro = ['pro', 'plus'].includes(currentUser?.plan?.trim().toLowerCase() || '')
+    && currentUser?.subscription_status?.trim().toLowerCase() === 'active'
+    && (subscriptionEnd === null || (Number.isFinite(subscriptionEnd) && subscriptionEnd > notificationNow));
 
   const handleProfile = () => {
     if (isExternalAccount) return;
@@ -246,6 +252,11 @@ export default function Header() {
               )}
             </div>
             <span className="user-pill-name">{currentUser?.name || t('header.guest')}</span>
+            {isPro && (
+              <span className="user-pro-badge" aria-label="Pro account" title="Pro">
+                PRO
+              </span>
+            )}
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="user-pill-chevron"
               style={{ opacity: 0, transition: 'transform 0.3s ease', transform: profileOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
               <polyline points="6 9 12 15 18 9" />
