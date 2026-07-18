@@ -347,6 +347,10 @@ function localizedMockLabel(value: string, t: TFunction) {
   return value;
 }
 
+function localizedGroupName(value: string, t: TFunction) {
+  return value === 'Genshin Impact' ? t('chat.groupNames.genshinImpact') : value;
+}
+
 function isChatMessageEvent(value: unknown): value is ChatMessageEvent {
   if (!value || typeof value !== 'object') return false;
   const payload = value as Record<string, unknown>;
@@ -1929,7 +1933,7 @@ function Chat() {
                     <img src={c.avatar} alt="" className="avatar-img" />
                   </div>
                   <div className="contact-info">
-                    <div className="contact-name">{c.name}</div>
+                    <div className="contact-name">{localizedGroupName(c.name, t)}</div>
                     <div className="contact-preview">{localizedMockLabel(c.lastMsg, t)}</div>
                   </div>
                   <div className="contact-time">{localizedMockLabel(c.time, t)}</div>
@@ -1982,7 +1986,11 @@ function Chat() {
                       <img src={activeContactInfo.avatar} alt="" className="avatar-img" />
                     </div>
                     <div className="messages-header-info">
-                      <div className="messages-header-name">{activeContactInfo.name}</div>
+                      <div className="messages-header-name">
+                        {activeContactInfo.type === 'group'
+                          ? localizedGroupName(activeContactInfo.name, t)
+                          : activeContactInfo.name}
+                      </div>
                       <div
                         className={`messages-header-status ${
                           activeContactInfo.type === 'group'

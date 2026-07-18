@@ -14,6 +14,9 @@
     "zh": "中"
   },
   "chat": {
+    "groupNames": {
+      "genshinImpact": "原神"
+    },
     "groups": "群聊",
     "contacts": "用户",
     "chat": "聊天",
