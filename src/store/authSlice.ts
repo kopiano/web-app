@@ -11,6 +11,7 @@ export interface AuthUser {
   github_id?: string | null;
   avatar?: string | null;
   username?: string | null;
+  role?: 'user' | 'admin' | 'super_admin';
   plan?: string;
   subscription_status?: string;
   subscription_start_at?: string | null;
