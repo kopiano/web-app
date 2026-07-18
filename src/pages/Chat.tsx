@@ -533,7 +533,7 @@ function Chat() {
   const [momentPublishing, setMomentPublishing] = useState(false);
   const [momentUploadProgress, setMomentUploadProgress] = useState<MomentUploadProgress | null>(null);
   const [openMomentMenuId, setOpenMomentMenuId] = useState<string | null>(null);
-  const [previewMomentImage, setPreviewMomentImage] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [deleteMomentId, setDeleteMomentId] = useState<string | null>(null);
   const [deletingMomentId, setDeletingMomentId] = useState<string | null>(null);
   const [completedProcessingMoments, setCompletedProcessingMoments] = useState<Set<string>>(
@@ -775,18 +775,18 @@ function Chat() {
   }, [openMomentMenuId]);
 
   useEffect(() => {
-    if (openMomentMenuId === null && deleteMomentId === null && previewMomentImage === null) return;
+    if (openMomentMenuId === null && deleteMomentId === null && previewImage === null) return;
 
     const closeMomentOverlays = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || deletingMomentId !== null) return;
       setOpenMomentMenuId(null);
       setDeleteMomentId(null);
-      setPreviewMomentImage(null);
+      setPreviewImage(null);
     };
 
     document.addEventListener('keydown', closeMomentOverlays);
     return () => document.removeEventListener('keydown', closeMomentOverlays);
-  }, [openMomentMenuId, deleteMomentId, deletingMomentId, previewMomentImage]);
+  }, [openMomentMenuId, deleteMomentId, deletingMomentId, previewImage]);
 
   useEffect(() => {
     if (!isMemberShareOpen && !isCreateGroupOpen) return;
@@ -807,13 +807,13 @@ function Chat() {
   }, [groupCreating, isCreateGroupOpen, isMemberShareOpen, sharingMembers]);
 
   useEffect(() => {
-    if (previewMomentImage === null) return;
+    if (previewImage === null) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [previewMomentImage]);
+  }, [previewImage]);
 
   useEffect(() => {
     if (currentUser) {
@@ -2112,11 +2112,10 @@ function Chat() {
                       <div className="msg-content">
                         <div className={`msg ${msg.from === 'me' ? 'sent' : 'received'}${msg.imageUrl ? ' image-message' : ''}`}>
                           {msg.imageUrl && (
-                            <a
+                            <button
+                              type="button"
                               className="chat-message-image-link"
-                              href={msg.imageUrl}
-                              target="_blank"
-                              rel="noreferrer"
+                              onClick={() => setPreviewImage(msg.imageUrl || null)}
                               aria-label={t('chat.openImage', { name: msg.imageName || '' }).trim()}
                             >
                               <img
@@ -2124,7 +2123,10 @@ function Chat() {
                                 src={msg.imageUrl}
                                 alt={msg.imageName || t('chat.sharedImage')}
                               />
-                            </a>
+                              <span className="chat-message-image-expand" aria-hidden="true">
+                                <Maximize2 size={17} strokeWidth={1.9} />
+                              </span>
+                            </button>
                           )}
                           {!msg.imageUrl && (
                           <div className={`msg-text${msgIndex === contactMessages.length - 1 ? ' typing-text' : ''}`}>
@@ -2484,7 +2486,7 @@ function Chat() {
                         type="button"
                         className="card-media-wrap moment-image-wrap"
                         aria-label={t('chat.viewImage')}
-                        onClick={() => setPreviewMomentImage(post.media || null)}
+                        onClick={() => setPreviewImage(post.media || null)}
                       >
                         <img
                           src={post.media}
@@ -2831,26 +2833,26 @@ function Chat() {
           </div>
         </div>
       </div>
-      {previewMomentImage && (
+      {previewImage && (
         <div
           className="moment-image-preview-overlay"
           role="dialog"
           aria-modal="true"
-          aria-label={t('chat.momentImagePreview')}
+          aria-label={t('chat.imagePreview')}
         >
           <button
             type="button"
             className="moment-image-preview-backdrop"
             aria-label={t('chat.closeImagePreview')}
-            onClick={() => setPreviewMomentImage(null)}
+            onClick={() => setPreviewImage(null)}
           />
           <div className="moment-image-preview-content">
-            <img src={previewMomentImage} alt={t('chat.momentImagePreview')} />
+            <img src={previewImage} alt={t('chat.imagePreview')} />
             <button
               type="button"
               className="moment-image-preview-close"
               aria-label={t('chat.closeImagePreview')}
-              onClick={() => setPreviewMomentImage(null)}
+              onClick={() => setPreviewImage(null)}
             >
               <X size={22} strokeWidth={2} />
             </button>
