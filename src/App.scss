@@ -3,6 +3,10 @@
 @use '@/styles/backgroundImg.scss';
 @use '@/styles/overview.scss';
 
+.persistent-music-page.is-hidden {
+  display: none;
+}
+
 
 * {
   margin: 0;

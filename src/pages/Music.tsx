@@ -60,9 +60,13 @@ import {
   type MusicUserLibrary,
 } from '@/api/music';
 import { createProCheckout } from '@/api/subscription';
+import { useMusicPlayback } from '@/context/MusicPlaybackContext';
 import type { RootState } from '@/store/store';
 import '@/styles/music.scss';
 
+type MusicProps = {
+  isActive?: boolean;
+};
 type View = 'home' | 'library' | 'playlist' | 'favorites';
 type PlayMode = 'sequential' | 'shuffle' | 'single';
 type LibraryLayout = 'list' | 'cards';
@@ -309,8 +313,9 @@ const hasActiveLibrarySubscription = (user: RootState['auth']['user']) => {
   return paidPlan && activeStatus && endTimestamp > Date.now();
 };
 
-function Music() {
+function Music({ isActive = true }: MusicProps) {
   const { t, i18n } = useTranslation();
+  const { publishPlayback, registerControls } = useMusicPlayback();
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const authInitialized = useSelector((state: RootState) => state.auth.initialized);
   const [storedProDialog] = useState(getStoredProDialogState);
@@ -646,40 +651,43 @@ function Music() {
   }, [loadTrackDetails, persistPlaybackProgress, playbackTrackId, resetProgress]);
 
   const goToTrack = useCallback((direction: 1 | -1) => {
-    const visibleQueue = pageTracksRef.current;
-    const currentTracks = visibleQueue.some((track) => track.id === currentTrack.id)
-      ? visibleQueue
-      : tracksRef.current;
-    const queueCurrentIndex = currentTracks.findIndex((track) => track.id === currentTrack.id);
-    const playableIndexes = currentTracks.reduce<number[]>((indexes, track, index) => {
-      if (track.processingStatus === 'ready') indexes.push(index);
-      return indexes;
-    }, []);
-    if (!playableIndexes.length) return;
-    let nextIndex: number;
+    const currentTrackId = playbackTrackId || currentTrack.id;
+    const readyVisibleTracks = pageTracksRef.current.filter(
+      (track) => track.processingStatus === 'ready',
+    );
+    const readyTracks = tracksRef.current.filter(
+      (track) => track.processingStatus === 'ready',
+    );
+    const visibleHasCurrent = readyVisibleTracks.some((track) => track.id === currentTrackId);
+    const currentTracks = visibleHasCurrent && readyVisibleTracks.length > 1
+      ? readyVisibleTracks
+      : readyTracks;
+    if (!currentTracks.length) return;
+
+    const queueCurrentIndex = currentTracks.findIndex((track) => track.id === currentTrackId);
+    let nextTrack: MusicTrack;
     if (playMode === 'shuffle') {
-      const candidates = playableIndexes.filter((index) => index !== queueCurrentIndex);
-      nextIndex = candidates.length
+      const candidates = currentTracks.filter((track) => track.id !== currentTrackId);
+      nextTrack = candidates.length
         ? candidates[Math.floor(Math.random() * candidates.length)]
-        : playableIndexes[0];
+        : currentTracks[0];
     } else {
-      const playablePosition = playableIndexes.indexOf(queueCurrentIndex);
-      const nextPosition = playablePosition < 0
-        ? direction === 1 ? 0 : playableIndexes.length - 1
-        : (playablePosition + direction + playableIndexes.length) % playableIndexes.length;
-      nextIndex = playableIndexes[nextPosition];
+      const nextIndex = queueCurrentIndex < 0
+        ? direction === 1 ? 0 : currentTracks.length - 1
+        : (queueCurrentIndex + direction + currentTracks.length) % currentTracks.length;
+      nextTrack = currentTracks[nextIndex];
     }
-    void playTrack(currentTracks[nextIndex]);
-  }, [currentTrack.id, playMode, playTrack]);
+    void playTrack(nextTrack);
+  }, [currentTrack.id, playbackTrackId, playMode, playTrack]);
 
   useEffect(() => {
-    document.body.classList.add('music-route');
-    document.documentElement.classList.add('music-route');
+    document.body.classList.toggle('music-route', isActive);
+    document.documentElement.classList.toggle('music-route', isActive);
     return () => {
       document.body.classList.remove('music-route');
       document.documentElement.classList.remove('music-route');
     };
-  }, []);
+  }, [isActive]);
 
   useEffect(() => {
     setCollectionUserId(currentUser?.id || '');
@@ -1250,6 +1258,7 @@ function Music() {
   }, [currentTrack.id, goToTrack, persistPlaybackProgress, playMode, resetProgress]);
 
   useEffect(() => {
+    if (!isActive) return;
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
       if (target.matches('input, button, a')) return;
@@ -1263,7 +1272,7 @@ function Music() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [currentTrack, goToTrack, hasPlayableTracks, isPlaying, playTrack]);
+  }, [currentTrack, goToTrack, hasPlayableTracks, isActive, isPlaying, playTrack]);
 
   const toggleFavorite = async (trackId: string) => {
     if (!requireMusicAccount()) return;
@@ -1541,7 +1550,7 @@ function Music() {
 
   const VolumeIcon = volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
 
-  const toggleCurrentPlayback = () => {
+  const toggleCurrentPlayback = useCallback(() => {
     if (isPlaying) {
       setIsPlaying(false);
       return;
@@ -1549,7 +1558,28 @@ function Music() {
     if (currentTrack.processingStatus === 'ready') {
       void playTrack(currentTrack);
     }
-  };
+  }, [currentTrack, isPlaying, playTrack]);
+
+  const playNextTrack = useCallback(() => {
+    goToTrack(1);
+  }, [goToTrack]);
+
+  const playPreviousTrack = useCallback(() => {
+    goToTrack(-1);
+  }, [goToTrack]);
+
+  useEffect(() => {
+    publishPlayback({
+      track: currentTrack.id ? currentTrack : null,
+      isPlaying,
+      canPlay: hasPlayableTracks,
+    });
+  }, [currentTrack, hasPlayableTracks, isPlaying, publishPlayback]);
+
+  useEffect(() => registerControls({
+    togglePlayback: toggleCurrentPlayback,
+    playNext: playNextTrack,
+  }), [playNextTrack, registerControls, toggleCurrentPlayback]);
 
   const toggleLibraryPlayback = () => {
     if (isPlaying) {
@@ -2343,7 +2373,7 @@ function Music() {
         </div>
 
         <div className="music-transport">
-          <button type="button" disabled={!hasPlayableTracks} onClick={() => goToTrack(-1)} aria-label={t('music.previousTrack')}><SkipBack size={19} fill="currentColor" /></button>
+          <button type="button" disabled={!hasPlayableTracks} onClick={playPreviousTrack} aria-label={t('music.previousTrack')}><SkipBack size={19} fill="currentColor" /></button>
           <button
             type="button"
             className="music-main-play"
@@ -2353,7 +2383,7 @@ function Music() {
           >
             {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
           </button>
-          <button type="button" disabled={!hasPlayableTracks} onClick={() => goToTrack(1)} aria-label={t('music.nextTrack')}><SkipForward size={19} fill="currentColor" /></button>
+          <button type="button" disabled={!hasPlayableTracks} onClick={playNextTrack} aria-label={t('music.nextTrack')}><SkipForward size={19} fill="currentColor" /></button>
         </div>
 
         <div className={`music-timeline${isPlaying ? ' is-playing' : ''}`}>

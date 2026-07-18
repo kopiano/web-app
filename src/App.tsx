@@ -1,12 +1,21 @@
 import '@/i18n';
-import { Navigate, Outlet, createBrowserRouter, RouterProvider, useNavigate } from 'react-router-dom';
+import {
+  Navigate,
+  Outlet,
+  createBrowserRouter,
+  RouterProvider,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import Overview from '@/pages/Overview';
 import Chat from '@/pages/Chat';
 import Music from '@/pages/Music';
 import Video from '@/pages/Video';
 import Header from '@/pages/Header';
 import BackgroundImg from '@/components/BackgroundImg';
+import MiniMusicPlayer from '@/components/MiniMusicPlayer';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { MusicPlaybackProvider } from '@/context/MusicPlaybackContext';
 import "@/App.scss";
 import "@/styles/oauth.scss";
 import { useEffect, useState } from 'react';
@@ -144,7 +153,10 @@ const SubscriptionSuccess = () => {
 
 const Layout = () => {
   const dispatch = useDispatch<typeof store.dispatch>();
+  const location = useLocation();
   const isOAuthSuccess = window.location.pathname === '/oauth/success';
+  const isMusicRoute = location.pathname === '/music';
+  const [hasMountedMusic, setHasMountedMusic] = useState(isMusicRoute);
 
   useEffect(() => {
     if (isOAuthSuccess) return;
@@ -155,11 +167,25 @@ const Layout = () => {
     dispatch(fetchCurrentUser());
   }, [dispatch, isOAuthSuccess]);
 
+  useEffect(() => {
+    if (isMusicRoute) setHasMountedMusic(true);
+  }, [isMusicRoute]);
+
+  const shouldMountMusic = hasMountedMusic || isMusicRoute;
+
   return (
-      <ThemeProvider>
-      <BackgroundImg />
-      <Header />
-      <Outlet />
+    <ThemeProvider>
+      <MusicPlaybackProvider>
+        <BackgroundImg />
+        <Header />
+        {shouldMountMusic && (
+          <div className={`persistent-music-page${isMusicRoute ? '' : ' is-hidden'}`}>
+            <Music isActive={isMusicRoute} />
+          </div>
+        )}
+        {!isMusicRoute && <Outlet />}
+        {!isMusicRoute && <MiniMusicPlayer />}
+      </MusicPlaybackProvider>
     </ThemeProvider>
   );
 };
@@ -182,7 +208,7 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <Overview /> },
       { path: '/chat', element: <Chat /> },
-      { path: '/music', element: <Music /> },
+      { path: '/music', element: <></> },
       { path: '/video', element: <Video /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],

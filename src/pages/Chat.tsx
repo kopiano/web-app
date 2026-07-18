@@ -9,7 +9,6 @@ import {
   Check,
   Maximize2,
   Plus,
-  RefreshCw,
   Search,
   Share2,
   Users,
@@ -595,7 +594,6 @@ function Chat() {
     ? activeConversationCache?.messages || []
     : guestMessages[activeConversationId] || [];
   const historyLoading = Boolean(currentUser && activeConversationCache?.loading);
-  const historyRefreshing = Boolean(currentUser && activeConversationCache?.refreshing);
   const historyLoadingMore = Boolean(currentUser && activeConversationCache?.loadingMore);
   const activeGroupMembers = useMemo(
     () => activeContactInfo?.type === 'group' ? activeContactInfo.members || [] : [],
@@ -1174,17 +1172,6 @@ function Chat() {
     currentUser?.id,
     dispatch,
   ]);
-
-  function refreshActiveConversation() {
-    if (!currentUser || !activeContactInfo || activeContactInfo.id.startsWith('mock:')) return;
-    dispatch(fetchConversationHistory({
-      conversationId: activeContactInfo.id,
-      chatType: activeContactInfo.type === 'group' ? 'public' : 'private',
-      contactId: contactIdFromConversation(activeContactInfo.id),
-      userId: currentUser.id,
-      mode: 'refresh',
-    }));
-  }
 
   function handleMessageListScroll(event: React.UIEvent<HTMLDivElement>) {
     if (
@@ -2067,22 +2054,6 @@ function Chat() {
                             <Share2 size={16} strokeWidth={2.2} aria-hidden="true" />
                           </button>
                         </div>
-                      )}
-                      {currentUser && (
-                        <button
-                          type="button"
-                          className="group-share-button conversation-refresh-button"
-                          aria-label={t('chat.refreshMessages')}
-                          onClick={refreshActiveConversation}
-                          disabled={historyLoading || historyRefreshing}
-                        >
-                          <RefreshCw
-                            size={15}
-                            strokeWidth={2.2}
-                            className={historyRefreshing ? 'is-spinning' : undefined}
-                            aria-hidden="true"
-                          />
-                        </button>
                       )}
                     </div>
                   </>

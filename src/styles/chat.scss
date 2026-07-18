@@ -596,21 +596,6 @@ $chat-margin-left: 100px;
     flex: 0 0 30px;
 }
 
-.conversation-refresh-button {
-    visibility: visible;
-    opacity: 1;
-    transform: scale(1);
-}
-
-.conversation-refresh-button:disabled {
-    cursor: default;
-    opacity: 0.58;
-}
-
-.conversation-refresh-button .is-spinning {
-    animation: chat-loading-spin 0.75s linear infinite;
-}
-
 .group-members-toolbar:hover .group-share-button,
 .group-members-toolbar:focus-within .group-share-button {
     visibility: visible;
