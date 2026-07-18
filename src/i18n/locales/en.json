@@ -76,6 +76,8 @@
     "noContacts": "No contacts yet.",
     "retry": "Retry",
     "loadingConversation": "Loading conversation",
+    "loadingOlderMessages": "Loading older messages",
+    "refreshMessages": "Refresh messages",
     "noMessages": "",
     "openImage": "Open image {{name}}",
     "sharedImage": "Shared image",

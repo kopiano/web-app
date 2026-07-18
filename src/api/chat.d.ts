@@ -62,6 +62,7 @@ export interface MessageHistoryQuery {
   chat_type: 'private' | 'public';
   contact_id: string;
   limit?: number;
+  before_id?: number;
 }
 
 export interface CreateGroupInput {

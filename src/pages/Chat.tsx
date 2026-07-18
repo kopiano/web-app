@@ -9,6 +9,7 @@ import {
   Check,
   Maximize2,
   Plus,
+  RefreshCw,
   Search,
   Share2,
   Users,
@@ -19,7 +20,6 @@ import { defaultAvatarDataUrl, resolveAssetUrl, resolveAvatarUrl } from '@/lib/a
 import {
   addGroupMembers,
   createGroup,
-  getMessageHistory,
   sendImageMessage,
   sendMessage,
 } from '@/api/chat';
@@ -43,7 +43,17 @@ import type {
 } from '@/api/chat';
 import type { MomentApiItem, MomentUploadProgress } from '@/api/moment';
 import type { RootState, AppDispatch } from '@/store/store';
-import { refreshContacts, updateContactPreview } from '@/store/chatSlice';
+import {
+  appendConversationMessage,
+  fetchConversationHistory,
+  MESSAGE_CACHE_TTL_MS,
+  patchConversationMessage,
+  refreshContacts,
+  replaceConversationMessage,
+  toChatMessage,
+  updateContactPreview,
+} from '@/store/chatSlice';
+import type { ChatMessage } from '@/store/chatSlice';
 import '@/styles/chat.scss';
 
 /* ── Types ── */
@@ -59,19 +69,7 @@ interface Contact {
   members?: ChatApiMember[];
 }
 
-interface Message {
-  id: number | string;
-  text: string;
-  from: 'me' | 'them';
-  time: string;
-  status?: 'sending' | 'sent' | 'failed';
-  clientMessageId?: string;
-  sendRequest?: SendMessageInput;
-  sendImageRequest?: SendImageMessageInput;
-  imageUrl?: string;
-  imageName?: string;
-  createdAt?: string;
-}
+type Message = ChatMessage;
 
 interface Comment {
   id: string;
@@ -295,27 +293,6 @@ function messageConversationId(message: ChatApiMessage, userId: string) {
 
 function contactIdFromConversation(conversationId: string) {
   return conversationId.slice(conversationId.indexOf(':') + 1);
-}
-
-function toUiMessage(message: ChatApiMessage, userId: string): Message | null {
-  const imageUrl = message.message_type === 2
-    ? resolveAssetUrl(message.file_url)
-    : '';
-  if (!message.content && !imageUrl) return null;
-  return {
-    id: message.id,
-    text: message.content || message.file_name || 'Photo',
-    from: message.send_id === userId ? 'me' : 'them',
-    time: new Date(message.created_at).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-    status: message.status === 'sent' ? 'sent' : undefined,
-    clientMessageId: message.client_message_id || undefined,
-    imageUrl: imageUrl || undefined,
-    imageName: message.file_name || undefined,
-    createdAt: message.created_at,
-  };
 }
 
 function historyDateLabel(value: string, t: TFunction) {
@@ -544,8 +521,7 @@ function Chat() {
   const [groupCreating, setGroupCreating] = useState(false);
   const [groupCreateError, setGroupCreateError] = useState('');
   const [inputText, setInputText] = useState('');
-  const [messages, setMessages] = useState<Record<string, Message[]>>(mockMessages);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [guestMessages, setGuestMessages] = useState<Record<string, Message[]>>(mockMessages);
   const [showEmoji, setShowEmoji] = useState(false);
   const [showMomentEmoji, setShowMomentEmoji] = useState(false);
   const [moments, setMoments] = useState<MomentPost[]>([]);
@@ -583,6 +559,9 @@ function Chat() {
   const msgEndRef = useRef<HTMLDivElement>(null);
   const lastScrolledConversationRef = useRef('');
   const wasHistoryLoadingRef = useRef(false);
+  const wasHistoryLoadingMoreRef = useRef(false);
+  const historyLoadMoreScrollHeightRef = useRef(0);
+  const historyLoadMoreConversationRef = useRef('');
   const imagePreviewUrlsRef = useRef(new Set<string>());
   const contactsPanelRef = useRef<HTMLElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -609,6 +588,15 @@ function Chat() {
     [activeContact, visibleContacts],
   );
   const activeConversationId = activeContactInfo?.id || '';
+  const activeConversationCache = useSelector(
+    (state: RootState) => state.chat.conversations[activeConversationId],
+  );
+  const activeMessages = currentUser
+    ? activeConversationCache?.messages || []
+    : guestMessages[activeConversationId] || [];
+  const historyLoading = Boolean(currentUser && activeConversationCache?.loading);
+  const historyRefreshing = Boolean(currentUser && activeConversationCache?.refreshing);
+  const historyLoadingMore = Boolean(currentUser && activeConversationCache?.loadingMore);
   const activeGroupMembers = useMemo(
     () => activeContactInfo?.type === 'group' ? activeContactInfo.members || [] : [],
     [activeContactInfo],
@@ -1052,19 +1040,10 @@ function Chat() {
         if (payload.event !== 'message' || payload.message.send_id === currentUser.id) return;
 
         const conversationId = messageConversationId(payload.message, currentUser.id);
-        const incoming = toUiMessage(payload.message, currentUser.id);
+        const incoming = toChatMessage(payload.message, currentUser.id);
         if (!conversationId || !incoming) return;
 
-        setMessages(previous => {
-          const conversationMessages = previous[conversationId] || [];
-          if (conversationMessages.some(message => message.id === incoming.id)) {
-            return previous;
-          }
-          return {
-            ...previous,
-            [conversationId]: [...conversationMessages, incoming],
-          };
-        });
+        dispatch(appendConversationMessage({ conversationId, message: incoming }));
         if (payload.message.content) {
           dispatch(updateContactPreview({
             id: conversationId,
@@ -1159,55 +1138,77 @@ function Chat() {
     const conversationId = activeContactInfo.id;
     const chatType = activeContactInfo.type === 'group' ? 'public' : 'private';
     const contactId = contactIdFromConversation(conversationId);
-    let disposed = false;
+    dispatch(fetchConversationHistory({
+      conversationId,
+      chatType,
+      contactId,
+      userId: currentUser.id,
+    }));
+  }, [activeConversationId, activeContactInfo?.type, currentUser?.id, dispatch]);
 
-    setHistoryLoading(true);
-    getMessageHistory({ chat_type: chatType, contact_id: contactId })
-      .then(history => {
-        if (disposed) return;
-        const loadedMessages = history
-          .map(message => toUiMessage(message, currentUser.id))
-          .filter((message): message is Message => message !== null);
-        setMessages(previous => {
-          const localMessages = previous[conversationId] || [];
-          const byClientId = new Map(
-            localMessages
-              .filter(message => message.clientMessageId)
-              .map(message => [message.clientMessageId, message]),
-          );
-          const merged = loadedMessages.map(message => {
-            const local = message.clientMessageId ? byClientId.get(message.clientMessageId) : undefined;
-            return local ? { ...local, ...message, status: 'sent' as const } : message;
-          });
-          const loadedIds = new Set(merged.map(message => message.id));
-          const loadedClientIds = new Set(
-            merged
-              .map(message => message.clientMessageId)
-              .filter((id): id is string => Boolean(id)),
-          );
-          return {
-            ...previous,
-            [conversationId]: [
-              ...merged,
-              ...localMessages.filter(message =>
-                !loadedIds.has(message.id)
-                && (!message.clientMessageId || !loadedClientIds.has(message.clientMessageId)),
-              ),
-            ],
-          };
-        });
-      })
-      .catch(() => {
-        if (!disposed) setMessages(previous => ({ ...previous, [conversationId]: previous[conversationId] || [] }));
-      })
-      .finally(() => {
-        if (!disposed) setHistoryLoading(false);
-      });
+  useEffect(() => {
+    if (
+      !currentUser
+      || !activeContactInfo
+      || activeContactInfo.id.startsWith('mock:')
+      || !activeConversationCache?.fetchedAt
+    ) {
+      return;
+    }
 
-    return () => {
-      disposed = true;
-    };
-  }, [activeConversationId, activeContactInfo?.type, currentUser?.id]);
+    const elapsed = Date.now() - activeConversationCache.fetchedAt;
+    const timer = window.setTimeout(() => {
+      dispatch(fetchConversationHistory({
+        conversationId: activeContactInfo.id,
+        chatType: activeContactInfo.type === 'group' ? 'public' : 'private',
+        contactId: contactIdFromConversation(activeContactInfo.id),
+        userId: currentUser.id,
+      }));
+    }, Math.max(0, MESSAGE_CACHE_TTL_MS - elapsed + 50));
+
+    return () => window.clearTimeout(timer);
+  }, [
+    activeContactInfo?.id,
+    activeContactInfo?.type,
+    activeConversationCache?.fetchedAt,
+    currentUser?.id,
+    dispatch,
+  ]);
+
+  function refreshActiveConversation() {
+    if (!currentUser || !activeContactInfo || activeContactInfo.id.startsWith('mock:')) return;
+    dispatch(fetchConversationHistory({
+      conversationId: activeContactInfo.id,
+      chatType: activeContactInfo.type === 'group' ? 'public' : 'private',
+      contactId: contactIdFromConversation(activeContactInfo.id),
+      userId: currentUser.id,
+      mode: 'refresh',
+    }));
+  }
+
+  function handleMessageListScroll(event: React.UIEvent<HTMLDivElement>) {
+    if (
+      event.currentTarget.scrollTop > 80
+      || !currentUser
+      || !activeContactInfo
+      || activeContactInfo.id.startsWith('mock:')
+      || !activeConversationCache?.initialized
+      || !activeConversationCache.hasMore
+      || activeConversationCache.loadingMore
+    ) {
+      return;
+    }
+
+    historyLoadMoreScrollHeightRef.current = event.currentTarget.scrollHeight;
+    historyLoadMoreConversationRef.current = activeContactInfo.id;
+    dispatch(fetchConversationHistory({
+      conversationId: activeContactInfo.id,
+      chatType: activeContactInfo.type === 'group' ? 'public' : 'private',
+      contactId: contactIdFromConversation(activeContactInfo.id),
+      userId: currentUser.id,
+      mode: 'older',
+    }));
+  }
 
   function selectContact(contactId: string) {
     setActiveContact(contactId);
@@ -1438,10 +1439,23 @@ function Chat() {
   useLayoutEffect(() => {
     const conversationChanged = lastScrolledConversationRef.current !== activeConversationId;
     const historyJustLoaded = wasHistoryLoadingRef.current && !historyLoading;
+    const olderHistoryJustLoaded = (
+      wasHistoryLoadingMoreRef.current
+      && !historyLoadingMore
+      && historyLoadMoreConversationRef.current === activeConversationId
+    );
     const shouldJumpToBottom = conversationChanged || historyLoading || historyJustLoaded;
+    const messageList = msgListRef.current;
 
-    if (shouldJumpToBottom) {
-      const messageList = msgListRef.current;
+    if (olderHistoryJustLoaded && messageList) {
+      messageList.scrollTop = Math.max(
+        0,
+        messageList.scrollHeight - historyLoadMoreScrollHeightRef.current,
+      );
+      historyLoadMoreConversationRef.current = '';
+    } else if (historyLoadingMore) {
+      // Keep the viewport stable while older messages are being prepended.
+    } else if (shouldJumpToBottom) {
       if (messageList) messageList.scrollTop = messageList.scrollHeight;
     } else {
       msgEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -1449,7 +1463,8 @@ function Chat() {
 
     lastScrolledConversationRef.current = activeConversationId;
     wasHistoryLoadingRef.current = historyLoading;
-  }, [messages, activeConversationId, historyLoading]);
+    wasHistoryLoadingMoreRef.current = historyLoadingMore;
+  }, [activeMessages, activeConversationId, historyLoading, historyLoadingMore]);
 
   useEffect(() => {
     const input = momentInputRef.current;
@@ -1480,22 +1495,18 @@ function Chat() {
   ) {
     try {
       const persisted = await sendMessage(request);
-      const persistedMessage = toUiMessage(persisted, userId);
+      const persistedMessage = toChatMessage(persisted, userId);
       if (!persistedMessage) throw new Error('Message response has no content');
-      setMessages(previous => ({
-        ...previous,
-        [conversationId]: (previous[conversationId] || []).map(message =>
-          message.id === temporaryId || message.clientMessageId === request.client_message_id
-            ? { ...persistedMessage, id: persisted.id, status: 'sent' }
-            : message
-        ),
+      dispatch(replaceConversationMessage({
+        conversationId,
+        temporaryId,
+        message: { ...persistedMessage, id: persisted.id, status: 'sent' },
       }));
     } catch {
-      setMessages(previous => ({
-        ...previous,
-        [conversationId]: (previous[conversationId] || []).map(message =>
-          message.id === temporaryId ? { ...message, status: 'failed' } : message
-        ),
+      dispatch(patchConversationMessage({
+        conversationId,
+        messageId: temporaryId,
+        changes: { status: 'failed' },
       }));
     }
   }
@@ -1509,26 +1520,22 @@ function Chat() {
   ) {
     try {
       const persisted = await sendImageMessage(request);
-      const persistedMessage = toUiMessage(persisted, userId);
+      const persistedMessage = toChatMessage(persisted, userId);
       if (!persistedMessage?.imageUrl) throw new Error('Image message response has no image');
-      setMessages(previous => ({
-        ...previous,
-        [conversationId]: (previous[conversationId] || []).map(message =>
-          message.id === temporaryId || message.clientMessageId === request.client_message_id
-            ? { ...persistedMessage, id: persisted.id, status: 'sent' }
-            : message
-        ),
+      dispatch(replaceConversationMessage({
+        conversationId,
+        temporaryId,
+        message: { ...persistedMessage, id: persisted.id, status: 'sent' },
       }));
       window.setTimeout(() => {
         URL.revokeObjectURL(previewUrl);
         imagePreviewUrlsRef.current.delete(previewUrl);
       }, 0);
     } catch {
-      setMessages(previous => ({
-        ...previous,
-        [conversationId]: (previous[conversationId] || []).map(message =>
-          message.id === temporaryId ? { ...message, status: 'failed' } : message
-        ),
+      dispatch(patchConversationMessage({
+        conversationId,
+        messageId: temporaryId,
+        changes: { status: 'failed' },
       }));
     }
   }
@@ -1554,7 +1561,7 @@ function Chat() {
       clientMessageId,
       sendRequest: request,
     };
-    setMessages(p => ({ ...p, [conversationId]: [...(p[conversationId] || []), newMsg] }));
+    dispatch(appendConversationMessage({ conversationId, message: newMsg }));
     setInputText('');
 
     await persistMessage(conversationId, temporaryId, request, currentUser.id);
@@ -1562,11 +1569,10 @@ function Chat() {
 
   async function retryMessage(message: Message) {
     if (message.status !== 'failed' || !activeConversationId || !currentUser) return;
-    setMessages(previous => ({
-      ...previous,
-      [activeConversationId]: (previous[activeConversationId] || []).map(item =>
-        item.id === message.id ? { ...item, status: 'sending' } : item
-      ),
+    dispatch(patchConversationMessage({
+      conversationId: activeConversationId,
+      messageId: message.id,
+      changes: { status: 'sending' },
     }));
     if (message.sendImageRequest && message.imageUrl) {
       await persistImageMessage(
@@ -1607,7 +1613,17 @@ function Chat() {
       from: 'me',
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     };
-    setMessages(p => ({ ...p, [activeConversationId]: [...(p[activeConversationId] || []), newMsg] }));
+    if (currentUser) {
+      dispatch(appendConversationMessage({
+        conversationId: activeConversationId,
+        message: newMsg,
+      }));
+    } else {
+      setGuestMessages(previous => ({
+        ...previous,
+        [activeConversationId]: [...(previous[activeConversationId] || []), newMsg],
+      }));
+    }
     e.target.value = '';
   }
 
@@ -1636,7 +1652,7 @@ function Chat() {
       imageUrl: previewUrl,
       imageName: f.name,
     };
-    setMessages(p => ({ ...p, [conversationId]: [...(p[conversationId] || []), newMsg] }));
+    dispatch(appendConversationMessage({ conversationId, message: newMsg }));
 
     await persistImageMessage(conversationId, temporaryId, request, previewUrl, currentUser.id);
   }
@@ -2017,41 +2033,58 @@ function Chat() {
                             : t('chat.offline')}
                       </div>
                     </div>
-                    {activeContactInfo.type === 'group' && (
-                      <div className="group-members-toolbar">
-                        <div
-                          className="group-member-stack"
-                          aria-label={t('chat.groupMemberAvatars', { count: activeGroupMembers.length })}
-                        >
-                          {activeGroupMembers.slice(0, MAX_VISIBLE_GROUP_AVATARS).map(member => (
-                            <span
-                              key={member.user_id}
-                              className="group-member-avatar"
-                              // title={member.username}
-                            >
-                              <img
-                                src={resolveAvatarUrl(member.avatar) || fallbackAvatar(member.username)}
-                                alt={member.username}
-                              />
-                              {member.online && <span className="group-member-online" aria-hidden="true" />}
-                            </span>
-                          ))}
-                          {activeGroupMembers.length > MAX_VISIBLE_GROUP_AVATARS && (
-                            <span className="group-member-overflow">
-                              {activeGroupMembers.length - MAX_VISIBLE_GROUP_AVATARS}+
-                            </span>
-                          )}
+                    <div className="messages-header-actions">
+                      {activeContactInfo.type === 'group' && (
+                        <div className="group-members-toolbar">
+                          <div
+                            className="group-member-stack"
+                            aria-label={t('chat.groupMemberAvatars', { count: activeGroupMembers.length })}
+                          >
+                            {activeGroupMembers.slice(0, MAX_VISIBLE_GROUP_AVATARS).map(member => (
+                              <span
+                                key={member.user_id}
+                                className="group-member-avatar"
+                              >
+                                <img
+                                  src={resolveAvatarUrl(member.avatar) || fallbackAvatar(member.username)}
+                                  alt={member.username}
+                                />
+                                {member.online && <span className="group-member-online" aria-hidden="true" />}
+                              </span>
+                            ))}
+                            {activeGroupMembers.length > MAX_VISIBLE_GROUP_AVATARS && (
+                              <span className="group-member-overflow">
+                                {activeGroupMembers.length - MAX_VISIBLE_GROUP_AVATARS}+
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="group-share-button"
+                            aria-label={t('chat.shareGroup')}
+                            onClick={openMemberShareDialog}
+                          >
+                            <Share2 size={16} strokeWidth={2.2} aria-hidden="true" />
+                          </button>
                         </div>
+                      )}
+                      {currentUser && (
                         <button
                           type="button"
-                          className="group-share-button"
-                          aria-label={t('chat.shareGroup')}
-                          onClick={openMemberShareDialog}
+                          className="group-share-button conversation-refresh-button"
+                          aria-label={t('chat.refreshMessages')}
+                          onClick={refreshActiveConversation}
+                          disabled={historyLoading || historyRefreshing}
                         >
-                          <Share2 size={16} strokeWidth={2.2} aria-hidden="true" />
+                          <RefreshCw
+                            size={15}
+                            strokeWidth={2.2}
+                            className={historyRefreshing ? 'is-spinning' : undefined}
+                            aria-hidden="true"
+                          />
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </>
                 ) : (
                   isConversationLoading ? (
@@ -2065,15 +2098,20 @@ function Chat() {
                   )
                 )}
               </div>
-              <div ref={msgListRef} className="msg-list">
+              <div ref={msgListRef} className="msg-list" onScroll={handleMessageListScroll}>
+                {historyLoadingMore && (
+                  <div className="message-history-loading" role="status" aria-label={t('chat.loadingOlderMessages')}>
+                    <span className="chat-loading-spinner" aria-hidden="true" />
+                  </div>
+                )}
                 {isConversationLoading || historyLoading ? (
                   <div className="messages-loading" role="status" aria-label={t('chat.loadingConversation')}>
                     <span className="chat-loading-spinner" aria-hidden="true" />
                   </div>
-                ) : (messages[activeConversationId] || []).length === 0 ? (
+                ) : activeMessages.length === 0 ? (
                   <div className="msg-empty">{t('chat.noMessages')}</div>
                 ) : (
-                  (messages[activeConversationId] || []).map((msg, msgIndex, contactMessages) => {
+                  activeMessages.map((msg, msgIndex, contactMessages) => {
                     const previousMessage = contactMessages[msgIndex - 1];
                     const showDateDivider = Boolean(
                       msg.createdAt

@@ -522,7 +522,6 @@ $chat-margin-left: 100px;
 
 .group-members-toolbar {
     min-width: 0;
-    margin-left: auto;
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -584,8 +583,32 @@ $chat-margin-left: 100px;
     font-weight: 700;
 }
 
+.messages-header-actions {
+    min-width: 0;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
 .group-share-button {
     flex: 0 0 30px;
+}
+
+.conversation-refresh-button {
+    visibility: visible;
+    opacity: 1;
+    transform: scale(1);
+}
+
+.conversation-refresh-button:disabled {
+    cursor: default;
+    opacity: 0.58;
+}
+
+.conversation-refresh-button .is-spinning {
+    animation: chat-loading-spin 0.75s linear infinite;
 }
 
 .group-members-toolbar:hover .group-share-button,
@@ -1489,6 +1512,20 @@ $chat-margin-left: 100px;
     flex: 1;
     display: grid;
     place-items: center;
+}
+
+.message-history-loading {
+    display: flex;
+    min-height: 34px;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 34px;
+}
+
+.message-history-loading .chat-loading-spinner {
+    width: 18px;
+    height: 18px;
+    border-width: 2px;
 }
 
 .chat-loading-spinner {

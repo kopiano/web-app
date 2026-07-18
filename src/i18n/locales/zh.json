@@ -76,6 +76,8 @@
     "noContacts": "暂无联系人。",
     "retry": "重试",
     "loadingConversation": "正在加载会话",
+    "loadingOlderMessages": "正在加载更早消息",
+    "refreshMessages": "刷新消息",
     "noMessages": "暂无消息",
     "openImage": "打开图片 {{name}}",
     "sharedImage": "聊天图片",

@@ -34,13 +34,13 @@ export function sendImageMessage(input) {
   })
 }
 
-export function getMessageHistory({ chat_type, contact_id, limit = 100 }) {
-  const key = `${chat_type}:${contact_id}:${limit}`
+export function getMessageHistory({ chat_type, contact_id, limit = 50, before_id }) {
+  const key = `${chat_type}:${contact_id}:${limit}:${before_id || ''}`
   const existingRequest = historyRequests.get(key)
   if (existingRequest) return existingRequest
 
   const historyRequest = request.get('/message/history', {
-    params: { chat_type, contact_id, limit },
+    params: { chat_type, contact_id, limit, before_id },
   }).then(response => {
     if (Array.isArray(response.data)) return response.data
     throw new Error('Invalid message history response')
