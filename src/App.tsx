@@ -80,7 +80,7 @@ function hasActiveSubscription(user: {
   subscription_end_at?: string | null;
 }) {
   const paidPlan = user.plan?.toLowerCase() === 'pro' || user.plan?.toLowerCase() === 'plus';
-  const activeStatus = (user.subscription_status ?? 'active').toLowerCase() === 'active';
+  const activeStatus = (user.subscription_status ?? '').toLowerCase() === 'active';
   const endTimestamp = user.subscription_end_at
     ? Date.parse(user.subscription_end_at)
     : Number.POSITIVE_INFINITY;
