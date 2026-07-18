@@ -16,7 +16,11 @@ function MiniMusicPlayer() {
   if (!track?.id) return null;
 
   return (
-    <aside className="mini-music-player" aria-label={t('music.player')}>
+    <aside
+      className={`mini-music-player${isPlaying ? '' : ' fade-out'}`}
+      aria-hidden={!isPlaying}
+      aria-label={t('music.player')}
+    >
       <div className={`mini-music-cover${isPlaying ? ' is-playing' : ''}`} aria-hidden="true">
         {track.cover
           ? <img src={track.cover} alt="" />
@@ -35,7 +39,6 @@ function MiniMusicPlayer() {
           disabled={!canPlay}
           onClick={togglePlayback}
           aria-label={t(isPlaying ? 'music.pause' : 'music.play')}
-          title={t(isPlaying ? 'music.pause' : 'music.play')}
         >
           {isPlaying
             ? <Pause size={17} fill="currentColor" />
