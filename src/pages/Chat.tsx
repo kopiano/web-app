@@ -14,6 +14,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import avatarFrame from '@/assets/images/avatar-frame.webp';
 import { defaultAvatarDataUrl, resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar';
 import {
   addGroupMembers,
@@ -54,6 +55,7 @@ interface Contact {
   lastMsg: string;
   time: string;
   online?: boolean;
+  isPro?: boolean;
   members?: ChatApiMember[];
 }
 
@@ -1943,8 +1945,16 @@ function Chat() {
               <div className="contact-group-label">{t('chat.contacts')}</div>
               {visibleContacts.filter(c => c.type === 'user').map(c => (
                 <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => selectContact(c.id)}>
-                  <div className="contact-avatar">
+                  <div className={`contact-avatar${c.isPro ? ' has-pro-frame' : ''}`}>
                     <img src={c.avatar} alt="" className="avatar-img" />
+                    {c.isPro && (
+                      <img
+                        src={avatarFrame}
+                        alt=""
+                        className="contact-avatar-frame"
+                        aria-hidden="true"
+                      />
+                    )}
                     {c.online && <div className="contact-online" />}
                   </div>
                   <div className="contact-info">

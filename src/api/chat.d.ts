@@ -12,6 +12,7 @@ export interface ChatApiContact {
   avatar?: string | null;
   username: string;
   online?: boolean | null;
+  is_pro?: boolean;
   content?: string | null;
   last_message_time?: string | null;
   members?: ChatApiMember[];

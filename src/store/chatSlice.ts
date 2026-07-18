@@ -11,6 +11,7 @@ export interface ChatContact {
   time: string
   lastMessageTime: string | null
   online?: boolean
+  isPro: boolean
   members: ChatMember[]
 }
 
@@ -28,6 +29,7 @@ interface ApiContact {
   avatar?: string | null
   username: string
   online?: boolean | null
+  is_pro?: boolean
   content?: string | null
   last_message_time?: string | null
   members?: ChatMember[]
@@ -115,6 +117,7 @@ function formatContact(contact: ApiContact): ChatContact | null {
     time: formatLatestMessageTime(contact.last_message_time || null),
     lastMessageTime: contact.last_message_time || null,
     online: contact.online ?? undefined,
+    isPro: Boolean(contact.is_pro),
     members: contact.members || [],
   }
 }

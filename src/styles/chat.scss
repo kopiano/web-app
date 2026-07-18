@@ -344,7 +344,11 @@ $chat-margin-left: 100px;
     place-items: center;
     flex-shrink: 0;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
+}
+
+.contact-avatar.has-pro-frame {
+    // filter: drop-shadow(0 6px 10px rgba(50, 50, 50, 0.32));
 }
 
 .avatar-img {
@@ -355,15 +359,30 @@ $chat-margin-left: 100px;
     display: block;
 }
 
+.contact-avatar-frame {
+    position: absolute;
+    z-index: 2;
+    top: 50%;
+    left: 50%;
+    width: 58px;
+    height: 58px;
+    max-width: none;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+    transform: translate(-50%, -50%);
+}
+
 .contact-online {
     position: absolute;
+    z-index: 3;
     bottom: 1px;
-    right: 1px;
-    width: 11px;
-    height: 11px;
+    right: 0px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: #4ade80;
-    border: 2.5px solid rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.95);
     box-shadow: 0 0 4px rgba(74, 222, 128, 0.4);
 }
 
