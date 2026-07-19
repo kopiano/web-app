@@ -753,6 +753,7 @@ function VideoWatch({
                 active
                 autoPlay
                 controls={false}
+                toggleOnSurfaceClick
                 onVideoElement={setMedia}
                 errorLabel={t('video.player.error')}
                 onViewQualified={() => {

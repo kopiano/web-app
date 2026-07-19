@@ -72,6 +72,7 @@ interface HlsVideoProps {
   onDeactivate?: () => void;
   onViewQualified?: () => void;
   controls?: boolean;
+  toggleOnSurfaceClick?: boolean;
   onVideoElement?: (video: HTMLVideoElement | null) => void;
   playbackId?: string;
   errorLabel?: string;
@@ -89,6 +90,7 @@ export default function HlsVideo({
   onDeactivate,
   onViewQualified,
   controls = active,
+  toggleOnSurfaceClick = false,
   onVideoElement,
   playbackId,
   errorLabel = 'Unable to play this video.',
@@ -500,6 +502,22 @@ export default function HlsVideo({
     });
   };
 
+  const handleSurfaceClick = () => {
+    if (!toggleOnSurfaceClick) return;
+    if (!active) {
+      onActivate?.();
+      return;
+    }
+
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused || video.ended) {
+      void video.play().catch(() => setPlaybackError(true));
+    } else {
+      video.pause();
+    }
+  };
+
   useEffect(() => {
     const container = containerRef.current;
     if (!active || !container || !onDeactivate) return;
@@ -521,7 +539,12 @@ export default function HlsVideo({
   }, [active, onDeactivate]);
 
   return (
-    <div ref={containerRef} className="hls-video" style={{ aspectRatio }}>
+    <div
+      ref={containerRef}
+      className="hls-video"
+      style={{ aspectRatio }}
+      onClick={handleSurfaceClick}
+    >
       <video
         ref={videoRef}
         controls={controls}
@@ -536,7 +559,10 @@ export default function HlsVideo({
           type="button"
           className="hls-video-play"
           aria-label={active ? 'Resume video' : 'Play video'}
-          onClick={handlePlay}
+          onClick={(event) => {
+            event.stopPropagation();
+            handlePlay();
+          }}
         >
           <svg
             width="32"
