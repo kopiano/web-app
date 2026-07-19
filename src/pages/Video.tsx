@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import {
   ArrowLeft,
   Bookmark,
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  BarChart3,
   Clock3,
-  Eye,
   Expand,
   Heart,
   Home,
+  ImagePlus,
   Library,
   ListVideo,
   MessageCircle,
@@ -24,14 +27,19 @@ import {
   Share2,
   Smile,
   ThumbsUp,
+  Upload,
   Volume2,
   VolumeX,
   X,
 } from 'lucide-react';
 import HlsVideo from '@/components/HlsVideo';
+import { defaultAvatarDataUrl, resolveAvatarUrl } from '@/lib/avatar';
+import type { RootState } from '@/store/store';
 import '@/styles/video.scss';
 
 type VideoView = 'home' | 'library' | 'favorites' | 'playlist' | 'watch';
+type VideoUploadStep = 'upload' | 'publish';
+type VideoVisibility = 'public' | 'private';
 
 type VideoItem = {
   id: string;
@@ -350,6 +358,8 @@ const COLLECTIONS: VideoCollection[] = [
 
 const CATEGORIES = ['All', 'Movies', 'Genshin Impact', 'Travel', 'Nature', 'Design', 'Music'];
 const VALID_VIEWS = new Set<VideoView>(['home', 'library', 'favorites', 'playlist', 'watch']);
+const DEFAULT_UPLOAD_POSTER = VIDEOS[0].poster;
+const VIDEO_UPLOAD_DRAFT_KEY = 'lume-video-upload-draft';
 const VIDEO_COMMENTS: VideoComment[] = [
   {
     id: 'comment-1',
@@ -417,27 +427,45 @@ function VideoCard({
   onFavorite: (videoId: string) => void;
   variant?: string;
 }) {
+  const playlistLikes = `${Math.max(1, Math.round(Number.parseFloat(video.views) * 0.08))}K`;
+
   return (
     <article className={`video-tile${variant ? ` is-${variant}` : ''}`}>
       <button type="button" className="video-tile-hit" onClick={() => onPlay(video)}>
         <img src={video.poster} alt="" />
         <span className="video-quality">{video.resolution}</span>
         <span className="video-category-tag">{video.category}</span>
-        <span className="video-duration">
-          <Clock3 size={12} aria-hidden="true" />
-          {video.duration}
-        </span>
+        {variant !== 'playlist' && (
+          <span className="video-duration">
+            <Clock3 size={12} aria-hidden="true" />
+            {video.duration}
+          </span>
+        )}
         <span className="video-tile-play" aria-hidden="true">
           <Play size={22} fill="currentColor" />
         </span>
         <span className="video-tile-details">
-          <img src={video.avatar} alt="" className="video-avatar" />
+          {variant !== 'playlist' && <img src={video.avatar} alt="" className="video-avatar" />}
           <span className="video-tile-copy">
             <strong>{video.title}</strong>
             <small>{video.creator}</small>
-            <span>
-              <Eye size={13} aria-hidden="true" />
-              {video.views}
+            <span className="video-tile-meta">
+              {variant === 'playlist' && (
+                <span>
+                  <ThumbsUp size={13} aria-hidden="true" />
+                  {playlistLikes}
+                </span>
+              )}
+              <span>
+                <BarChart3 size={13} aria-hidden="true" />
+                {video.views}
+              </span>
+              {variant === 'playlist' && (
+                <span className="video-tile-inline-duration">
+                  <Clock3 size={13} aria-hidden="true" />
+                  {video.duration}
+                </span>
+              )}
             </span>
           </span>
         </span>
@@ -831,13 +859,265 @@ function VideoWatchPage({
   );
 }
 
+function getUploadTitle(fileName: string) {
+  return fileName.replace(/\.[^/.]+$/, '').replace(/[-_]+/g, ' ').trim() || 'Untitled video';
+}
+
+function formatUploadedDuration(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return '00:00';
+  return formatPlaybackTime(value);
+}
+
+function VideoUploadDialog({
+  step,
+  progress,
+  videoFile,
+  coverPreview,
+  title,
+  tags,
+  visibility,
+  duration,
+  error,
+  isPublishing,
+  videoInputRef,
+  coverInputRef,
+  onClose,
+  onSelectVideo,
+  onSelectCover,
+  onTitleChange,
+  onTagsChange,
+  onVisibilityChange,
+  onPublish,
+}: {
+  step: VideoUploadStep;
+  progress: number;
+  videoFile: File | null;
+  coverPreview: string;
+  title: string;
+  tags: string;
+  visibility: VideoVisibility;
+  duration: string;
+  error: string;
+  isPublishing: boolean;
+  videoInputRef: React.RefObject<HTMLInputElement | null>;
+  coverInputRef: React.RefObject<HTMLInputElement | null>;
+  onClose: () => void;
+  onSelectVideo: (file: File | null) => void;
+  onSelectCover: (file: File | null) => void;
+  onTitleChange: (value: string) => void;
+  onTagsChange: (value: string) => void;
+  onVisibilityChange: (visibility: VideoVisibility) => void;
+  onPublish: () => void;
+}) {
+  const readyToPublish = Boolean(title.trim() && videoFile && progress === 100);
+
+  return createPortal(
+    <div className="video-upload-overlay" role="presentation">
+      <button
+        type="button"
+        className="video-upload-backdrop"
+        aria-label="Close upload dialog"
+        disabled={isPublishing}
+        onClick={onClose}
+      />
+      <section
+        className={`video-upload-dialog is-${step}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="video-upload-title"
+      >
+        <button
+          type="button"
+          className="video-upload-close"
+          aria-label="Close upload dialog"
+          disabled={isPublishing}
+          onClick={onClose}
+        >
+          <X size={18} />
+        </button>
+
+        {step === 'publish' && (
+          <div className="video-upload-progress">
+            <div className="video-upload-progress-copy">
+              <span>{progress < 100 ? 'Uploading video' : 'Upload complete'}</span>
+              <strong>{progress}%</strong>
+            </div>
+            <span className="video-upload-progress-track" aria-hidden="true">
+              <i style={{ width: `${progress}%` }} />
+            </span>
+          </div>
+        )}
+
+        {step === 'upload' ? (
+          <div className="video-upload-select-step">
+            <span className="video-upload-mark" aria-hidden="true">
+              <Upload size={24} />
+            </span>
+            <p className="video-upload-eyebrow">New video</p>
+            <h2 id="video-upload-title">Upload a video</h2>
+            <p className="video-upload-description">
+              Choose a video file to prepare it for publishing.
+            </p>
+            <input
+              ref={videoInputRef}
+              className="video-upload-file-input"
+              type="file"
+              accept="video/*"
+              onChange={(event) => onSelectVideo(event.target.files?.[0] ?? null)}
+            />
+            <button
+              type="button"
+              className="video-upload-dropzone"
+              disabled={progress > 0 && progress < 100}
+              onClick={() => videoInputRef.current?.click()}
+            >
+              <Upload size={22} />
+              <span>
+                <strong>{videoFile?.name || 'Select a video file'}</strong>
+                <small>{videoFile ? 'Preparing your upload' : 'MP4, WebM, MOV and other video formats'}</small>
+              </span>
+            </button>
+            {error && <p className="video-upload-error" role="alert">{error}</p>}
+          </div>
+        ) : (
+          <div className="video-upload-publish-step">
+            <div className="video-upload-summary">
+              <span>
+                <small>Video</small>
+                <strong>{videoFile?.name}</strong>
+              </span>
+              <span>
+                <small>Duration</small>
+                <strong>{duration}</strong>
+              </span>
+              <span className="video-upload-visibility-field">
+                <small>Visibility</small>
+                <div className={`video-upload-visibility is-${visibility}`} aria-label="Video visibility">
+                  {(['public', 'private'] as VideoVisibility[]).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={visibility === option ? 'is-active' : ''}
+                      aria-pressed={visibility === option}
+                      onClick={() => onVisibilityChange(option)}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </span>
+            </div>
+
+            <div className="video-upload-heading">
+              <span className={`video-upload-complete-icon${progress < 100 ? ' is-uploading' : ''}`} aria-hidden="true">
+                {progress < 100 ? <Upload size={20} /> : <CheckCircle2 size={20} />}
+              </span>
+              <div>
+                <p className="video-upload-eyebrow">{progress < 100 ? 'Uploading video' : 'Ready to publish'}</p>
+                <h2 id="video-upload-title">Video details</h2>
+              </div>
+            </div>
+
+            <div className="video-upload-form">
+              <div
+                className={`video-upload-cover-field${coverPreview ? ' has-preview' : ' is-empty'}`}
+                role="button"
+                tabIndex={0}
+                aria-label={coverPreview ? 'Change video cover' : 'Choose video cover'}
+                onClick={() => coverInputRef.current?.click()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    coverInputRef.current?.click();
+                  }
+                }}
+              >
+                {coverPreview ? (
+                  <img src={coverPreview} alt="Selected video cover" />
+                ) : (
+                  <span className="video-upload-cover-empty">
+                    <ImagePlus size={28} aria-hidden="true" />
+                    <strong>Choose a cover</strong>
+                    <small>Select an image for your video</small>
+                  </span>
+                )}
+                <input
+                  ref={coverInputRef}
+                  className="video-upload-file-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => onSelectCover(event.target.files?.[0] ?? null)}
+                />
+              </div>
+
+              <div className="video-upload-fields">
+                <label>
+                  <span>Title</span>
+                  <input
+                    type="text"
+                    value={title}
+                    maxLength={120}
+                    placeholder="Give your video a title"
+                    onChange={(event) => onTitleChange(event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Category tags</span>
+                  <input
+                    type="text"
+                    value={tags}
+                    placeholder="#Travel #Nature"
+                    onChange={(event) => onTagsChange(event.target.value)}
+                  />
+                  <small>Use # before each category. Separate tags with spaces.</small>
+                </label>
+              </div>
+            </div>
+
+            {error && <p className="video-upload-error" role="alert">{error}</p>}
+            <button
+              type="button"
+              className="video-upload-publish"
+              disabled={!readyToPublish || isPublishing}
+              onClick={onPublish}
+            >
+              <Upload size={18} />
+              {isPublishing ? 'Publishing...' : 'Publish video'}
+            </button>
+          </div>
+        )}
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
 function Video() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+  const [videos, setVideos] = useState<VideoItem[]>(VIDEOS);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [uploadStep, setUploadStep] = useState<VideoUploadStep>('upload');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadVideoFile, setUploadVideoFile] = useState<File | null>(null);
+  const [uploadVideoSrc, setUploadVideoSrc] = useState('');
+  const [uploadCoverPreview, setUploadCoverPreview] = useState('');
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadTags, setUploadTags] = useState('');
+  const [uploadDuration, setUploadDuration] = useState('00:00');
+  const [uploadResolution, setUploadResolution] = useState<VideoItem['resolution']>('1080p');
+  const [uploadVisibility, setUploadVisibility] = useState<VideoVisibility>('public');
+  const [uploadError, setUploadError] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
+  const uploadDraftHydratedRef = useRef(false);
+  const uploadTimerRef = useRef<number | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const requestedView = searchParams.get('view') as VideoView | null;
   const requestedVideoId = searchParams.get('video');
   const watchedVideo = useMemo(
-    () => VIDEOS.find((video) => video.id === requestedVideoId) ?? null,
-    [requestedVideoId],
+    () => videos.find((video) => video.id === requestedVideoId) ?? null,
+    [requestedVideoId, videos],
   );
   const activeView = requestedView === 'watch' && !watchedVideo
     ? 'home'
@@ -847,6 +1127,7 @@ function Video() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [query, setQuery] = useState('');
   const [activeVideo, setActiveVideo] = useState<VideoItem | null>(null);
+  const [homeVisibleCount, setHomeVisibleCount] = useState(20);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(
     () => new Set(['northbound', 'sea-of-clouds', 'teyvat-after-rain', 'analog-rooms']),
   );
@@ -858,7 +1139,7 @@ function Video() {
 
   const filteredVideos = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return VIDEOS.filter((video) => {
+    return videos.filter((video) => {
       const matchesCategory = activeCategory === 'All' || video.category === activeCategory;
       const matchesQuery = !normalizedQuery
         || `${video.title} ${video.creator} ${video.description}`
@@ -866,7 +1147,7 @@ function Video() {
           .includes(normalizedQuery);
       return matchesCategory && matchesQuery;
     });
-  }, [activeCategory, query]);
+  }, [activeCategory, query, videos]);
 
   const filteredCollections = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -885,11 +1166,24 @@ function Video() {
   const playlistPageCount = Math.max(1, Math.ceil(filteredVideos.length / 8));
   const safePlaylistPage = Math.min(playlistPage, playlistPageCount);
   const playlistVideos = filteredVideos.slice((safePlaylistPage - 1) * 8, safePlaylistPage * 8);
-  const homeVideos = filteredVideos.slice(0, 4);
-  const featuredVideo = filteredVideos[0] ?? VIDEOS[0];
+  const homeVideos = videos.slice(0, homeVisibleCount);
+  const featuredVideo = filteredVideos[0] ?? videos[0] ?? VIDEOS[0];
   const watchPlaylist = useMemo(() => {
-    return VIDEOS;
-  }, [watchedVideo]);
+    return videos;
+  }, [videos]);
+
+  useEffect(() => {
+    if (activeView !== 'home') return;
+
+    const loadMoreHomeVideos = () => {
+      if (window.innerHeight + window.scrollY < document.documentElement.scrollHeight - 480) return;
+      setHomeVisibleCount((count) => Math.min(count + 20, videos.length));
+    };
+
+    window.addEventListener('scroll', loadMoreHomeVideos, { passive: true });
+    loadMoreHomeVideos();
+    return () => window.removeEventListener('scroll', loadMoreHomeVideos);
+  }, [activeView, videos.length]);
 
   useEffect(() => {
     if (!activeVideo) return;
@@ -904,6 +1198,86 @@ function Video() {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [activeVideo]);
+
+  useEffect(() => {
+    if (!isUploadOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isPublishing) closeUploadDialog();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isPublishing, isUploadOpen]);
+
+  useEffect(() => () => {
+    if (uploadTimerRef.current !== null) window.clearInterval(uploadTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(VIDEO_UPLOAD_DRAFT_KEY);
+    if (saved) {
+      try {
+        const draft = JSON.parse(saved) as {
+          isOpen?: boolean;
+          step?: VideoUploadStep;
+          progress?: number;
+          title?: string;
+          tags?: string;
+          duration?: string;
+          resolution?: VideoItem['resolution'];
+          visibility?: VideoVisibility;
+        };
+        setIsUploadOpen(Boolean(draft.isOpen));
+        setUploadStep(draft.step === 'publish' ? 'publish' : 'upload');
+        setUploadProgress(Number.isFinite(draft.progress) ? Math.max(0, Math.min(100, draft.progress ?? 0)) : 0);
+        setUploadTitle(draft.title ?? '');
+        setUploadTags(draft.tags ?? '');
+        setUploadDuration(draft.duration ?? '00:00');
+        setUploadResolution(draft.resolution ?? '1080p');
+        setUploadVisibility(draft.visibility === 'private' ? 'private' : 'public');
+      } catch {
+        window.localStorage.removeItem(VIDEO_UPLOAD_DRAFT_KEY);
+      }
+    }
+    window.setTimeout(() => {
+      uploadDraftHydratedRef.current = true;
+    }, 0);
+  }, []);
+
+  useEffect(() => {
+    if (!uploadDraftHydratedRef.current) return;
+    if (!isUploadOpen) {
+      window.localStorage.removeItem(VIDEO_UPLOAD_DRAFT_KEY);
+      return;
+    }
+    try {
+      window.localStorage.setItem(VIDEO_UPLOAD_DRAFT_KEY, JSON.stringify({
+        isOpen: true,
+        step: uploadStep,
+        progress: uploadProgress,
+        title: uploadTitle,
+        tags: uploadTags,
+        duration: uploadDuration,
+        resolution: uploadResolution,
+        visibility: uploadVisibility,
+      }));
+    } catch {
+      // Upload drafts are optional; never break the page when storage is unavailable.
+    }
+  }, [
+    isUploadOpen,
+    uploadStep,
+    uploadProgress,
+    uploadTitle,
+    uploadTags,
+    uploadDuration,
+    uploadResolution,
+    uploadVisibility,
+  ]);
 
   const navigateTo = (view: Exclude<VideoView, 'favorites' | 'watch'>) => {
     const next = new URLSearchParams();
@@ -956,6 +1330,140 @@ function Video() {
       else next.add(videoId);
       return next;
     });
+  };
+
+  const clearUploadTimer = () => {
+    if (uploadTimerRef.current === null) return;
+    window.clearInterval(uploadTimerRef.current);
+    uploadTimerRef.current = null;
+  };
+
+  const closeUploadDialog = () => {
+    if (isPublishing) return;
+    clearUploadTimer();
+    setIsUploadOpen(false);
+    setUploadStep('upload');
+    setUploadProgress(0);
+    setUploadVideoFile(null);
+    setUploadVideoSrc('');
+    setUploadCoverPreview('');
+    setUploadTitle('');
+    setUploadTags('');
+    setUploadDuration('00:00');
+    setUploadResolution('1080p');
+    setUploadVisibility('public');
+    setUploadError('');
+    if (videoInputRef.current) videoInputRef.current.value = '';
+    if (coverInputRef.current) coverInputRef.current.value = '';
+  };
+
+  const openUploadDialog = () => {
+    if (!currentUser) {
+      window.dispatchEvent(new CustomEvent('app:notification', {
+        detail: { message: '请先注册或登录后再上传视频', type: 'error' },
+      }));
+      return;
+    }
+    setIsUploadOpen(true);
+  };
+
+  const updateVideoMetadata = (src: string) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      setUploadDuration(formatUploadedDuration(video.duration));
+      if (video.videoWidth >= 3840) setUploadResolution('4K');
+      else if (video.videoWidth >= 2048) setUploadResolution('2K');
+      else setUploadResolution('1080p');
+      video.removeAttribute('src');
+      video.load();
+    };
+    video.onerror = () => {
+      video.removeAttribute('src');
+      video.load();
+    };
+    video.src = src;
+  };
+
+  const selectUploadVideo = (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      setUploadError('请选择有效的视频文件。');
+      return;
+    }
+
+    clearUploadTimer();
+    const src = URL.createObjectURL(file);
+    setUploadError('');
+    setUploadVideoFile(file);
+    setUploadVideoSrc(src);
+    setUploadTitle(getUploadTitle(file.name));
+    setUploadProgress(6);
+    setUploadStep('publish');
+    updateVideoMetadata(src);
+
+    uploadTimerRef.current = window.setInterval(() => {
+      setUploadProgress((current) => {
+        const next = Math.min(100, current + Math.max(4, Math.round((100 - current) * 0.18)));
+        if (next === 100) {
+          clearUploadTimer();
+        }
+        return next;
+      });
+    }, 130);
+  };
+
+  const selectUploadCover = (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setUploadError('请选择图片作为视频封面。');
+      return;
+    }
+    setUploadError('');
+    setUploadCoverPreview(URL.createObjectURL(file));
+  };
+
+  const publishVideo = () => {
+    if (!currentUser || !uploadVideoFile || !uploadVideoSrc || !uploadTitle.trim()) {
+      setUploadError('请完成视频文件和标题后再发布。');
+      return;
+    }
+
+    const category = uploadTags
+      .split(/\s+/)
+      .find((tag) => tag.startsWith('#'))
+      ?.slice(1)
+      .trim() || 'All';
+    const creator = currentUser.name || currentUser.username || 'User';
+    const newVideo: VideoItem = {
+      id: `uploaded-${Date.now()}`,
+      title: uploadTitle.trim(),
+      description: uploadTags.trim()
+        ? `Published with ${uploadTags.trim()}`
+        : 'A newly published video.',
+      creator,
+      avatar: resolveAvatarUrl(currentUser.avatar) || defaultAvatarDataUrl(creator),
+      views: '0 views',
+      duration: uploadDuration,
+      resolution: uploadResolution,
+      category,
+      poster: uploadCoverPreview || DEFAULT_UPLOAD_POSTER,
+      src: uploadVideoSrc,
+    };
+
+    setIsPublishing(true);
+    window.setTimeout(() => {
+      setVideos((current) => [newVideo, ...current]);
+      setHomeVisibleCount((current) => Math.max(current, 20));
+      setIsPublishing(false);
+      const next = new URLSearchParams(searchParams);
+      next.delete('page');
+      setSearchParams(next);
+      closeUploadDialog();
+      window.dispatchEvent(new CustomEvent('app:notification', {
+        detail: { message: '视频已发布到你的 Playlist 和 Home', type: 'success' },
+      }));
+    }, 420);
   };
 
   return (
@@ -1012,11 +1520,25 @@ function Video() {
           )}
         </header>
 
-        {activeView !== 'home' && activeView !== 'library' && (
+        {activeView === 'playlist' && (
+          <div className="video-playlist-category-row">
+            <CategoryNav
+              active={activeCategory}
+              onChange={changeCategory}
+              className="is-playlist"
+            />
+            <button type="button" className="video-upload-trigger" onClick={openUploadDialog}>
+              <Upload size={17} />
+              <span>Upload video</span>
+            </button>
+          </div>
+        )}
+
+        {activeView === 'favorites' && (
           <CategoryNav
             active={activeCategory}
             onChange={changeCategory}
-            className={activeView === 'playlist' ? 'is-playlist' : ''}
+            className="is-playlist"
           />
         )}
 
@@ -1053,16 +1575,18 @@ function Video() {
             </section>
 
             <section className="video-section">
+              <div className="video-home-recommendation">Today's Picks</div>
               {homeVideos.length ? (
                 <div className="video-home-grid">
                   {homeVideos.map((video) => (
                     <VideoCard
                       key={video.id}
                       video={video}
-                      favorite={favoriteIds.has(video.id)}
-                      onPlay={openVideo}
-                      onFavorite={toggleFavorite}
-                    />
+                    favorite={favoriteIds.has(video.id)}
+                    onPlay={openVideo}
+                    onFavorite={toggleFavorite}
+                    variant="playlist"
+                  />
                   ))}
                 </div>
               ) : (
@@ -1113,7 +1637,7 @@ function Video() {
         )}
 
         {activeView === 'favorites' && (
-          <section className="video-section video-favorites-section">
+          <section className="video-section video-favorites-section video-playlist-section">
             <div className="video-collection-toolbar">
               <button
                 type="button"
@@ -1218,6 +1742,30 @@ function Video() {
           </button>
         ))}
       </nav>
+
+      {isUploadOpen && (
+        <VideoUploadDialog
+          step={uploadStep}
+          progress={uploadProgress}
+          videoFile={uploadVideoFile}
+          coverPreview={uploadCoverPreview}
+          title={uploadTitle}
+          tags={uploadTags}
+          visibility={uploadVisibility}
+          duration={uploadDuration}
+          error={uploadError}
+          isPublishing={isPublishing}
+          videoInputRef={videoInputRef}
+          coverInputRef={coverInputRef}
+          onClose={closeUploadDialog}
+          onSelectVideo={selectUploadVideo}
+          onSelectCover={selectUploadCover}
+          onTitleChange={setUploadTitle}
+          onTagsChange={setUploadTags}
+          onVisibilityChange={setUploadVisibility}
+          onPublish={publishVideo}
+        />
+      )}
 
       {activeVideo && createPortal(
         <div className="video-player-backdrop" role="dialog" aria-modal="true" aria-label={activeVideo.title}>
