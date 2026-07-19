@@ -42,6 +42,7 @@
     radial-gradient(circle at 75% 8%, rgba(255, 255, 255, 0.82), transparent 31%);
   backdrop-filter: blur(22px) saturate(115%);
   -webkit-backdrop-filter: blur(22px) saturate(115%);
+  backdrop-filter: blur(22px) saturate(115%);
 }
 
 .music-page button,
@@ -104,6 +105,7 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   transform: translateY(-50%);
   transition: box-shadow 0.42s ease;
 }
@@ -714,6 +716,7 @@
   box-shadow: 0 8px 22px rgba(20, 22, 29, 0.16);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   font-size: 0.9rem;
 }
 
@@ -769,6 +772,7 @@
   box-shadow: 0 8px 22px rgba(20, 22, 29, 0.16);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
   transition:
     color 0.2s ease,
     background-color 0.2s ease,
@@ -799,6 +803,7 @@
   box-shadow: 0 14px 32px rgba(16, 18, 24, 0.22);
   backdrop-filter: blur(13px);
   -webkit-backdrop-filter: blur(13px);
+  backdrop-filter: blur(13px);
   transition:
     visibility 0s linear 0.18s,
     opacity 0.18s ease,
@@ -887,6 +892,7 @@
   background: rgba(255,255,255,0.26);
   backdrop-filter: blur(9px) !important;
   -webkit-backdrop-filter: blur(9px) !important;
+  backdrop-filter: blur(9px) !important;
   box-shadow: 0 40px 30px rgba(0,0,0,0.1) !important;
 }
 
@@ -1032,6 +1038,7 @@
   box-shadow: 0 22px 70px rgba(35, 42, 60, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
 }
 
 .music-now-playing {
@@ -1804,6 +1811,7 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   background: rgba(15, 23, 42, 0.26);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   cursor: default;
 }
 
@@ -1823,6 +1831,7 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
     inset 0 1px 0 rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(36px) saturate(145%);
   -webkit-backdrop-filter: blur(36px) saturate(145%);
+  backdrop-filter: blur(36px) saturate(145%);
   animation: music-duplicate-dialog-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -2157,6 +2166,7 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
     inset 0 1px 0 rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(18px) saturate(120%);
   -webkit-backdrop-filter: blur(18px) saturate(120%);
+  backdrop-filter: blur(18px) saturate(120%);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -2308,6 +2318,7 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   background: rgba(18, 23, 31, 0.28);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
   cursor: default;
 }
 
@@ -2327,6 +2338,7 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(36px) saturate(145%);
   -webkit-backdrop-filter: blur(36px) saturate(145%);
+  backdrop-filter: blur(36px) saturate(145%);
   animation: music-duplicate-dialog-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   transition: width 360ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -3163,6 +3175,7 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   text-align: center;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
 
 .music-user-library-empty h2 {
@@ -3773,6 +3786,7 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   box-shadow: 0 0.8rem 2.4rem rgba(40, 45, 57, 0.08);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
 }
 
 .music-library-layout-switch::before {
@@ -4134,6 +4148,7 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
     inset 0 1px 0 rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
   // transition: color 0.1s ease;
 }
 
@@ -4880,6 +4895,7 @@ main.music-page .music-library-favorite {
   background: rgba(255, 255, 255, 0.921);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
 }
 
 main.music-page .music-library-favorite.is-favorite:hover,
