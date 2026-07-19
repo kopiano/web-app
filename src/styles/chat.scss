@@ -141,10 +141,20 @@ $chat-margin-left: 100px;
     flex-shrink: 0;
     position: relative;
     overflow-y: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
     display: flex;
     flex-direction: column;
     gap: 2px;
     padding: 14px 0;
+}
+
+.contacts-panel::-webkit-scrollbar {
+    display: none;
+}
+
+.contacts-panel > :not(.contact-active-indicator) {
+    flex-shrink: 0;
 }
 
 .contact-active-indicator {
