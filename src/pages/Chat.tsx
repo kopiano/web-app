@@ -1616,6 +1616,8 @@ function Chat() {
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    // IME candidate confirmation also emits Enter; let the input method handle it.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();

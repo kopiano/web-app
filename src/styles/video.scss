@@ -176,12 +176,29 @@
 
 
 .video-category-nav {
+  width: fit-content;
+  max-width: 100%;
   margin: 3rem 0 2.4rem;
+  padding: 4px 6px;
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  border-radius: 2rem;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow:
+    0 1.2rem 3rem rgba(38, 48, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
   overflow-x: auto;
   scrollbar-width: none;
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  backdrop-filter: blur(22px) saturate(165%);
+}
+
+.video-category-nav.is-playlist {
+  width: fit-content;
+  margin-left: max(0px, calc((100% - 1246px) / 2));
+  margin-right: 0;
 }
 
 .video-category-nav::-webkit-scrollbar {
@@ -189,48 +206,27 @@
 }
 
 .video-category-nav button {
-  position: relative;
   flex: 0 0 auto;
-  min-height: 3.7rem;
-  padding: 0 1.35rem;
-  border: 1px solid transparent;
-  border-radius: 1.9rem;
-  color: #68706c;
+  min-width: 92px;
+  height: 36px;
+  padding: 0 1.2rem;
+  border: 0;
+  border-radius: 2rem;
+  color: #313131;
   background: transparent;
-  font-size: 1.25rem;
-  font-weight: 650;
-}
-
-.video-category-nav button::after {
-  content: '';
-  position: absolute;
-  right: 1.35rem;
-  bottom: 0.55rem;
-  left: 1.35rem;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--video-accent);
-  opacity: 0;
-  transform: scaleX(0);
+  font-size: 15px;
+  font-weight: 500;
 }
 
 .video-category-nav button:hover {
-  color: var(--video-ink);
-  background: rgba(255, 255, 255, 0.44);
+  color: #1d2420;
+  background: rgba(95, 95, 95, 0.11);
 }
 
 .video-category-nav button.is-active {
-  border-color: rgba(255, 255, 255, 0.94);
-  color: var(--video-ink);
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 0.7rem 2rem rgba(41, 50, 45, 0.07);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-}
-
-.video-category-nav button.is-active::after {
-  opacity: 1;
-  transform: scaleX(1);
+  color: #fff;
+  background: #1d2420;
+  box-shadow: 0 0.8rem 2rem rgba(29, 36, 32, 0.16);
 }
 
 .video-featured {
@@ -299,6 +295,40 @@
   font-weight: 700;
   -webkit-backdrop-filter: blur(12px) saturate(145%);
   backdrop-filter: blur(12px) saturate(145%);
+}
+
+.video-category-tag {
+  display: none;
+}
+
+.video-tile.is-playlist .video-quality,
+.video-tile.is-playlist .video-category-tag {
+  top: 1rem;
+  min-height: 2.35rem;
+  padding: 0 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 999px;
+  color: #25302a;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 0.5rem 1.4rem rgba(24, 31, 27, 0.1);
+  font-size: 0.98rem;
+  font-weight: 700;
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+}
+
+.video-tile.is-playlist .video-quality {
+  left: 1rem;
+}
+
+.video-tile.is-playlist .video-category-tag {
+  left: 5.7rem;
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .video-featured-play,
@@ -454,6 +484,48 @@
   margin: 5.8rem auto 0;
 }
 
+.video-playlist-section {
+  margin-top: 4.8rem;
+}
+
+.video-playlist-section .video-section-heading {
+  min-height: 6rem;
+  margin-bottom: 2.4rem;
+  padding: 1.4rem 1.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 1.6rem;
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow:
+    0 1rem 2.8rem rgba(45, 55, 49, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+
+.video-playlist-section .video-section-heading h2 {
+  font-size: 2.8rem;
+}
+
+.video-playlist-section .video-section-heading > small {
+  padding: 0.65rem 1rem;
+  border: 1px solid rgba(57, 69, 62, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.video-playlist-section .video-playlist-grid {
+  grid-template-columns: repeat(4, 300px);
+  gap: 1.5rem;
+  justify-content: space-between;
+}
+
+.video-playlist-section .video-tile {
+  width: 300px;
+  height: 166px;
+  aspect-ratio: auto;
+  border-radius: 2rem;
+}
+
 .video-section-heading {
   margin-bottom: 2.2rem;
   display: flex;
@@ -579,8 +651,7 @@
   display: flex;
   align-items: flex-start;
   gap: 1rem;
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.88));
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.88));
   border-top: 1px solid rgba(255, 255, 255, 0.7);
   -webkit-backdrop-filter: blur(18px) saturate(145%);
   backdrop-filter: blur(18px) saturate(145%);
@@ -880,15 +951,29 @@
 }
 
 .video-pagination {
-  min-height: 8rem;
+  min-height: 8.5rem;
+  margin-top: 2.2rem;
+  padding-top: 1.8rem;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.65rem;
+  justify-content: space-between;
+  border-top: 1px solid rgba(57, 69, 62, 0.1);
+}
+
+.video-pagination-status {
+  color: var(--video-muted);
+  font-size: 1.18rem;
+  font-weight: 650;
+}
+
+.video-pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
 }
 
 .video-pagination button {
-  width: 3.7rem;
+  width: 3.9rem;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -904,7 +989,7 @@
 }
 
 .video-pagination button:hover:not(:disabled),
-.video-pagination button.is-active {
+.video-pagination button:focus-visible:not(:disabled) {
   color: #fff;
   background: #1d2420;
   transform: translateY(-0.2rem);
@@ -2010,6 +2095,10 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .video-playlist-section .video-playlist-grid {
+    grid-template-columns: repeat(3, 300px);
+  }
+
   .video-library-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2069,6 +2158,10 @@
   .video-home-grid,
   .video-playlist-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .video-playlist-section .video-playlist-grid {
+    grid-template-columns: repeat(2, 300px);
   }
 
   .video-player-info {
@@ -2137,6 +2230,10 @@
   .video-playlist-grid,
   .video-library-grid {
     grid-template-columns: 1fr;
+  }
+
+  .video-playlist-section .video-playlist-grid {
+    grid-template-columns: 300px;
   }
 
   .video-tile {

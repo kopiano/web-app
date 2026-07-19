@@ -380,12 +380,14 @@ const VIDEO_COMMENTS: VideoComment[] = [
 function CategoryNav({
   active,
   onChange,
+  className = '',
 }: {
   active: string;
   onChange: (category: string) => void;
+  className?: string;
 }) {
   return (
-    <div className="video-category-nav" role="tablist" aria-label="Video categories">
+    <div className={`video-category-nav${className ? ` ${className}` : ''}`} role="tablist" aria-label="Video categories">
       {CATEGORIES.map((category) => (
         <button
           key={category}
@@ -407,17 +409,20 @@ function VideoCard({
   favorite,
   onPlay,
   onFavorite,
+  variant = '',
 }: {
   video: VideoItem;
   favorite: boolean;
   onPlay: (video: VideoItem) => void;
   onFavorite: (videoId: string) => void;
+  variant?: string;
 }) {
   return (
-    <article className="video-tile">
+    <article className={`video-tile${variant ? ` is-${variant}` : ''}`}>
       <button type="button" className="video-tile-hit" onClick={() => onPlay(video)}>
         <img src={video.poster} alt="" />
         <span className="video-quality">{video.resolution}</span>
+        <span className="video-category-tag">{video.category}</span>
         <span className="video-duration">
           <Clock3 size={12} aria-hidden="true" />
           {video.duration}
@@ -437,15 +442,17 @@ function VideoCard({
           </span>
         </span>
       </button>
-      <button
-        type="button"
-        className={`video-favorite${favorite ? ' is-active' : ''}`}
-        aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
-        aria-pressed={favorite}
-        onClick={() => onFavorite(video.id)}
-      >
-        <Heart size={17} fill={favorite ? 'currentColor' : 'none'} />
-      </button>
+      {variant !== 'playlist' && (
+        <button
+          type="button"
+          className={`video-favorite${favorite ? ' is-active' : ''}`}
+          aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
+          aria-pressed={favorite}
+          onClick={() => onFavorite(video.id)}
+        >
+          <Heart size={17} fill={favorite ? 'currentColor' : 'none'} />
+        </button>
+      )}
     </article>
   );
 }
@@ -1006,7 +1013,11 @@ function Video() {
         </header>
 
         {activeView !== 'home' && activeView !== 'library' && (
-          <CategoryNav active={activeCategory} onChange={changeCategory} />
+          <CategoryNav
+            active={activeCategory}
+            onChange={changeCategory}
+            className={activeView === 'playlist' ? 'is-playlist' : ''}
+          />
         )}
 
         {activeView === 'home' && (
@@ -1042,16 +1053,6 @@ function Video() {
             </section>
 
             <section className="video-section">
-              <div className="video-section-heading">
-                <div>
-                  <span>Fresh selection</span>
-                  <h2>Made for your screen</h2>
-                </div>
-                <button type="button" onClick={() => navigateTo('playlist')}>
-                  View all
-                  <ChevronRight size={17} />
-                </button>
-              </div>
               {homeVideos.length ? (
                 <div className="video-home-grid">
                   {homeVideos.map((video) => (
@@ -1073,13 +1074,6 @@ function Video() {
 
         {activeView === 'library' && (
           <section className="video-section video-library-section">
-            <div className="video-section-heading">
-              <div>
-                <span>Saved by you</span>
-                <h2>Favorite collections</h2>
-              </div>
-              <small>{filteredCollections.length} collections</small>
-            </div>
             {filteredCollections.length ? (
               <div className="video-library-grid">
                 {filteredCollections.map((collection) => (
@@ -1147,6 +1141,7 @@ function Video() {
                     favorite={favoriteIds.has(video.id)}
                     onPlay={openVideo}
                     onFavorite={toggleFavorite}
+                    variant="playlist"
                   />
                 ))}
               </div>
@@ -1158,13 +1153,6 @@ function Video() {
 
         {activeView === 'playlist' && (
           <section className="video-section video-playlist-section">
-            <div className="video-section-heading">
-              <div>
-                <span>Complete collection</span>
-                <h2>{filteredVideos.length} videos</h2>
-              </div>
-              <small>Page {safePlaylistPage} of {playlistPageCount}</small>
-            </div>
             {playlistVideos.length ? (
               <div className="video-playlist-grid">
                 {playlistVideos.map((video) => (
@@ -1174,6 +1162,7 @@ function Video() {
                     favorite={favoriteIds.has(video.id)}
                     onPlay={openVideo}
                     onFavorite={toggleFavorite}
+                    variant="playlist"
                   />
                 ))}
               </div>
@@ -1182,33 +1171,27 @@ function Video() {
             )}
             {playlistPageCount > 1 && (
               <nav className="video-pagination" aria-label="Video playlist pages">
-                <button
-                  type="button"
-                  aria-label="Previous page"
-                  disabled={safePlaylistPage === 1}
-                  onClick={() => changePlaylistPage(safePlaylistPage - 1)}
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                {Array.from({ length: playlistPageCount }, (_, index) => index + 1).map((page) => (
+                <span className="video-pagination-status">
+                  Page {safePlaylistPage} of {playlistPageCount}
+                </span>
+                <div className="video-pagination-actions">
                   <button
                     type="button"
-                    key={page}
-                    className={safePlaylistPage === page ? 'is-active' : ''}
-                    aria-current={safePlaylistPage === page ? 'page' : undefined}
-                    onClick={() => changePlaylistPage(page)}
+                    aria-label="Previous page"
+                    disabled={safePlaylistPage === 1}
+                    onClick={() => changePlaylistPage(safePlaylistPage - 1)}
                   >
-                    {page}
+                    <ChevronLeft size={18} />
                   </button>
-                ))}
-                <button
-                  type="button"
-                  aria-label="Next page"
-                  disabled={safePlaylistPage === playlistPageCount}
-                  onClick={() => changePlaylistPage(safePlaylistPage + 1)}
-                >
-                  <ChevronRight size={18} />
-                </button>
+                  <button
+                    type="button"
+                    aria-label="Next page"
+                    disabled={safePlaylistPage === playlistPageCount}
+                    onClick={() => changePlaylistPage(safePlaylistPage + 1)}
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
               </nav>
             )}
           </section>
