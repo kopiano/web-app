@@ -54,13 +54,14 @@ import {
   uploadMusic,
   MusicDuplicateError,
   type MusicDuplicateMatch,
+  type MusicPage,
   type MusicTrack,
   type MusicUserLibrary,
 } from '@/api/music';
 import { createProCheckout } from '@/api/subscription';
 import { useMusicPlayback } from '@/context/MusicPlaybackContext';
 import { musicApi, type MusicPageQueryArgs } from '@/store/musicApi';
-import type { AppDispatch, RootState } from '@/store/store';
+import { store, type AppDispatch, type RootState } from '@/store/store';
 import '@/styles/music.scss';
 
 type MusicProps = {
@@ -312,6 +313,10 @@ const hasActiveLibrarySubscription = (user: RootState['auth']['user']) => {
   return paidPlan && activeStatus && endTimestamp > Date.now();
 };
 
+function musicPageCacheKey(args: MusicPageQueryArgs) {
+  return `${args.view}:${args.userId || 'guest'}:${args.page}:${args.pageSize}`;
+}
+
 function Music({ isActive = true }: MusicProps) {
   const { t, i18n } = useTranslation();
   const { publishPlayback, registerControls } = useMusicPlayback();
@@ -471,6 +476,7 @@ function Music({ isActive = true }: MusicProps) {
   const musicPageRequestRef = useRef(0);
   const musicScopeRef = useRef('');
   const musicRefreshKeyRef = useRef(0);
+  const musicPageCacheRef = useRef(new Map<string, MusicPage>());
   const userLibraryRequestRef = useRef(0);
   const favoriteBurstTimeoutRef = useRef<number | undefined>(undefined);
   const pageTracksRef = useRef<MusicTrack[]>([]);
@@ -798,15 +804,53 @@ function Music({ isActive = true }: MusicProps) {
       ? 4
       : libraryPageSize;
 
-    setIsMusicPageLoading(true);
     const pageQueryArgs: MusicPageQueryArgs = {
       view: activeView === 'home' ? 'home' : activeView,
       page: requestedPage,
       pageSize: requestedPageSize,
       userId: collectionOwnerId || undefined,
     };
+    const pageCacheKey = musicPageCacheKey(pageQueryArgs);
+    const cachedPage = musicPageCacheRef.current.get(pageCacheKey)
+      ?? musicApi.endpoints.getMusicPage.select(pageQueryArgs)(store.getState()).data;
     const shouldForceRefetch = musicRefreshKeyRef.current !== musicRefreshKey;
     musicRefreshKeyRef.current = musicRefreshKey;
+    const applyMusicPage = (music: MusicPage) => {
+      if (requestId !== musicPageRequestRef.current) return;
+      if (
+        isCollectionView
+        && music.totalPages > 0
+        && requestedPage > music.totalPages
+      ) {
+        setMusicTotal(music.total);
+        setMusicTotalDuration(music.totalDuration);
+        setMusicPageCount(music.totalPages);
+        setLibraryPage(music.totalPages);
+        return;
+      }
+
+      const cachedById = new Map(tracksRef.current.map((track) => [track.id, track]));
+      const visibleItems = music.items.map((track) => (
+        mergeMusicTrack(cachedById.get(track.id), track)
+      ));
+      const mergedTracks = mergeMusicTracks(tracksRef.current, music.items);
+      tracksRef.current = mergedTracks;
+      setTracks(mergedTracks);
+      setPageTracks(visibleItems);
+      setMusicTotal(music.total);
+      setMusicTotalDuration(music.totalDuration);
+      setMusicPageCount(music.totalPages);
+    };
+
+    if (cachedPage) {
+      musicPageCacheRef.current.set(pageCacheKey, cachedPage);
+      applyMusicPage(cachedPage);
+      setIsMusicLoaded(true);
+      setIsMusicPageLoading(false);
+    } else {
+      setIsMusicPageLoading(true);
+    }
+
     const musicRequest = dispatch(
       musicApi.endpoints.getMusicPage.initiate(pageQueryArgs, {
         subscribe: false,
@@ -817,29 +861,8 @@ function Music({ isActive = true }: MusicProps) {
     musicRequest
       .then((music) => {
         if (requestId !== musicPageRequestRef.current) return;
-        if (
-          isCollectionView
-          && music.totalPages > 0
-          && requestedPage > music.totalPages
-        ) {
-          setMusicTotal(music.total);
-          setMusicTotalDuration(music.totalDuration);
-          setMusicPageCount(music.totalPages);
-          setLibraryPage(music.totalPages);
-          return;
-        }
-
-        const cachedById = new Map(tracksRef.current.map((track) => [track.id, track]));
-        const visibleItems = music.items.map((track) => (
-          mergeMusicTrack(cachedById.get(track.id), track)
-        ));
-        const mergedTracks = mergeMusicTracks(tracksRef.current, music.items);
-        tracksRef.current = mergedTracks;
-        setTracks(mergedTracks);
-        setPageTracks(visibleItems);
-        setMusicTotal(music.total);
-        setMusicTotalDuration(music.totalDuration);
-        setMusicPageCount(music.totalPages);
+        musicPageCacheRef.current.set(pageCacheKey, music);
+        applyMusicPage(music);
         if (isCollectionView && requestedPage < music.totalPages) {
           dispatch(musicApi.util.prefetch('getMusicPage', {
             ...pageQueryArgs,
@@ -855,7 +878,7 @@ function Music({ isActive = true }: MusicProps) {
       .finally(() => {
         if (requestId === musicPageRequestRef.current) {
           setIsMusicLoaded(true);
-          setIsMusicPageLoading(false);
+          if (!cachedPage) setIsMusicPageLoading(false);
         }
       });
   }, [
@@ -2126,7 +2149,6 @@ function Music({ isActive = true }: MusicProps) {
                     type="button"
                     disabled={isMusicPageLoading || libraryPage <= 1}
                     onClick={() => {
-                      setIsMusicPageLoading(true);
                       setLibraryPage((page) => Math.max(1, page - 1));
                     }}
                     aria-label={t('music.previousPage')}
@@ -2137,7 +2159,6 @@ function Music({ isActive = true }: MusicProps) {
                     type="button"
                     disabled={isMusicPageLoading || libraryPage >= libraryPageCount}
                     onClick={() => {
-                      setIsMusicPageLoading(true);
                       setLibraryPage((page) => Math.min(libraryPageCount, page + 1));
                     }}
                     aria-label={t('music.nextPage')}
