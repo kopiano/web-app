@@ -15,7 +15,12 @@ import {
   X,
 } from 'lucide-react';
 import avatarFrame from '@/assets/images/avatar-frame.webp';
-import { defaultAvatarDataUrl, resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar';
+import {
+  defaultAvatarDataUrl,
+  resolveAssetUrl,
+  resolveAvatarUrl,
+  resolveChatAvatarUrl,
+} from '@/lib/avatar';
 import {
   addGroupMembers,
   createGroup,
@@ -538,7 +543,7 @@ function Chat() {
   const [groupCreating, setGroupCreating] = useState(false);
   const [groupCreateError, setGroupCreateError] = useState('');
   const [inputText, setInputText] = useState('');
-  const [guestMessages, setGuestMessages] = useState<Record<string, Message[]>>(mockMessages);
+  const guestMessages = mockMessages;
   const [showEmoji, setShowEmoji] = useState(false);
   const [showMomentEmoji, setShowMomentEmoji] = useState(false);
   const [moments, setMoments] = useState<MomentPost[]>([]);
@@ -653,7 +658,7 @@ function Chat() {
       candidates.set(member.user_id, {
         userId: member.user_id,
         username: member.username,
-        avatar: resolveAvatarUrl(member.avatar) || fallbackAvatar(member.username),
+        avatar: resolveChatAvatarUrl(member.avatar, member.username),
         online: member.online,
       });
     });
@@ -1561,7 +1566,11 @@ function Chat() {
 
   async function handleSend() {
     const content = inputText.trim();
-    if (!content || !activeConversationId || !activeContactInfo || !currentUser) return;
+    if (!content || !activeConversationId || !activeContactInfo) return;
+    if (!currentUser) {
+      notify(t('chat.signInToSend'), 'warning');
+      return;
+    }
 
     const temporaryId = `local:${Date.now()}:${Math.random().toString(36).slice(2)}`;
     const conversationId = activeConversationId;
@@ -1625,31 +1634,32 @@ function Chat() {
 
   function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
+    e.target.value = '';
     if (!f || !activeConversationId) return;
+    if (!currentUser) {
+      notify(t('chat.signInToSend'), 'warning');
+      return;
+    }
     const newMsg: Message = {
       id: Date.now(),
       text: `📎 ${f.name}`,
       from: 'me',
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     };
-    if (currentUser) {
-      dispatch(appendConversationMessage({
-        conversationId: activeConversationId,
-        message: newMsg,
-      }));
-    } else {
-      setGuestMessages(previous => ({
-        ...previous,
-        [activeConversationId]: [...(previous[activeConversationId] || []), newMsg],
-      }));
-    }
-    e.target.value = '';
+    dispatch(appendConversationMessage({
+      conversationId: activeConversationId,
+      message: newMsg,
+    }));
   }
 
   async function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     e.target.value = '';
-    if (!f || !f.type.startsWith('image/') || !activeConversationId || !activeContactInfo || !currentUser) return;
+    if (!f || !f.type.startsWith('image/') || !activeConversationId || !activeContactInfo) return;
+    if (!currentUser) {
+      notify(t('chat.signInToSend'), 'warning');
+      return;
+    }
     const temporaryId = `local:${Date.now()}:${Math.random().toString(36).slice(2)}`;
     const conversationId = activeConversationId;
     const contactId = contactIdFromConversation(conversationId);
@@ -2065,7 +2075,7 @@ function Chat() {
                                 className="group-member-avatar"
                               >
                                 <img
-                                  src={resolveAvatarUrl(member.avatar) || fallbackAvatar(member.username)}
+                                  src={resolveChatAvatarUrl(member.avatar, member.username)}
                                   alt={member.username}
                                 />
                                 {member.online && <span className="group-member-online" aria-hidden="true" />}
@@ -2267,13 +2277,35 @@ function Chat() {
                       </div>
                     )}
                   </div>
-                  <button className="input-tool-btn" onClick={() => chatImageRef.current?.click()} aria-label={t('chat.image')}>
+                  <button
+                    type="button"
+                    className="input-tool-btn"
+                    onClick={() => {
+                      if (!currentUser) {
+                        notify(t('chat.signInToSend'), 'warning');
+                        return;
+                      }
+                      chatImageRef.current?.click();
+                    }}
+                    aria-label={t('chat.image')}
+                  >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
                     </svg>
                   </button>
                   <input ref={chatImageRef} type="file" accept="image/*" hidden onChange={pickImage} />
-                  <button className="input-tool-btn" onClick={() => fileRef.current?.click()} aria-label={t('chat.file')}>
+                  <button
+                    type="button"
+                    className="input-tool-btn"
+                    onClick={() => {
+                      if (!currentUser) {
+                        notify(t('chat.signInToSend'), 'warning');
+                        return;
+                      }
+                      fileRef.current?.click();
+                    }}
+                    aria-label={t('chat.file')}
+                  >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
                     </svg>

@@ -1,3 +1,14 @@
+import systemNotificationAvatar from '@/assets/images/z-logo.png';
+
+const SYSTEM_NOTIFICATION_NAMES = new Set([
+  'system notifications',
+  '系统通知',
+]);
+
+export function isSystemNotificationUser(name?: string | null): boolean {
+  return SYSTEM_NOTIFICATION_NAMES.has(name?.trim().toLocaleLowerCase() || '');
+}
+
 export function resolveAvatarUrl(avatar?: string | null): string {
   if (!avatar) return '';
   if (/^(?:data:|blob:|https?:)/i.test(avatar)) return avatar;
@@ -28,6 +39,14 @@ export function defaultAvatarDataUrl(name?: string | null): string {
   ].join('');
 
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+export function resolveChatAvatarUrl(
+  avatar?: string | null,
+  username?: string | null,
+): string {
+  if (isSystemNotificationUser(username)) return systemNotificationAvatar;
+  return resolveAvatarUrl(avatar) || defaultAvatarDataUrl(username);
 }
 
 export function resolveAssetUrl(asset?: string | null): string {

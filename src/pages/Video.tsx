@@ -23,7 +23,6 @@ import {
   Settings2,
   Share2,
   Smile,
-  Sparkles,
   ThumbsUp,
   Volume2,
   VolumeX,
@@ -862,6 +861,14 @@ function Video() {
     });
   }, [activeCategory, query]);
 
+  const filteredCollections = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return COLLECTIONS;
+    return COLLECTIONS.filter((collection) => (
+      collection.name.toLowerCase().includes(normalizedQuery)
+    ));
+  }, [query]);
+
   const favoriteVideos = useMemo(() => {
     const collectionIds = new Set(selectedCollection.videoIds);
     return filteredVideos.filter((video) => collectionIds.has(video.id) || favoriteIds.has(video.id));
@@ -874,9 +881,7 @@ function Video() {
   const homeVideos = filteredVideos.slice(0, 4);
   const featuredVideo = filteredVideos[0] ?? VIDEOS[0];
   const watchPlaylist = useMemo(() => {
-    if (!watchedVideo) return VIDEOS.slice(0, 6);
-    const queue = [watchedVideo, ...VIDEOS.filter((video) => video.id !== watchedVideo.id)];
-    return queue.slice(0, 6);
+    return VIDEOS;
   }, [watchedVideo]);
 
   useEffect(() => {
@@ -962,17 +967,13 @@ function Video() {
       {activeView !== 'watch' && (
         <>
       <div className="video-page-shell">
-        <header className="video-page-header">
+        <header className={`video-page-header${activeView === 'library' ? ' is-library' : ''}`}>
           <div>
-            <span className="video-page-kicker">
-              <Sparkles size={14} aria-hidden="true" />
-              Curated motion
-            </span>
             <h1>
               {activeView === 'home' && 'Watch beautifully.'}
-              {activeView === 'library' && 'Your library'}
+              {activeView === 'library' && 'library'}
               {activeView === 'favorites' && selectedCollection.name}
-              {activeView === 'playlist' && 'Video library'}
+              {activeView === 'playlist' && 'Video playlist'}
             </h1>
           </div>
           <label className="video-search">
@@ -984,6 +985,16 @@ function Video() {
               aria-label="Search videos"
               onChange={(event) => setQuery(event.target.value)}
             />
+            {query && (
+              <button
+                type="button"
+                className="video-search-clear"
+                aria-label="Clear search"
+                onClick={() => setQuery('')}
+              >
+                <X size={16} strokeWidth={2.4} />
+              </button>
+            )}
           </label>
         </header>
 
@@ -1068,10 +1079,11 @@ function Video() {
                 <span>Saved by you</span>
                 <h2>Favorite collections</h2>
               </div>
-              <small>{COLLECTIONS.length} collections</small>
+              <small>{filteredCollections.length} collections</small>
             </div>
-            <div className="video-library-grid">
-              {COLLECTIONS.map((collection) => (
+            {filteredCollections.length ? (
+              <div className="video-library-grid">
+                {filteredCollections.map((collection) => (
                 <button
                   type="button"
                   key={collection.id}
@@ -1091,10 +1103,19 @@ function Video() {
                       {collection.plays}
                     </em>
                   </span>
-                  <ChevronRight size={20} aria-hidden="true" />
+                  <span className="video-collection-play-button" aria-hidden="true">
+                    <Play
+                      size={20}
+                      strokeWidth={2}
+                      fill="currentColor"
+                    />
+                  </span>
                 </button>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="video-empty">No collections match your search.</div>
+            )}
           </section>
         )}
 

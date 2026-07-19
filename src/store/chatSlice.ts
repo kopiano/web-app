@@ -5,7 +5,13 @@ import type {
   SendImageMessageInput,
   SendMessageInput,
 } from '@/api/chat'
-import { defaultAvatarDataUrl, resolveAssetUrl, resolveAvatarUrl } from '@/lib/avatar'
+import {
+  defaultAvatarDataUrl,
+  isSystemNotificationUser,
+  resolveAssetUrl,
+  resolveAvatarUrl,
+  resolveChatAvatarUrl,
+} from '@/lib/avatar'
 
 export interface ChatContact {
   id: string
@@ -218,7 +224,9 @@ function formatContact(contact: ApiContact): ChatContact | null {
     id,
     name: contact.username,
     type: contact.chat_type === 'public' ? 'group' : 'user',
-    avatar: resolveAvatarUrl(contact.avatar) || fallbackAvatar(contact),
+    avatar: isSystemNotificationUser(contact.username)
+      ? resolveChatAvatarUrl(contact.avatar, contact.username)
+      : resolveAvatarUrl(contact.avatar) || fallbackAvatar(contact),
     lastMsg: contact.content || '',
     time: formatLatestMessageTime(contact.last_message_time || null),
     lastMessageTime: contact.last_message_time || null,
