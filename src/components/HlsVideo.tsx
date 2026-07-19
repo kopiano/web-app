@@ -101,6 +101,8 @@ export default function HlsVideo({
   const resumeAfterInterruptionRef = useRef(false);
   const lastPersistedSecondRef = useRef(-1);
   const playbackReadyRef = useRef(false);
+  const lastPlaybackTimeRef = useRef(0);
+  const persistPlaybackPositionRef = useRef<(force?: boolean) => void>(() => undefined);
   const [playbackError, setPlaybackError] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isDocumentVisible, setIsDocumentVisible] = useState(!document.hidden);
@@ -229,6 +231,7 @@ export default function HlsVideo({
         const saved = Number(window.localStorage.getItem(playbackStorageKey));
         if (Number.isFinite(saved) && saved > 0 && saved < video.duration - 3) {
           video.currentTime = saved;
+          lastPlaybackTimeRef.current = saved;
         }
       } catch {
         // Playback persistence is optional when storage is unavailable.
@@ -372,6 +375,7 @@ export default function HlsVideo({
 
     return () => {
       disposed = true;
+      persistPlaybackPositionRef.current(true);
       clearRetryTimer();
       if (nativeHlsAttached) {
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
@@ -410,18 +414,22 @@ export default function HlsVideo({
         !playbackReadyRef.current
         || !playbackId
         || !playbackStorageKey
-        || !Number.isFinite(video.currentTime)
       ) return;
-      const second = Math.floor(video.currentTime);
+      const currentTime = Number.isFinite(video.currentTime) && video.currentTime > 0
+        ? video.currentTime
+        : lastPlaybackTimeRef.current;
+      if (!Number.isFinite(currentTime) || currentTime <= 0) return;
+      const second = Math.floor(currentTime);
       if (!force && second === lastPersistedSecondRef.current) return;
       lastPersistedSecondRef.current = second;
       try {
-        window.localStorage.setItem(playbackStorageKey, String(video.currentTime));
+        window.localStorage.setItem(playbackStorageKey, String(currentTime));
       } catch {
         // Playback persistence is optional when storage is unavailable.
       }
-      dispatch(updateVideoPlaybackTime({ videoId: playbackId, currentTime: video.currentTime }));
+      dispatch(updateVideoPlaybackTime({ videoId: playbackId, currentTime }));
     };
+    persistPlaybackPositionRef.current = persistPlaybackPosition;
     const handlePlaying = () => {
       setIsPlaying(true);
       if (playbackId) dispatch(activateVideo(playbackId));
@@ -431,8 +439,18 @@ export default function HlsVideo({
       persistPlaybackPosition(true);
       if (playbackId) dispatch(pauseVideo(playbackId));
     };
-    const handleTimeUpdate = () => persistPlaybackPosition();
-    const handleSeeked = () => persistPlaybackPosition(true);
+    const handleTimeUpdate = () => {
+      if (Number.isFinite(video.currentTime) && video.currentTime > 0) {
+        lastPlaybackTimeRef.current = video.currentTime;
+      }
+      persistPlaybackPosition();
+    };
+    const handleSeeked = () => {
+      if (Number.isFinite(video.currentTime) && video.currentTime > 0) {
+        lastPlaybackTimeRef.current = video.currentTime;
+      }
+      persistPlaybackPosition(true);
+    };
     const persistAudio = () => {
       try {
         window.localStorage.setItem(VIDEO_AUDIO_STORAGE_KEY, JSON.stringify({
@@ -453,6 +471,7 @@ export default function HlsVideo({
 
     return () => {
       persistPlaybackPosition(true);
+      persistPlaybackPositionRef.current = () => undefined;
       video.removeEventListener('playing', handlePlaying);
       video.removeEventListener('pause', handleStopped);
       video.removeEventListener('ended', handleStopped);
