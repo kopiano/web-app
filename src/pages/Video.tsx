@@ -759,7 +759,7 @@ function VideoWatchPage({
                   aria-pressed={likedVideo}
                   onClick={() => setLikedVideo((current) => !current)}
                 >
-                  <ThumbsUp size={18} fill="currentColor" />
+                  <ThumbsUp size={18} fill={likedVideo ? 'currentColor' : 'none'} />
                   <span>48.2K</span>
                 </button>
                 <button
