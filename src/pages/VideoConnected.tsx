@@ -631,10 +631,26 @@ function VideoWatch({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(video.raw.duration);
   const [playerHeight, setPlayerHeight] = useState<number>();
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenControlsVisible, setFullscreenControlsVisible] = useState(false);
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [viewIncrementVisible, setViewIncrementVisible] = useState(false);
+  const fullscreenControlsTimerRef = useRef<number | undefined>(undefined);
+
+  const revealFullscreenControls = useCallback(() => {
+    if (document.fullscreenElement !== stageRef.current) return;
+
+    setFullscreenControlsVisible(true);
+    if (fullscreenControlsTimerRef.current !== undefined) {
+      window.clearTimeout(fullscreenControlsTimerRef.current);
+    }
+    fullscreenControlsTimerRef.current = window.setTimeout(() => {
+      setFullscreenControlsVisible(false);
+      fullscreenControlsTimerRef.current = undefined;
+    }, 6_000);
+  }, []);
 
   useEffect(() => {
     viewedRef.current = false;
@@ -652,6 +668,31 @@ function VideoWatch({
     update();
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fullscreen = document.fullscreenElement === stageRef.current;
+      setIsFullscreen(fullscreen);
+      if (fullscreen) {
+        revealFullscreenControls();
+        return;
+      }
+
+      setFullscreenControlsVisible(false);
+      if (fullscreenControlsTimerRef.current !== undefined) {
+        window.clearTimeout(fullscreenControlsTimerRef.current);
+        fullscreenControlsTimerRef.current = undefined;
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      if (fullscreenControlsTimerRef.current !== undefined) {
+        window.clearTimeout(fullscreenControlsTimerRef.current);
+      }
+    };
+  }, [revealFullscreenControls]);
 
   useEffect(() => {
     if (!media) return;
@@ -690,6 +731,7 @@ function VideoWatch({
       if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return;
 
       event.preventDefault();
+      revealFullscreenControls();
       if (!media) return;
       if (media.paused || media.ended) {
         void media.play();
@@ -700,7 +742,7 @@ function VideoWatch({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [media]);
+  }, [media, revealFullscreenControls]);
 
   const roots = comments.filter((comment) => !comment.parentId);
   const replies = useMemo(() => {
@@ -763,7 +805,12 @@ function VideoWatch({
       </button>
       <div className="video-watch-layout">
         <div className="video-watch-main">
-          <div ref={stageRef} className="video-watch-player">
+          <div
+            ref={stageRef}
+            className={`video-watch-player${isFullscreen ? ' is-fullscreen' : ''}${fullscreenControlsVisible ? ' is-controls-visible' : ''}`}
+            onPointerMove={revealFullscreenControls}
+            onPointerDown={revealFullscreenControls}
+          >
             {video.status === 'ready' && video.src ? (
               <HlsVideo
                 key={video.id}

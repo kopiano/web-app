@@ -1572,6 +1572,62 @@
   transform: translateY(0);
 }
 
+.video-watch-player:fullscreen,
+.video-watch-player.is-fullscreen {
+  width: 100vw;
+  min-width: 100vw;
+  max-width: none;
+  height: 100vh;
+  min-height: 100vh;
+  max-height: none;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: #000;
+  transform-origin: center;
+  animation: video-watch-fullscreen-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.video-watch-player:fullscreen .hls-video,
+.video-watch-player.is-fullscreen .hls-video {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none;
+}
+
+.video-watch-player:fullscreen .hls-video video,
+.video-watch-player.is-fullscreen .hls-video video {
+  max-height: none;
+  object-fit: cover;
+  object-position: center 0%;
+}
+
+.video-watch-player:fullscreen::after,
+.video-watch-player.is-fullscreen::after {
+  display: none;
+}
+
+.video-watch-player.is-fullscreen::after,
+.video-watch-player.is-fullscreen:hover::after,
+.video-watch-player.is-fullscreen:focus-within::after,
+.video-watch-player.is-fullscreen .video-watch-controls,
+.video-watch-player.is-fullscreen:hover .video-watch-controls,
+.video-watch-player.is-fullscreen:focus-within .video-watch-controls {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.8rem);
+}
+
+.video-watch-player.is-fullscreen.is-controls-visible::after,
+.video-watch-player.is-fullscreen.is-controls-visible .video-watch-controls {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 .video-load-more-sentinel {
   width: 100%;
   height: 1px;
@@ -3085,6 +3141,17 @@
   }
 }
 
+@keyframes video-watch-fullscreen-enter {
+  from {
+    opacity: 0.7;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @media (max-width: 1120px) {
   .video-featured {
     width: 100%;
@@ -3439,7 +3506,8 @@
   .video-featured-media > img,
   .video-player-backdrop,
   .video-player-shell,
-  .video-upload-dialog {
+  .video-upload-dialog,
+  .video-watch-player.is-fullscreen {
     animation: none;
   }
 
