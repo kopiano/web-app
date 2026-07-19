@@ -595,6 +595,7 @@ function Chat() {
   const momentsLoadingRef = useRef(false);
   const momentsCursorRef = useRef<{ createdAt: string; id: string } | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
+  const isChatComposingRef = useRef(false);
   const commentInputRefs = useRef(new Map<string, HTMLInputElement>());
   const processingFailureNotifiedRef = useRef(new Set<string>());
   const processingCompletionTimersRef = useRef(new Map<string, number>());
@@ -1617,7 +1618,7 @@ function Chat() {
 
   function handleKeyDown(e: React.KeyboardEvent) {
     // IME candidate confirmation also emits Enter; let the input method handle it.
-    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (isChatComposingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -2314,7 +2315,10 @@ function Chat() {
                   </button>
                   <input ref={fileRef} type="file" hidden onChange={pickFile} />
                   <input ref={chatInputRef} className="msg-text-input" type="text" placeholder={t('chat.messagePlaceholder')} value={inputText}
-                    onChange={e => setInputText(e.target.value)} onKeyDown={handleKeyDown} />
+                    onChange={e => setInputText(e.target.value)}
+                    onCompositionStart={() => { isChatComposingRef.current = true; }}
+                    onCompositionEnd={() => { isChatComposingRef.current = false; }}
+                    onKeyDown={handleKeyDown} />
                   <button className="msg-send-btn" disabled={!inputText.trim()} onClick={handleSend} aria-label={t('chat.sendMessage')}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
