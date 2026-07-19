@@ -970,35 +970,42 @@ function Video() {
         <header className={`video-page-header${activeView === 'library' ? ' is-library' : ''}`}>
           <div>
             <h1>
-              {activeView === 'home' && 'Watch beautifully.'}
+              {activeView === 'home' && 'Browse the entire Lume library'}
               {activeView === 'library' && 'library'}
               {activeView === 'favorites' && selectedCollection.name}
               {activeView === 'playlist' && 'Video playlist'}
             </h1>
-          </div>
-          <label className="video-search">
-            <Search size={17} aria-hidden="true" />
-            <input
-              type="search"
-              value={query}
-              placeholder="Search videos"
-              aria-label="Search videos"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            {query && (
-              <button
-                type="button"
-                className="video-search-clear"
-                aria-label="Clear search"
-                onClick={() => setQuery('')}
-              >
-                <X size={16} strokeWidth={2.4} />
-              </button>
+            {activeView === 'home' && (
+              <p className="video-page-header-subtitle">
+                Everything published on Lume. Hover any card — the whole page floats.
+              </p>
             )}
-          </label>
+          </div>
+          {activeView === 'library' && (
+            <label className="video-search">
+              <Search size={17} aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                placeholder="Search videos"
+                aria-label="Search videos"
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              {query && (
+                <button
+                  type="button"
+                  className="video-search-clear"
+                  aria-label="Clear search"
+                  onClick={() => setQuery('')}
+                >
+                  <X size={16} strokeWidth={2.4} />
+                </button>
+              )}
+            </label>
+          )}
         </header>
 
-        {activeView !== 'library' && (
+        {activeView !== 'home' && activeView !== 'library' && (
           <CategoryNav active={activeCategory} onChange={changeCategory} />
         )}
 
@@ -1013,7 +1020,7 @@ function Video() {
                 <img src={featuredVideo.poster} alt="" />
                 <span className="video-quality">{featuredVideo.resolution}</span>
                 <span className="video-featured-play" aria-hidden="true">
-                  <Play size={28} fill="currentColor" />
+                  <Play size={20} strokeWidth={2} fill="currentColor" />
                 </span>
               </button>
               <div className="video-featured-copy">
@@ -1031,14 +1038,6 @@ function Video() {
                     </span>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="video-watch-button"
-                  onClick={() => openVideo(featuredVideo)}
-                >
-                  <Play size={17} fill="currentColor" />
-                  Watch now
-                </button>
               </div>
             </section>
 
