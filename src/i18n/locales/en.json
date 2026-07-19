@@ -313,5 +313,120 @@
     "ignoreDuplicateResult": "Uploaded {{uploadedCount}} songs and skipped {{skippedCount}} duplicates.",
     "exactDuplicate": "This music has already been uploaded.",
     "uploadFailed": "Music upload failed. Please try again."
+  },
+  "video": {
+    "back": "Back",
+    "more": "More options",
+    "navigation": "Video navigation",
+    "loading": "Loading videos...",
+    "loadingMore": "Loading more videos...",
+    "loadFailed": "Unable to load videos.",
+    "empty": "No videos yet.",
+    "user": "User",
+    "authRequired": "Please sign in to continue.",
+    "actionFailed": "Unable to update the video. Please try again.",
+    "nav": {
+      "home": "Home",
+      "library": "Library",
+      "playlist": "Playlist"
+    },
+    "home": {
+      "title": "Browse the entire Lume library",
+      "subtitle": "Everything published on Lume. Hover any card — the whole page floats.",
+      "featured": "Featured film",
+      "today": "Today's Picks"
+    },
+    "library": {
+      "title": "Library",
+      "search": "Search collection titles",
+      "clear": "Clear search",
+      "folder": "Favorites folder",
+      "videoCount_one": "{{count}} video",
+      "videoCount_other": "{{count}} videos",
+      "playCount": "{{count}} plays",
+      "empty": "No collections match your search."
+    },
+    "playlist": {
+      "title": "Video playlist",
+      "pagination": "Video playlist pages",
+      "page": "Page {{page}}"
+    },
+    "categories": {
+      "all": "All",
+      "label": "Video categories"
+    },
+    "player": {
+      "error": "Unable to play this video.",
+      "failed": "Video processing failed.",
+      "processing": "Processing video {{progress}}%",
+      "progress": "Video progress",
+      "play": "Play",
+      "pause": "Pause",
+      "mute": "Mute",
+      "unmute": "Unmute",
+      "volume": "Volume",
+      "settings": "Player settings",
+      "fullscreen": "Fullscreen"
+    },
+    "queue": {
+      "label": "PLAYLIST",
+      "next": "Up next",
+      "count_one": "{{count}} video",
+      "count_other": "{{count}} videos",
+      "playing": "Playing"
+    },
+    "comments": {
+      "count_one": "{{count}} comment",
+      "count_other": "{{count}} comments",
+      "settings": "Comment settings",
+      "replying": "Replying to @{{name}}",
+      "cancelReply": "Cancel reply",
+      "placeholder": "Add a thoughtful comment",
+      "post": "Post comment",
+      "reply": "Reply",
+      "failed": "Unable to post the comment."
+    },
+    "upload": {
+      "action": "Upload video",
+      "close": "Close upload dialog",
+      "newVideo": "New video",
+      "title": "Upload a video",
+      "description": "Choose a video file to prepare it for publishing.",
+      "selectVideo": "Select a video file",
+      "formats": "MP4, WebM, MOV and other video formats",
+      "uploading": "Uploading video",
+      "processing": "Processing video {{progress}}%",
+      "video": "Video",
+      "duration": "Duration",
+      "visibility": "Visibility",
+      "public": "Public",
+      "private": "Private",
+      "detailsReady": "Ready to publish",
+      "details": "Video details",
+      "chooseCover": "Choose a cover",
+      "selectedCover": "Selected video cover",
+      "coverHint": "Select an image for your video",
+      "videoTitle": "Title",
+      "categories": "Category tags",
+      "categoryHint": "Use # before each category and separate tags with spaces.",
+      "publishing": "Publishing...",
+      "publish": "Publish video",
+      "publishQueued": "Publication queued",
+      "awaitingReady": "Waiting for video readiness {{progress}}%",
+      "processingFailed": "Video processing failed",
+      "retryPublish": "Retry publishing",
+      "invalidVideo": "Please choose a valid video file.",
+      "invalidCover": "Please choose an image after the video upload starts.",
+      "titleRequired": "Add a title before publishing.",
+      "categoryRequired": "Add at least one category tag before publishing.",
+      "failed": "Video upload failed. Please try again.",
+      "coverFailed": "Unable to upload the cover.",
+      "coverTooLarge": "The cover image is too large. Choose an image under 10 MB.",
+      "coverUnsupported": "This cover image format is not supported. Choose a PNG, JPEG, WebP, GIF, or AVIF image.",
+      "draftMissing": "This upload draft no longer exists. Upload the video again.",
+      "invalidDetails": "Add a title and at least one category tag before publishing.",
+      "published": "Video details were published.",
+      "publishFailed": "Unable to publish the video details."
+    }
   }
 }

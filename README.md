@@ -472,5 +472,18 @@ subscription_end_at   TIMESTAMPTZ,
 
 
 ## video
-Vidstack + HLS.js播放器
+播放器ui：Vidstack + HLS.js自定义播放器
+使用ffmpeg解码成hls格式(.m3u8+ts)，播放hsl
+视频保存在后端本地src/assets/video中
+初始只显示视频封面，不设置视频src，封面图片懒加载<img loading="lazy">，不要第一页下载所有封面
+页面只初始化一个hls播放器
+播放进度保存，使用localStorage本地持久化
+减少重渲染，hls生命周期一定要destroy()
+网络不好要重连，监听error，恢复recoverMediaError()，否则播放器直接黑屏
+视频不要提前加载，应该preload="metadata"，而不是auto，播放器配置：preload="metadata"、playsInline、muted 自动播放静音
+视频封面FFmpeg：第2秒截图，第一帧容易黑屏
+页面切后台自动暂停，回来继续播放
+移动端适配需要playsInline，否则直接全屏体验差
+React Query管理分页、缓存和预取，Redux Toolkit（仅管理全局播放状态）
+性能：离开可视区域立即暂停并销毁 HLS 实例，避免多个视频同时缓冲
 

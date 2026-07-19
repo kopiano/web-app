@@ -313,5 +313,120 @@
     "ignoreDuplicateResult": "已上传 {{uploadedCount}} 首歌曲，忽略 {{skippedCount}} 首重复歌曲。",
     "exactDuplicate": "该音乐已经上传过了。",
     "uploadFailed": "音乐上传失败，请重试。"
+  },
+  "video": {
+    "back": "返回",
+    "more": "更多操作",
+    "navigation": "视频导航",
+    "loading": "正在加载视频...",
+    "loadingMore": "正在加载更多视频...",
+    "loadFailed": "视频加载失败。",
+    "empty": "暂无视频。",
+    "user": "用户",
+    "authRequired": "请登录后继续操作。",
+    "actionFailed": "操作失败，请重试。",
+    "nav": {
+      "home": "首页",
+      "library": "视频库",
+      "playlist": "播放列表"
+    },
+    "home": {
+      "title": "浏览 Lume 全部视频",
+      "subtitle": "这里汇集了 Lume 发布的所有内容。悬停卡片，整个页面随之浮动。",
+      "featured": "精选影片",
+      "today": "今日推荐"
+    },
+    "library": {
+      "title": "视频库",
+      "search": "搜索收藏夹标题",
+      "clear": "清空搜索",
+      "folder": "收藏夹",
+      "videoCount_one": "{{count}} 个视频",
+      "videoCount_other": "{{count}} 个视频",
+      "playCount": "{{count}} 次播放",
+      "empty": "没有匹配的收藏夹。"
+    },
+    "playlist": {
+      "title": "视频播放列表",
+      "pagination": "视频播放列表分页",
+      "page": "第 {{page}} 页"
+    },
+    "categories": {
+      "all": "全部",
+      "label": "视频分类"
+    },
+    "player": {
+      "error": "视频暂时无法播放。",
+      "failed": "视频处理失败。",
+      "processing": "视频处理中 {{progress}}%",
+      "progress": "视频播放进度",
+      "play": "播放",
+      "pause": "暂停",
+      "mute": "静音",
+      "unmute": "取消静音",
+      "volume": "音量",
+      "settings": "播放器设置",
+      "fullscreen": "全屏"
+    },
+    "queue": {
+      "label": "播放列表",
+      "next": "接下来播放",
+      "count_one": "{{count}} 个视频",
+      "count_other": "{{count}} 个视频",
+      "playing": "正在播放"
+    },
+    "comments": {
+      "count_one": "{{count}} 条评论",
+      "count_other": "{{count}} 条评论",
+      "settings": "评论设置",
+      "replying": "正在回复 @{{name}}",
+      "cancelReply": "取消回复",
+      "placeholder": "写下你的评论",
+      "post": "发表评论",
+      "reply": "回复",
+      "failed": "评论发布失败。"
+    },
+    "upload": {
+      "action": "上传视频",
+      "close": "关闭上传弹窗",
+      "newVideo": "新视频",
+      "title": "上传视频",
+      "description": "选择视频后即可一边上传，一边填写发布信息。",
+      "selectVideo": "选择视频文件",
+      "formats": "支持 MP4、WebM、MOV 等视频格式",
+      "uploading": "正在上传视频",
+      "processing": "视频处理中 {{progress}}%",
+      "video": "视频",
+      "duration": "时长",
+      "visibility": "可见权限",
+      "public": "公开",
+      "private": "私密",
+      "detailsReady": "可以发布",
+      "details": "填写视频信息",
+      "chooseCover": "选择视频封面",
+      "selectedCover": "已选择的视频封面",
+      "coverHint": "点击整个区域选择图片",
+      "videoTitle": "标题",
+      "categories": "分类标签",
+      "categoryHint": "每个分类前使用 #，分类之间用空格分隔。",
+      "publishing": "正在发布...",
+      "publish": "发布视频",
+      "publishQueued": "已进入发布队列",
+      "awaitingReady": "等待视频就绪 {{progress}}%",
+      "processingFailed": "视频处理失败",
+      "retryPublish": "重新发布",
+      "invalidVideo": "请选择有效的视频文件。",
+      "invalidCover": "请在视频开始上传后选择有效图片。",
+      "titleRequired": "发布前请填写视频标题。",
+      "categoryRequired": "发布前请至少填写一个分类标签。",
+      "failed": "视频上传失败，请重试。",
+      "coverFailed": "封面上传失败。",
+      "coverTooLarge": "封面图片过大，请选择小于 10 MB 的图片。",
+      "coverUnsupported": "该封面图片格式不受支持，请选择 PNG、JPEG、WebP、GIF 或 AVIF 图片。",
+      "draftMissing": "该上传草稿已不存在，请重新上传视频。",
+      "invalidDetails": "发布前请填写标题并至少添加一个分类标签。",
+      "published": "视频信息已发布。",
+      "publishFailed": "视频信息发布失败。"
+    }
   }
 }

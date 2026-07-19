@@ -46,6 +46,7 @@
 .video-page-shell {
   width: min(144rem, 100%);
   margin: 0 auto;
+  padding: 0 43px;
   animation: video-page-enter 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -1498,6 +1499,43 @@
   object-fit: cover;
 }
 
+.video-processing-player {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: #fff;
+  background: #101513;
+}
+
+.video-processing-player img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-processing-player::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 11, 10, 0.48);
+}
+
+.video-processing-player span {
+  position: relative;
+  z-index: 1;
+  padding: 0.75rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 2rem;
+  background: rgba(12, 16, 14, 0.45);
+  font-size: 1.2rem;
+  font-weight: 600;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
 .video-watch-player::after {
   content: '';
   position: absolute;
@@ -1532,6 +1570,12 @@
 .video-watch-player:focus-within .video-watch-controls {
   opacity: 1;
   transform: translateY(0);
+}
+
+.video-load-more-sentinel {
+  width: 100%;
+  height: 1px;
+  pointer-events: none;
 }
 
 .video-watch-timeline {
@@ -1783,6 +1827,40 @@
   color: #323232;
   font-size: 13px;
   margin-top: 4px;
+}
+
+.video-watch-view-count {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.video-watch-view-count b {
+  position: absolute;
+  left: calc(100% + 0.35rem);
+  bottom: -0.1rem;
+  color: #e05f6f;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  animation: video-view-count-pop 1.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes video-view-count-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(0.55rem) scale(0.8);
+  }
+  22% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-1.1rem) scale(1.03);
+  }
 }
 
 .video-watch-actions {

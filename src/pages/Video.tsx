@@ -1336,7 +1336,11 @@ function Video() {
         setUploadTags(draft.tags ?? '');
         setUploadDuration(draft.duration ?? '00:00');
         setUploadResolution(draft.resolution ?? '1080p');
-        setUploadVisibility(draft.visibility === 'private' ? 'private' : 'public');
+        setUploadVisibility(
+          draft.step === 'publish' && draft.visibility === 'private'
+            ? 'private'
+            : 'public',
+        );
       } catch {
         window.localStorage.removeItem(VIDEO_UPLOAD_DRAFT_KEY);
       }
@@ -1462,6 +1466,7 @@ function Video() {
       }));
       return;
     }
+    if (uploadStep === 'upload') setUploadVisibility('public');
     setIsUploadOpen(true);
   };
 

@@ -10,7 +10,7 @@ import {
 import Overview from '@/pages/Overview';
 import Chat from '@/pages/Chat';
 import Music from '@/pages/Music';
-import Video from '@/pages/Video';
+import Video from '@/pages/VideoConnected';
 import Header from '@/pages/Header';
 import BackgroundImg from '@/components/BackgroundImg';
 import MiniMusicPlayer from '@/components/MiniMusicPlayer';
@@ -20,8 +20,10 @@ import "@/App.scss";
 import "@/styles/oauth.scss";
 import { useEffect, useState } from 'react';
 import { Provider, useDispatch } from 'react-redux';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { store } from '@/store/store';
+import { queryClient } from '@/lib/queryClient';
 import { clearUser, fetchCurrentUser } from '@/store/authSlice';
 import { authStorage, clearAuthReturnTo, getAuthReturnTo } from '@/lib/auth';
 
@@ -218,7 +220,9 @@ const router = createBrowserRouter([
 function App() {
   return (
     <Provider store={store}>
-      <RouterProvider router={router} />
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
     </Provider>
   );
 }
