@@ -682,6 +682,26 @@ function VideoWatch({
     };
   }, [media, video.raw.duration]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' || event.repeat) return;
+
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return;
+
+      event.preventDefault();
+      if (!media) return;
+      if (media.paused || media.ended) {
+        void media.play();
+      } else {
+        media.pause();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [media]);
+
   const roots = comments.filter((comment) => !comment.parentId);
   const replies = useMemo(() => {
     const grouped = new Map<string, VideoApiComment[]>();
