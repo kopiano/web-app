@@ -63,7 +63,7 @@
     "groupNameRequired": "请输入群聊名称。",
     "groupAvatarRequired": "请上传群聊头像。",
     "selectGroupMembers": "请至少选择一位联系人。",
-    "invalidGroupAvatar": "请选择不超过 5 MB 的有效图片。",
+    "invalidGroupAvatar": "请选择不超过 50 MB 的有效图片。",
     "noMatchingUsers": "没有匹配的用户。",
     "today": "今天",
     "yesterday": "昨天",

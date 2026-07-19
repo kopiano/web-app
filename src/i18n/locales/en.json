@@ -63,7 +63,7 @@
     "groupNameRequired": "Enter a group name.",
     "groupAvatarRequired": "Upload a group avatar.",
     "selectGroupMembers": "Select at least one person.",
-    "invalidGroupAvatar": "Please select a valid image up to 5 MB.",
+    "invalidGroupAvatar": "Please select a valid image up to 50 MB.",
     "noMatchingUsers": "No matching users.",
     "today": "Today",
     "yesterday": "Yesterday",
