@@ -35,6 +35,8 @@ interface HlsVideoProps {
   onActivate?: () => void;
   onDeactivate?: () => void;
   onViewQualified?: () => void;
+  controls?: boolean;
+  onVideoElement?: (video: HTMLVideoElement | null) => void;
 }
 
 export default function HlsVideo({
@@ -48,6 +50,8 @@ export default function HlsVideo({
   onActivate,
   onDeactivate,
   onViewQualified,
+  controls = active,
+  onVideoElement,
 }: HlsVideoProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -247,6 +251,11 @@ export default function HlsVideo({
     };
   }, []);
 
+  useEffect(() => {
+    onVideoElement?.(videoRef.current);
+    return () => onVideoElement?.(null);
+  }, [onVideoElement]);
+
   const handlePlay = () => {
     setPlaybackError(false);
     if (!active) {
@@ -280,7 +289,7 @@ export default function HlsVideo({
     <div ref={containerRef} className="hls-video" style={{ aspectRatio }}>
       <video
         ref={videoRef}
-        controls={active}
+        controls={controls}
         playsInline
         preload={active ? 'metadata' : 'none'}
         poster={poster}

@@ -469,3 +469,7 @@ plan                 VARCHAR(20) NOT NULL DEFAULT 'free', -- free/pro
 subscription_status  VARCHAR(20) NOT NULL DEFAULT 'active', -- active/expired
 subscription_start_at TIMESTAMPTZ,
 subscription_end_at   TIMESTAMPTZ,
+
+
+## video
+Vidstack + HLS.js播放器
