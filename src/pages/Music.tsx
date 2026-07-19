@@ -31,7 +31,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'qrcode';
 import bg0 from '@/assets/images/bg-0.webp';
@@ -46,9 +46,7 @@ import alipayYearlyQr from '@/assets/pay/Alipay_year.webp';
 import unionPayYearlyQr from '@/assets/pay/UnionPay_year.webp';
 import {
   deleteMusicTrack,
-  getMusic,
   getMusicLibrary,
-  getMyMusic,
   getMusicTrack,
   musicWebSocketUrl,
   normalizeMusicEvent,
@@ -61,7 +59,8 @@ import {
 } from '@/api/music';
 import { createProCheckout } from '@/api/subscription';
 import { useMusicPlayback } from '@/context/MusicPlaybackContext';
-import type { RootState } from '@/store/store';
+import { musicApi, type MusicPageQueryArgs } from '@/store/musicApi';
+import type { AppDispatch, RootState } from '@/store/store';
 import '@/styles/music.scss';
 
 type MusicProps = {
@@ -316,6 +315,7 @@ const hasActiveLibrarySubscription = (user: RootState['auth']['user']) => {
 function Music({ isActive = true }: MusicProps) {
   const { t, i18n } = useTranslation();
   const { publishPlayback, registerControls } = useMusicPlayback();
+  const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const authInitialized = useSelector((state: RootState) => state.auth.initialized);
   const [storedProDialog] = useState(getStoredProDialogState);
@@ -470,6 +470,7 @@ function Music({ isActive = true }: MusicProps) {
   const playRequestRef = useRef(0);
   const musicPageRequestRef = useRef(0);
   const musicScopeRef = useRef('');
+  const musicRefreshKeyRef = useRef(0);
   const userLibraryRequestRef = useRef(0);
   const favoriteBurstTimeoutRef = useRef<number | undefined>(undefined);
   const pageTracksRef = useRef<MusicTrack[]>([]);
@@ -798,24 +799,20 @@ function Music({ isActive = true }: MusicProps) {
       : libraryPageSize;
 
     setIsMusicPageLoading(true);
-    const musicRequest = activeView === 'playlist' && currentUser
-      ? getMyMusic({
-        page: requestedPage,
-        pageSize: requestedPageSize,
-        collection: 'uploads',
-        userId: collectionOwnerId,
-      })
-      : activeView === 'favorites' && currentUser
-        ? getMyMusic({
-          page: requestedPage,
-          pageSize: requestedPageSize,
-          collection: 'favorites',
-          userId: collectionOwnerId,
-        })
-        : getMusic({
-          page: requestedPage,
-          pageSize: requestedPageSize,
-        });
+    const pageQueryArgs: MusicPageQueryArgs = {
+      view: activeView === 'home' ? 'home' : activeView,
+      page: requestedPage,
+      pageSize: requestedPageSize,
+      userId: collectionOwnerId || undefined,
+    };
+    const shouldForceRefetch = musicRefreshKeyRef.current !== musicRefreshKey;
+    musicRefreshKeyRef.current = musicRefreshKey;
+    const musicRequest = dispatch(
+      musicApi.endpoints.getMusicPage.initiate(pageQueryArgs, {
+        subscribe: false,
+        forceRefetch: shouldForceRefetch,
+      }),
+    ).unwrap();
 
     musicRequest
       .then((music) => {
@@ -843,6 +840,12 @@ function Music({ isActive = true }: MusicProps) {
         setMusicTotal(music.total);
         setMusicTotalDuration(music.totalDuration);
         setMusicPageCount(music.totalPages);
+        if (isCollectionView && requestedPage < music.totalPages) {
+          dispatch(musicApi.util.prefetch('getMusicPage', {
+            ...pageQueryArgs,
+            page: requestedPage + 1,
+          }, { force: false }));
+        }
       })
       .catch((error) => {
         if (requestId === musicPageRequestRef.current) {
@@ -859,6 +862,7 @@ function Music({ isActive = true }: MusicProps) {
     activeView,
     authInitialized,
     collectionOwnerId,
+    dispatch,
     currentUser?.id,
     hasLibraryAccess,
     isCollectionView,
