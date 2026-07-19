@@ -1532,11 +1532,14 @@
 }
 
 .video-watch-queue > header > strong {
-  padding: 0.55rem 0.7rem;
-  border-radius: 1.3rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(40, 48, 44, 0.08);
+  border-radius: 1rem;
   color: #59635d;
   background: rgba(255, 255, 255, 0.72);
   font-size: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .video-watch-queue-list {
@@ -1572,7 +1575,7 @@
   height: 100%;
   padding: 0.65rem;
   display: grid;
-  grid-template-columns: 2.2rem 8.4rem minmax(0, 1fr);
+  grid-template-columns: 1.7rem 8.4rem minmax(0, 1fr);
   align-items: center;
   gap: 0.7rem;
   border-radius: 1.2rem;
@@ -1590,10 +1593,12 @@
 }
 
 .video-watch-queue-index {
+  width: 1.7rem;
   color: #87908b;
   font-size: 1rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .video-watch-queue-poster {
@@ -1632,6 +1637,7 @@
   min-width: 0;
   display: grid;
   gap: 0.3rem;
+  padding-right: 0.3rem;
 }
 
 .video-watch-queue-copy strong,
@@ -1658,10 +1664,13 @@
   position: absolute;
   top: 0.65rem;
   right: 0.65rem;
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--video-accent);
   font-size: 0.86rem;
   font-weight: 850;
-  text-transform: uppercase;
 }
 
 .video-comments {

@@ -791,10 +791,10 @@ function VideoWatchPage({
         >
           <header>
             <div>
-              <span>Up next</span>
-              <h2>Playlist</h2>
+              <span>播放列表</span>
+              <h2>接下来播放</h2>
             </div>
-            <strong>{playlist.length} videos</strong>
+            <strong>{playlist.length} 个视频</strong>
           </header>
           <div className="video-watch-queue-list">
             {playlist.map((item, index) => (
@@ -805,7 +805,7 @@ function VideoWatchPage({
                 aria-current={item.id === video.id ? 'true' : undefined}
                 onClick={() => onSelectVideo(item)}
               >
-                <span className="video-watch-queue-index">{String(index + 1).padStart(2, '0')}</span>
+                <span className="video-watch-queue-index">{index + 1}</span>
                 <span className="video-watch-queue-poster">
                   <img src={item.poster} alt="" />
                   <small>{item.duration}</small>
@@ -815,7 +815,7 @@ function VideoWatchPage({
                   <small>{item.creator}</small>
                   <em>{item.views}</em>
                 </span>
-                {item.id === video.id && <span className="video-watch-now">Now playing</span>}
+                {item.id === video.id && <span className="video-watch-now">正在播放</span>}
               </button>
             ))}
           </div>
@@ -972,7 +972,7 @@ function Video() {
               {activeView === 'home' && 'Watch beautifully.'}
               {activeView === 'library' && 'Your library'}
               {activeView === 'favorites' && selectedCollection.name}
-              {activeView === 'playlist' && 'All videos'}
+              {activeView === 'playlist' && 'Video library'}
             </h1>
           </div>
           <label className="video-search">
@@ -1140,8 +1140,8 @@ function Video() {
           <section className="video-section video-playlist-section">
             <div className="video-section-heading">
               <div>
-                <span>Complete archive</span>
-                <h2>{filteredVideos.length} films</h2>
+                <span>Complete collection</span>
+                <h2>{filteredVideos.length} videos</h2>
               </div>
               <small>Page {safePlaylistPage} of {playlistPageCount}</small>
             </div>

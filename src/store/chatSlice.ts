@@ -25,6 +25,7 @@ export interface ChatMember {
   avatar?: string | null
   username: string
   online: boolean
+  created_at: string
 }
 
 interface ApiContact {

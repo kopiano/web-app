@@ -352,9 +352,27 @@ const contacts: Contact[] = [
     lastMsg: 'See you tomorrow',
     time: '11:30',
     members: [
-      { user_id: 'mock:user:2', username: 'Alice', avatar: fallbackAvatar('Alice'), online: true },
-      { user_id: 'mock:user:3', username: 'Bob', avatar: fallbackAvatar('Bob'), online: false },
-      { user_id: 'mock:user:4', username: 'Catherine', avatar: fallbackAvatar('Catherine'), online: true },
+      {
+        user_id: 'mock:user:2',
+        username: 'Alice',
+        avatar: fallbackAvatar('Alice'),
+        online: true,
+        created_at: '2026-01-03T09:00:00.000Z',
+      },
+      {
+        user_id: 'mock:user:3',
+        username: 'Bob',
+        avatar: fallbackAvatar('Bob'),
+        online: false,
+        created_at: '2026-01-07T09:00:00.000Z',
+      },
+      {
+        user_id: 'mock:user:4',
+        username: 'Catherine',
+        avatar: fallbackAvatar('Catherine'),
+        online: true,
+        created_at: '2026-01-12T09:00:00.000Z',
+      },
     ],
   },
   { id: 'mock:user:2', name: 'Alice', type: 'user', avatar: fallbackAvatar('Alice'), lastMsg: 'Got it', time: '10:15', online: true },
@@ -596,7 +614,21 @@ function Chat() {
   const historyLoading = Boolean(currentUser && activeConversationCache?.loading);
   const historyLoadingMore = Boolean(currentUser && activeConversationCache?.loadingMore);
   const activeGroupMembers = useMemo(
-    () => activeContactInfo?.type === 'group' ? activeContactInfo.members || [] : [],
+    () => {
+      if (activeContactInfo?.type !== 'group') return [];
+
+      return [...(activeContactInfo.members || [])]
+        .map((member, index) => ({
+          member,
+          index,
+          createdAt: Date.parse(member.created_at),
+        }))
+        .sort((left, right) => {
+          if (left.createdAt !== right.createdAt) return left.createdAt - right.createdAt;
+          return left.index - right.index;
+        })
+        .map(({ member }) => member);
+    },
     [activeContactInfo],
   );
   const existingGroupMemberIds = useMemo(

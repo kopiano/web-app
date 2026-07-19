@@ -3,6 +3,7 @@ export interface ChatApiMember {
   avatar?: string | null;
   username: string;
   online: boolean;
+  created_at: string;
 }
 
 export interface ChatApiContact {
