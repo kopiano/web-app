@@ -4,8 +4,6 @@ import { useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   ArrowLeft,
-  Bookmark,
-  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -24,8 +22,8 @@ import {
   Search,
   Send,
   Settings2,
-  Share2,
   Smile,
+  Star,
   ThumbsUp,
   Upload,
   Volume2,
@@ -72,6 +70,7 @@ type VideoComment = {
   time: string;
   text: string;
   likes: number;
+  replies?: VideoComment[];
 };
 
 const VIDEO_SOURCES = {
@@ -357,6 +356,15 @@ const COLLECTIONS: VideoCollection[] = [
 ];
 
 const CATEGORIES = ['All', 'Movies', 'Genshin Impact', 'Travel', 'Nature', 'Design', 'Music'];
+const VIDEO_COMMENT_EMOJIS = [
+  '😀','😃','😄','😁','😆','😅','😂','🤣',
+  '😊','😇','🙂','😉','😍','😘','😋','😎',
+  '🤩','🥳','🤔','🤗','🤓','😏','😒','😞',
+  '👍','👌','👏','🙌','💪','🙏','👋','🎉',
+  '✨','🔥','🚀','❤️','🌍','🎮','🥇','🏅',
+  '🌩️','🌨️','🌧️','🌦️','🌥️','🌤️','⛈️','⛅',
+  '🍉','🥬','🍇',
+];
 const VALID_VIEWS = new Set<VideoView>(['home', 'library', 'favorites', 'playlist', 'watch']);
 const DEFAULT_UPLOAD_POSTER = VIDEOS[0].poster;
 const VIDEO_UPLOAD_DRAFT_KEY = 'lume-video-upload-draft';
@@ -508,6 +516,7 @@ function VideoWatchPage({
   onSelectVideo: (video: VideoItem) => void;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const [media, setMedia] = useState<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
@@ -517,13 +526,18 @@ function VideoWatchPage({
   const [playerHeight, setPlayerHeight] = useState<number>();
   const [comments, setComments] = useState<VideoComment[]>(VIDEO_COMMENTS);
   const [commentDraft, setCommentDraft] = useState('');
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<{ commentId: string; author: string } | null>(null);
   const [likedComments, setLikedComments] = useState<Set<string>>(() => new Set());
-  const [shared, setShared] = useState(false);
+  const [likedVideo, setLikedVideo] = useState(false);
 
   useEffect(() => {
     setCommentDraft('');
+    setIsEmojiPickerOpen(false);
+    setReplyTarget(null);
     setComments(VIDEO_COMMENTS);
     setLikedComments(new Set());
+    setLikedVideo(false);
   }, [video.id]);
 
   useEffect(() => {
@@ -613,15 +627,25 @@ function VideoWatchPage({
   const submitComment = () => {
     const text = commentDraft.trim();
     if (!text) return;
-    setComments((current) => [{
+    const nextComment: VideoComment = {
       id: `comment-${Date.now()}`,
       author: 'You',
       avatar: video.avatar,
       time: 'Just now',
       text,
       likes: 0,
-    }, ...current]);
+    };
+    setComments((current) => {
+      if (!replyTarget) return [nextComment, ...current];
+      return current.map((comment) => (
+        comment.id === replyTarget.commentId
+          ? { ...comment, replies: [...(comment.replies ?? []), nextComment] }
+          : comment
+      ));
+    });
     setCommentDraft('');
+    setIsEmojiPickerOpen(false);
+    setReplyTarget(null);
   };
 
   const toggleCommentLike = (commentId: string) => {
@@ -633,14 +657,17 @@ function VideoWatchPage({
     });
   };
 
-  const shareVideo = async () => {
-    try {
-      await navigator.clipboard?.writeText(window.location.href);
-    } catch {
-      // The UI still confirms the interaction when clipboard permission is unavailable.
-    }
-    setShared(true);
-    window.setTimeout(() => setShared(false), 1800);
+  const replyToComment = (commentId: string, author: string) => {
+    const mention = `@${author} `;
+    setReplyTarget({ commentId, author });
+    setCommentDraft(mention);
+    setIsEmojiPickerOpen(false);
+    window.requestAnimationFrame(() => {
+      const input = commentInputRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(mention.length, mention.length);
+    });
   };
 
   const playbackValue = duration > 0 ? Math.min(currentTime, duration) : 0;
@@ -649,7 +676,7 @@ function VideoWatchPage({
     <div className="video-watch-page">
       <button type="button" className="video-watch-back" onClick={onBack}>
         <ArrowLeft size={18} />
-        Back to videos
+        Back
       </button>
 
       <div className="video-watch-layout">
@@ -724,42 +751,38 @@ function VideoWatchPage({
                 </span>
               </div>
               <div className="video-watch-actions">
-                <button type="button" className="is-like" aria-label="Like video">
-                  <Heart size={18} />
+                <button
+                  type="button"
+                  className={`is-like${likedVideo ? ' is-liked' : ''}`}
+                  aria-label={likedVideo ? 'Unlike video' : 'Like video'}
+                  title={likedVideo ? 'Unlike video' : 'Like video'}
+                  aria-pressed={likedVideo}
+                  onClick={() => setLikedVideo((current) => !current)}
+                >
+                  <ThumbsUp size={18} fill="currentColor" />
                   <span>48.2K</span>
                 </button>
                 <button
                   type="button"
                   className={favorite ? 'is-saved' : ''}
                   aria-pressed={favorite}
+                  aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
+                  title={favorite ? 'Remove from favorites' : 'Add to favorites'}
                   onClick={() => onFavorite(video.id)}
                 >
-                  {favorite ? <Check size={18} /> : <Bookmark size={18} />}
-                  <span>{favorite ? 'Saved' : 'Save'}</span>
+                  <Star size={18} fill={favorite ? 'currentColor' : 'none'} />
+                  <span>12.8K</span>
                 </button>
-                <button type="button" onClick={shareVideo}>
-                  <Share2 size={18} />
-                  <span>{shared ? 'Copied' : 'Share'}</span>
-                </button>
-                <button type="button" className="video-watch-more" aria-label="More options">
+                <button type="button" className="video-watch-more" aria-label="More options" title="More options">
                   <MoreHorizontal size={20} />
                 </button>
               </div>
-            </div>
-            <div className="video-watch-description">
-              <div className="video-watch-tags">
-                <span>{video.category}</span>
-                <span>{video.resolution}</span>
-                <span>Cinematic journey</span>
-              </div>
-              <p>{video.description} Filmed with a small crew over six weeks and finished in natural sound.</p>
             </div>
           </section>
 
           <section className="video-comments" aria-labelledby="video-comments-title">
             <div className="video-comments-heading">
               <div>
-                <span>Conversation</span>
                 <h2 id="video-comments-title">{comments.length} comments</h2>
               </div>
               <button type="button" aria-label="Comment settings">
@@ -769,7 +792,24 @@ function VideoWatchPage({
             <div className="video-comment-compose">
               <img src={video.avatar} alt="" />
               <div>
+                {replyTarget && (
+                  <div className="video-comment-replying">
+                    <span>Replying to <strong>@{replyTarget.author}</strong></span>
+                    <button
+                      type="button"
+                      aria-label="Cancel reply"
+                      title="Cancel reply"
+                      onClick={() => {
+                        setReplyTarget(null);
+                        setCommentDraft('');
+                      }}
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                )}
                 <textarea
+                  ref={commentInputRef}
                   value={commentDraft}
                   placeholder="Add a thoughtful comment"
                   aria-label="Write a comment"
@@ -777,13 +817,38 @@ function VideoWatchPage({
                   onChange={(event) => setCommentDraft(event.target.value)}
                 />
                 <div className="video-comment-compose-actions">
-                  <button type="button" aria-label="Add emoji" title="Add emoji">
+                  <button
+                    type="button"
+                    className={isEmojiPickerOpen ? 'is-active' : ''}
+                    aria-label="Add emoji"
+                    title="Add emoji"
+                    aria-expanded={isEmojiPickerOpen}
+                    onClick={() => setIsEmojiPickerOpen((current) => !current)}
+                  >
                     <Smile size={18} />
                   </button>
+                  {isEmojiPickerOpen && (
+                    <div className="video-comment-emoji-picker" aria-label="Choose an emoji">
+                      {VIDEO_COMMENT_EMOJIS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          aria-label={`Add ${emoji}`}
+                          onPointerDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setCommentDraft((current) => `${current}${emoji}`);
+                            setIsEmojiPickerOpen(false);
+                          }}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <span />
                   <button type="button" className="video-comment-submit" disabled={!commentDraft.trim()} onClick={submitComment}>
-                    <Send size={16} />
                     Post comment
+                    <Send size={16} />
                   </button>
                 </div>
               </div>
@@ -805,11 +870,44 @@ function VideoWatchPage({
                           <ThumbsUp size={15} fill={liked ? 'currentColor' : 'none'} />
                           {comment.likes + (liked ? 1 : 0)}
                         </button>
-                        <button type="button">
+                        <button type="button" onClick={() => replyToComment(comment.id, comment.author)}>
                           <MessageCircle size={15} />
                           Reply
                         </button>
                       </footer>
+                      {comment.replies && comment.replies.length > 0 && (
+                        <div className="video-comment-replies">
+                          {comment.replies.map((reply) => {
+                            const replyLiked = likedComments.has(reply.id);
+                            return (
+                              <article key={reply.id} className="video-comment-reply">
+                                <img src={reply.avatar} alt="" />
+                                <div>
+                                  <header>
+                                    <strong>{reply.author}</strong>
+                                    <time>{reply.time}</time>
+                                  </header>
+                                  <p>{reply.text}</p>
+                                  <footer>
+                                    <button
+                                      type="button"
+                                      className={replyLiked ? 'is-liked' : ''}
+                                      onClick={() => toggleCommentLike(reply.id)}
+                                    >
+                                      <ThumbsUp size={14} fill={replyLiked ? 'currentColor' : 'none'} />
+                                      {reply.likes + (replyLiked ? 1 : 0)}
+                                    </button>
+                                    <button type="button" onClick={() => replyToComment(comment.id, reply.author)}>
+                                      <MessageCircle size={14} />
+                                      Reply
+                                    </button>
+                                  </footer>
+                                </div>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </article>
                 );
