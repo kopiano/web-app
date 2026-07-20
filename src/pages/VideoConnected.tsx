@@ -215,6 +215,13 @@ function withoutCategoryMarkers(value: string) {
     .trim();
 }
 
+function versionedVideoPoster(video: VideoApiItem) {
+  if (!video.coverUrl || video.status === 'ready') return video.coverUrl;
+  const separator = video.coverUrl.includes('?') ? '&' : '?';
+  const revision = video.updatedAt || `${video.status}-${video.processingProgress}`;
+  return `${video.coverUrl}${separator}preview=${encodeURIComponent(revision)}`;
+}
+
 function toCardVideo(video: VideoApiItem, language: string): CardVideo {
   const category = firstCategory(video, language);
   const formatter = new Intl.NumberFormat(language, {
@@ -236,7 +243,7 @@ function toCardVideo(video: VideoApiItem, language: string): CardVideo {
     resolution: resolutionFor(video),
     category: category.name,
     categorySlug: category.slug,
-    poster: video.coverUrl,
+    poster: versionedVideoPoster(video),
     src: video.status === 'ready' ? video.hlsMasterUrl : '',
     status: video.status,
     processingProgress: video.processingProgress,
@@ -356,6 +363,9 @@ const VideoCard = memo(function VideoCard({
             className="video-tile-processing"
             role="status"
             aria-label={`Processing ${video.processingProgress}%`}
+            style={{
+              '--video-processing-progress': `${Math.max(0, Math.min(100, video.processingProgress))}%`,
+            } as CSSProperties}
           >
             <LoaderCircle size={20} aria-hidden="true" />
             <strong>{video.processingProgress}%</strong>
@@ -1336,6 +1346,7 @@ export default function VideoConnected() {
   const requestedVideoId = searchParams.get('video');
   const selectedCollectionId = searchParams.get('collection');
   const watchFromPlaylist = activeView === 'watch' && searchParams.get('from') === 'playlist';
+  const watchFromFavorites = activeView === 'watch' && searchParams.get('from') === 'favorites';
   const playlistPage = Math.max(1, Number(searchParams.get('page')) || 1);
   const urlPlaylistCategory = activeView === 'playlist'
     ? searchParams.get('category') || 'all'
@@ -1853,13 +1864,62 @@ export default function VideoConnected() {
 
   const openVideo = useCallback((video: CardVideo) => {
     const nextParams: Record<string, string> = { view: 'watch', video: video.id };
-    if (activeView === 'playlist') {
+    if (activeView === 'playlist' || watchFromPlaylist) {
       nextParams.from = 'playlist';
+      if (activeCategory !== 'all') nextParams.category = activeCategory;
+      if (playlistPage > 1) nextParams.page = String(playlistPage);
+    }
+    if ((activeView === 'favorites' || watchFromFavorites) && selectedCollectionId) {
+      nextParams.from = 'favorites';
+      nextParams.collection = selectedCollectionId;
       if (activeCategory !== 'all') nextParams.category = activeCategory;
     }
     setSearchParams(nextParams);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [activeCategory, activeView, setSearchParams]);
+  }, [
+    activeCategory,
+    activeView,
+    playlistPage,
+    selectedCollectionId,
+    setSearchParams,
+    watchFromFavorites,
+    watchFromPlaylist,
+  ]);
+
+  const returnFromWatch = useCallback(() => {
+    const category = searchParams.get('category');
+    if (watchFromPlaylist) {
+      const next = new URLSearchParams({ view: 'playlist' });
+      const page = searchParams.get('page');
+      if (category) next.set('category', category);
+      if (page) next.set('page', page);
+
+      setSearchParams(next);
+      setActiveCategory(category || 'all');
+      setSearch('');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (watchFromFavorites) {
+      const collectionId = searchParams.get('collection');
+      if (collectionId) {
+        const next = new URLSearchParams({ view: 'favorites', collection: collectionId });
+        if (category) next.set('category', category);
+
+        setSearchParams(next);
+        setActiveCategory(category || 'all');
+        setSearch('');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      navigateTo('library');
+      return;
+    }
+
+    navigateTo('home');
+  }, [navigateTo, searchParams, setSearchParams, watchFromFavorites, watchFromPlaylist]);
 
   const updateMockReaction = useCallback((
     videoId: string,
@@ -2323,7 +2383,7 @@ export default function VideoConnected() {
             playlist={watchPlaylist}
             comments={watchComments}
             currentUserAvatar={currentUserAvatar}
-            onBack={() => navigateTo('home')}
+            onBack={returnFromWatch}
             onSelect={openVideo}
             onReact={async (kind, active) => {
               if (!currentUser) {
