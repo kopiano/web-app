@@ -189,6 +189,13 @@ function firstCategory(video: VideoApiItem, language: string) {
   };
 }
 
+function withoutCategoryMarkers(value: string) {
+  return value
+    .replace(/(^|\s)#[\p{L}\p{N}-]+/gu, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function toCardVideo(video: VideoApiItem, language: string): CardVideo {
   const category = firstCategory(video, language);
   const formatter = new Intl.NumberFormat(language, {
@@ -2003,8 +2010,8 @@ export default function VideoConnected() {
                     </button>
                     <div className="video-featured-copy">
                       <span className="video-featured-label">{t('video.home.featured')}</span>
-                      <h2>{featured.title}</h2>
-                      <p>{featured.description}</p>
+                      <h2>{withoutCategoryMarkers(featured.title)}</h2>
+                      <p>{withoutCategoryMarkers(featured.description)}</p>
                       <div className="video-featured-author">
                         <img src={featured.avatar} alt="" {...lazyImageProps()} />
                         <div>
