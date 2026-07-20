@@ -325,6 +325,13 @@
     "user": "User",
     "authRequired": "Please sign in to continue.",
     "actionFailed": "Unable to update the video. Please try again.",
+    "deleteTitle": "Delete this video?",
+    "deleteDescription": "This video, its comments, reactions, and uploaded files will be permanently removed.",
+    "deleteCancel": "Cancel",
+    "deleteConfirm": "Delete video",
+    "deleting": "Deleting",
+    "deleteFailed": "Unable to delete this video. Please try again.",
+    "deleted": "Video deleted successfully.",
     "nav": {
       "home": "Home",
       "library": "Library",

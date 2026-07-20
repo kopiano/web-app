@@ -325,6 +325,13 @@
     "user": "用户",
     "authRequired": "请登录后继续操作。",
     "actionFailed": "操作失败，请重试。",
+    "deleteTitle": "删除这个视频？",
+    "deleteDescription": "该视频、评论、点赞和已上传的文件将被永久删除。",
+    "deleteCancel": "取消",
+    "deleteConfirm": "删除视频",
+    "deleting": "删除中",
+    "deleteFailed": "视频删除失败，请重试。",
+    "deleted": "视频已删除。",
     "nav": {
       "home": "首页",
       "library": "视频库",

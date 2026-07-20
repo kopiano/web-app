@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   ArrowLeft,
+  AlertTriangle,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -15,6 +16,7 @@ import {
   ImagePlus,
   Library,
   ListVideo,
+  LoaderCircle,
   MessageCircle,
   MoreHorizontal,
   Pause,
@@ -25,12 +27,14 @@ import {
   Smile,
   Star,
   ThumbsUp,
+  Trash2,
   Upload,
   Volume2,
   VolumeX,
   X,
 } from 'lucide-react';
 import HlsVideo from '@/components/HlsVideo';
+import { deleteVideo } from '@/api/video';
 import { defaultAvatarDataUrl, resolveAvatarUrl } from '@/lib/avatar';
 import type { RootState } from '@/store/store';
 import '@/styles/video.scss';
@@ -507,6 +511,7 @@ function VideoWatchPage({
   onFavorite,
   onBack,
   onSelectVideo,
+  onDelete,
 }: {
   video: VideoItem;
   playlist: VideoItem[];
@@ -514,6 +519,7 @@ function VideoWatchPage({
   onFavorite: (videoId: string) => void;
   onBack: () => void;
   onSelectVideo: (video: VideoItem) => void;
+  onDelete: (videoId: string) => Promise<void>;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
@@ -532,6 +538,9 @@ function VideoWatchPage({
   const [replyTarget, setReplyTarget] = useState<{ commentId: string; author: string } | null>(null);
   const [likedComments, setLikedComments] = useState<Set<string>>(() => new Set());
   const [likedVideo, setLikedVideo] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     setCommentDraft('');
@@ -548,6 +557,19 @@ function VideoWatchPage({
       window.clearTimeout(controlsHideTimerRef.current);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isDeleteDialogOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isDeleting) {
+        event.stopPropagation();
+        setIsDeleteDialogOpen(false);
+        setDeleteError('');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isDeleteDialogOpen, isDeleting]);
 
   const showPlayerControls = () => {
     setAreControlsVisible(true);
@@ -566,6 +588,17 @@ function VideoWatchPage({
       controlsHideTimerRef.current = undefined;
     }
     setAreControlsVisible(false);
+  };
+
+  const confirmDeleteVideo = async () => {
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      await onDelete(video.id);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : '删除视频失败，请稍后重试。');
+      setIsDeleting(false);
+    }
   };
 
   useEffect(() => {
@@ -807,7 +840,16 @@ function VideoWatchPage({
                   <Star size={18} fill={favorite ? 'currentColor' : 'none'} />
                   <span>12.8K</span>
                 </button>
-                <button type="button" className="video-watch-more" aria-label="More options" title="More options">
+                <button
+                  type="button"
+                  className="video-watch-more"
+                  aria-label="More options"
+                  title="More options"
+                  onClick={() => {
+                    setDeleteError('');
+                    setIsDeleteDialogOpen(true);
+                  }}
+                >
                   <MoreHorizontal size={20} />
                 </button>
               </div>
@@ -987,6 +1029,76 @@ function VideoWatchPage({
           </div>
         </aside>
       </div>
+
+      {isDeleteDialogOpen && createPortal(
+        <div className="video-delete-overlay" role="presentation">
+          <button
+            type="button"
+            className="video-delete-backdrop"
+            aria-label="Close delete confirmation"
+            onClick={() => {
+              if (!isDeleting) {
+                setIsDeleteDialogOpen(false);
+                setDeleteError('');
+              }
+            }}
+          />
+          <section
+            className="video-delete-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="video-delete-title"
+            aria-describedby="video-delete-description"
+          >
+            <button
+              type="button"
+              className="video-delete-close"
+              aria-label="Close delete confirmation"
+              onClick={() => {
+                if (!isDeleting) {
+                  setIsDeleteDialogOpen(false);
+                  setDeleteError('');
+                }
+              }}
+              disabled={isDeleting}
+            >
+              <X size={19} />
+            </button>
+            <div className="video-delete-icon" aria-hidden="true">
+              <AlertTriangle size={23} />
+            </div>
+            <p className="video-delete-eyebrow">VIDEO LIBRARY</p>
+            <h2 id="video-delete-title">Delete this video?</h2>
+            <p id="video-delete-description">
+              “{video.title}” and its comments, likes, favorites, playlist links, and local video files will be permanently removed.
+            </p>
+            {deleteError && <p className="video-delete-error" role="alert">{deleteError}</p>}
+            <div className="video-delete-actions">
+              <button
+                type="button"
+                className="video-delete-cancel"
+                onClick={() => {
+                  setIsDeleteDialogOpen(false);
+                  setDeleteError('');
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="video-delete-confirm"
+                onClick={() => void confirmDeleteVideo()}
+                disabled={isDeleting}
+              >
+                {isDeleting ? <LoaderCircle size={16} className="is-spinning" /> : <Trash2 size={16} />}
+                {isDeleting ? 'Deleting…' : 'Delete video'}
+              </button>
+            </div>
+          </section>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -1473,6 +1585,24 @@ function Video() {
     });
   };
 
+  const deleteWatchedVideo = async (videoId: string) => {
+    await deleteVideo(videoId);
+    setVideos((current) => current.filter((video) => video.id !== videoId));
+    setFavoriteIds((current) => {
+      const next = new Set(current);
+      next.delete(videoId);
+      return next;
+    });
+    const next = new URLSearchParams(searchParams);
+    next.delete('view');
+    next.delete('video');
+    next.delete('page');
+    setSearchParams(next);
+    window.dispatchEvent(new CustomEvent('app:notification', {
+      detail: { message: '视频及相关数据已删除', type: 'success' },
+    }));
+  };
+
   const clearUploadTimer = () => {
     if (uploadTimerRef.current === null) return;
     window.clearInterval(uploadTimerRef.current);
@@ -1618,6 +1748,7 @@ function Video() {
           onFavorite={toggleFavorite}
           onBack={() => navigateTo('home')}
           onSelectVideo={openVideo}
+          onDelete={deleteWatchedVideo}
         />
       )}
 

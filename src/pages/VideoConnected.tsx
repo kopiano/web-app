@@ -671,6 +671,7 @@ function VideoWatch({
   onComment,
   onCommentLike,
   onViewQualified,
+  onDelete,
 }: {
   video: CardVideo;
   playlist: CardVideo[];
@@ -682,6 +683,7 @@ function VideoWatch({
   onComment: (content: string, target: ReplyTarget | null) => void;
   onCommentLike: (comment: VideoApiComment, active: boolean) => void;
   onViewQualified: (videoId: string) => Promise<boolean>;
+  onDelete: (videoId: string) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const stageRef = useRef<HTMLDivElement>(null);
@@ -695,26 +697,35 @@ function VideoWatch({
   const [duration, setDuration] = useState(video.raw.duration);
   const [playerHeight, setPlayerHeight] = useState<number>();
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [fullscreenControlsVisible, setFullscreenControlsVisible] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
   const [volumeControlOpen, setVolumeControlOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [viewIncrementVisible, setViewIncrementVisible] = useState(false);
-  const fullscreenControlsTimerRef = useRef<number | undefined>(undefined);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const controlsTimerRef = useRef<number | undefined>(undefined);
   const volumeControlTimerRef = useRef<number | undefined>(undefined);
 
-  const revealFullscreenControls = useCallback(() => {
-    if (document.fullscreenElement !== stageRef.current) return;
-
-    setFullscreenControlsVisible(true);
-    if (fullscreenControlsTimerRef.current !== undefined) {
-      window.clearTimeout(fullscreenControlsTimerRef.current);
+  const revealControls = useCallback(() => {
+    setControlsVisible(true);
+    if (controlsTimerRef.current !== undefined) {
+      window.clearTimeout(controlsTimerRef.current);
     }
-    fullscreenControlsTimerRef.current = window.setTimeout(() => {
-      setFullscreenControlsVisible(false);
-      fullscreenControlsTimerRef.current = undefined;
-    }, 6_000);
+    controlsTimerRef.current = window.setTimeout(() => {
+      setControlsVisible(false);
+      controlsTimerRef.current = undefined;
+    }, document.fullscreenElement === stageRef.current ? 6_000 : 5_000);
+  }, []);
+
+  const hideControls = useCallback(() => {
+    if (controlsTimerRef.current !== undefined) {
+      window.clearTimeout(controlsTimerRef.current);
+      controlsTimerRef.current = undefined;
+    }
+    setControlsVisible(false);
   }, []);
 
   const showVolumeControl = useCallback(() => {
@@ -757,28 +768,28 @@ function VideoWatch({
       const fullscreen = document.fullscreenElement === stageRef.current;
       setIsFullscreen(fullscreen);
       if (fullscreen) {
-        revealFullscreenControls();
+        revealControls();
         return;
       }
 
-      setFullscreenControlsVisible(false);
-      if (fullscreenControlsTimerRef.current !== undefined) {
-        window.clearTimeout(fullscreenControlsTimerRef.current);
-        fullscreenControlsTimerRef.current = undefined;
-      }
+      hideControls();
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      if (fullscreenControlsTimerRef.current !== undefined) {
-        window.clearTimeout(fullscreenControlsTimerRef.current);
+      if (controlsTimerRef.current !== undefined) {
+        window.clearTimeout(controlsTimerRef.current);
       }
       if (volumeControlTimerRef.current !== undefined) {
         window.clearTimeout(volumeControlTimerRef.current);
       }
     };
-  }, [revealFullscreenControls]);
+  }, [hideControls, revealControls]);
+
+  useEffect(() => {
+    revealControls();
+  }, [revealControls, video.id]);
 
   useEffect(() => {
     if (!media) return;
@@ -817,7 +828,7 @@ function VideoWatch({
       if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return;
 
       event.preventDefault();
-      revealFullscreenControls();
+      revealControls();
       if (!media) return;
       if (media.paused || media.ended) {
         void media.play();
@@ -828,7 +839,7 @@ function VideoWatch({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [media, revealFullscreenControls]);
+  }, [media, revealControls]);
 
   const roots = comments.filter((comment) => !comment.parentId);
   const replies = useMemo(() => {
@@ -883,6 +894,17 @@ function VideoWatch({
     media.muted = value === 0;
   };
 
+  const confirmDeleteVideo = async () => {
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      await onDelete(video.id);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : t('video.deleteFailed'));
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="video-watch-page">
       <button type="button" className="video-watch-back" onClick={onBack}>
@@ -893,9 +915,11 @@ function VideoWatch({
         <div className="video-watch-main">
           <div
             ref={stageRef}
-            className={`video-watch-player${isFullscreen ? ' is-fullscreen' : ''}${fullscreenControlsVisible ? ' is-controls-visible' : ''}`}
-            onPointerMove={revealFullscreenControls}
-            onPointerDown={revealFullscreenControls}
+            className={`video-watch-player${isFullscreen ? ' is-fullscreen' : ''}${controlsVisible ? ' is-controls-visible' : ''}`}
+            onPointerEnter={revealControls}
+            onPointerMove={revealControls}
+            onPointerDown={revealControls}
+            onPointerLeave={hideControls}
           >
             {video.status === 'ready' && video.src ? (
               <HlsVideo
@@ -1027,7 +1051,15 @@ function VideoWatch({
                   <Star size={18} fill={video.favorited ? 'currentColor' : 'none'} />
                   <span>{new Intl.NumberFormat(undefined, { notation: 'compact' }).format(video.favoriteCount)}</span>
                 </button>
-                <button type="button" className="video-watch-more" aria-label={t('video.more')}>
+                <button
+                  type="button"
+                  className="video-watch-more"
+                  aria-label={t('video.more')}
+                  onClick={() => {
+                    setDeleteError('');
+                    setIsDeleteDialogOpen(true);
+                  }}
+                >
                   <MoreHorizontal size={20} />
                 </button>
               </div>
@@ -1164,6 +1196,61 @@ function VideoWatch({
           </div>
         </aside>
       </div>
+      {isDeleteDialogOpen && createPortal(
+        <div className="video-delete-overlay" role="presentation">
+          <button
+            type="button"
+            className="video-delete-backdrop"
+            aria-label={t('video.deleteCancel')}
+            onClick={() => {
+              if (!isDeleting) setIsDeleteDialogOpen(false);
+            }}
+          />
+          <section
+            className="video-delete-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="video-delete-title"
+          >
+            <button
+              type="button"
+              className="video-delete-close"
+              aria-label={t('video.deleteCancel')}
+              disabled={isDeleting}
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              <X size={20} />
+            </button>
+            <div className="video-delete-icon" aria-hidden="true">
+              <MoreHorizontal size={26} />
+            </div>
+            <p className="video-delete-eyebrow">{t('video.more')}</p>
+            <h2 id="video-delete-title">{t('video.deleteTitle')}</h2>
+            <p>{t('video.deleteDescription')}</p>
+            {deleteError && <p className="video-delete-error">{deleteError}</p>}
+            <div className="video-delete-actions">
+              <button
+                type="button"
+                className="video-delete-cancel"
+                disabled={isDeleting}
+                onClick={() => setIsDeleteDialogOpen(false)}
+              >
+                {t('video.deleteCancel')}
+              </button>
+              <button
+                type="button"
+                className="video-delete-confirm"
+                disabled={isDeleting}
+                onClick={() => void confirmDeleteVideo()}
+              >
+                {isDeleting && <LoaderCircle size={17} className="is-spinning" />}
+                {isDeleting ? t('video.deleting') : t('video.deleteConfirm')}
+              </button>
+            </div>
+          </section>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -1300,6 +1387,14 @@ export default function VideoConnected() {
         : false
     ),
   });
+  const generatedUploadCoverUrl = useMemo(() => {
+    if (uploadCoverUrl || !uploadStatusQuery.data?.coverUrl) return '';
+    const coverUrl = uploadStatusQuery.data.coverUrl;
+    const separator = coverUrl.includes('?') ? '&' : '?';
+    const revision = uploadStatusQuery.data.updatedAt
+      || `${uploadStatusQuery.data.status}-${uploadStatusQuery.data.processingProgress}`;
+    return `${coverUrl}${separator}preview=${encodeURIComponent(revision)}`;
+  }, [uploadCoverUrl, uploadStatusQuery.data]);
   const publishedProcessingQuery = useQuery({
     queryKey: ['video', 'published-processing', publishedProcessingVideos.map((video) => video.id)],
     queryFn: () => getVideos({ limit: 50, scope: 'accessible' }),
@@ -1710,6 +1805,20 @@ export default function VideoConnected() {
     ]);
   }, [queryClient]);
 
+  const deleteWatchedVideo = useCallback(async (videoId: string) => {
+    if (isMockVideoId(videoId)) {
+      setSearchParams({});
+      return;
+    }
+
+    await deleteVideo(videoId);
+    queryClient.removeQueries({ queryKey: ['video', 'detail', videoId] });
+    queryClient.removeQueries({ queryKey: ['video', 'comments', videoId] });
+    await invalidateVideoData();
+    setSearchParams({});
+    notify(t('video.deleted'), 'success');
+  }, [invalidateVideoData, queryClient, setSearchParams, t]);
+
   const toggleFavorite = useCallback(async (video: CardVideo) => {
     if (!currentUser) {
       notify(t('video.authRequired'), 'error');
@@ -2088,6 +2197,7 @@ export default function VideoConnected() {
               }
             }}
             onViewQualified={trackQualifiedVideoView}
+            onDelete={deleteWatchedVideo}
           />
         ) : (
           <div className="video-empty">
@@ -2356,7 +2466,7 @@ export default function VideoConnected() {
               progress={uploadProgress}
               processingProgress={uploadStatusQuery.data?.processingProgress ?? 0}
               videoName={uploadVideoName}
-              coverUrl={uploadCoverUrl}
+              coverUrl={uploadCoverUrl || generatedUploadCoverUrl}
               title={uploadTitle}
               tags={uploadTags}
               visibility={uploadVisibility}
