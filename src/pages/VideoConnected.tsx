@@ -286,6 +286,18 @@ function lazyImageProps() {
   };
 }
 
+function preloadImage(src: string) {
+  return new Promise<void>((resolve) => {
+    const image = new Image();
+    image.decoding = 'async';
+    image.onload = () => {
+      void image.decode().catch(() => undefined).finally(resolve);
+    };
+    image.onerror = () => resolve();
+    image.src = src;
+  });
+}
+
 function CategoryNav({
   active,
   categories,
@@ -1354,6 +1366,8 @@ export default function VideoConnected() {
   const [activeCategory, setActiveCategory] = useState(
     () => searchParams.get('category') || 'all',
   );
+  const [featuredVideoId, setFeaturedVideoId] = useState<string | null>(null);
+  const [previousFeaturedVideoId, setPreviousFeaturedVideoId] = useState<string | null>(null);
   const playlistFilterCategory = watchFromPlaylist
     ? searchParams.get('category') || activeCategory
     : activeCategory;
@@ -1401,6 +1415,9 @@ export default function VideoConnected() {
   const draftTitleSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const uploadPublishRequestedRef = useRef(false);
   const uploadFinalizingRef = useRef(false);
+  const featuredVideoIdRef = useRef<string | null>(null);
+  const featuredPreloadedPostersRef = useRef(new Set<string>());
+  const featuredTransitionInFlightRef = useRef(false);
 
   useEffect(() => () => {
     uploadAbortControllerRef.current?.abort();
@@ -1413,10 +1430,8 @@ export default function VideoConnected() {
   });
   const playlistCategoriesQuery = useQuery({
     queryKey: ['video', 'categories', 'playlist', currentUser?.id ?? 'public'],
-    queryFn: () => getVideoCategories({
-      scope: currentUser ? 'accessible' : 'public',
-    }),
-    enabled: activeView === 'playlist',
+    queryFn: () => getVideoCategories({ scope: 'mine' }),
+    enabled: Boolean(currentUser) && (activeView === 'playlist' || collectionDialogOpen),
   });
   const collectionsQuery = useQuery({
     queryKey: ['video', 'collections'],
@@ -1433,7 +1448,7 @@ export default function VideoConnected() {
     initialPageParam: null as Cursor,
     queryFn: ({ pageParam }) => pageQuery(pageParam, {
       limit: 8,
-      scope: currentUser ? 'accessible' : 'public',
+      scope: 'mine',
       ...(playlistFilterCategory !== 'all' ? { category: playlistFilterCategory } : {}),
     }),
     getNextPageParam: nextCursor,
@@ -1444,7 +1459,7 @@ export default function VideoConnected() {
         ? 1200
         : false
     ),
-    enabled: activeView === 'playlist' || watchFromPlaylist,
+    enabled: (activeView === 'playlist' || watchFromPlaylist) && Boolean(currentUser),
   });
   const collectionVideosQuery = useInfiniteQuery({
     queryKey: ['video', 'collection', selectedCollectionId, activeCategory],
@@ -1530,6 +1545,7 @@ export default function VideoConnected() {
     ? MOCK_VIDEO_CATEGORIES
     : categoriesQuery.data ?? [];
   const playlistCategories = playlistCategoriesQuery.data ?? [];
+  const collectionCategories = useMockData ? MOCK_VIDEO_CATEGORIES : playlistCategories;
   const effectiveCollections = collectionsQuery.data && collectionsQuery.data.length > 0
     ? collectionsQuery.data
     : useMockData
@@ -1548,6 +1564,10 @@ export default function VideoConnected() {
       .map((video) => toCardVideo(video, language)),
     [effectiveMockItems, language, realHomeItems, useMockData],
   );
+  const featuredVideos = useMemo(
+    () => homeVideos.filter((video) => video.status === 'ready'),
+    [homeVideos],
+  );
   const mockPlaylistItems = useMemo(
     () => effectiveMockItems.filter((video) => (
       playlistFilterCategory === 'all'
@@ -1557,6 +1577,7 @@ export default function VideoConnected() {
   );
   const mockPlaylistPageCount = Math.max(1, Math.ceil(mockPlaylistItems.length / 8));
   const playlistVideos = useMemo(() => {
+    if (!currentUser) return [];
     const items = useMockData
       ? mockPlaylistItems.slice((playlistPage - 1) * 8, playlistPage * 8)
       : playlistQuery.data?.pages[playlistPage - 1]?.items ?? [];
@@ -1580,6 +1601,7 @@ export default function VideoConnected() {
       .slice(0, 8);
   }, [
     activeCategory,
+    currentUser,
     language,
     mockPlaylistItems,
     playlistPage,
@@ -1589,6 +1611,7 @@ export default function VideoConnected() {
   ]);
   const watchPlaylist = useMemo(() => {
     if (!watchFromPlaylist) return homeVideos;
+    if (!currentUser) return [];
     const items = useMockData
       ? mockPlaylistItems
       : playlistQuery.data?.pages.flatMap((page) => page.items) ?? [];
@@ -1601,6 +1624,7 @@ export default function VideoConnected() {
       : homeVideos.filter((video) => video.categorySlug === playlistFilterCategory);
   }, [
     homeVideos,
+    currentUser,
     language,
     mockPlaylistItems,
     playlistFilterCategory,
@@ -1669,6 +1693,53 @@ export default function VideoConnected() {
     const categorySlug = selectedCollection?.categorySlug ?? 'all';
     if (activeCategory !== categorySlug) setActiveCategory(categorySlug);
   }, [activeCategory, activeView, selectedCollection?.categorySlug]);
+
+  useEffect(() => {
+    if (activeView !== 'home' || featuredVideos.length === 0) return;
+
+    if (!featuredVideos.some((video) => video.id === featuredVideoIdRef.current)) {
+      const initialId = featuredVideos[Math.floor(Math.random() * featuredVideos.length)].id;
+      featuredVideoIdRef.current = initialId;
+      setPreviousFeaturedVideoId(null);
+      setFeaturedVideoId(initialId);
+    }
+
+    if (featuredVideos.length < 2) return;
+    const intervalId = window.setInterval(() => {
+      if (featuredTransitionInFlightRef.current) return;
+
+      const currentId = featuredVideoIdRef.current;
+      const candidates = featuredVideos.filter((video) => video.id !== currentId);
+      const nextId = candidates[Math.floor(Math.random() * candidates.length)].id;
+      const nextVideo = featuredVideos.find((video) => video.id === nextId);
+      if (!nextVideo) return;
+
+      featuredTransitionInFlightRef.current = true;
+      const transition = async () => {
+        if (!featuredPreloadedPostersRef.current.has(nextVideo.poster)) {
+          await preloadImage(nextVideo.poster);
+          featuredPreloadedPostersRef.current.add(nextVideo.poster);
+        }
+
+        setPreviousFeaturedVideoId(featuredVideoIdRef.current);
+        featuredVideoIdRef.current = nextVideo.id;
+        setFeaturedVideoId(nextVideo.id);
+        featuredTransitionInFlightRef.current = false;
+      };
+      void transition();
+    }, 6_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+      featuredTransitionInFlightRef.current = false;
+    };
+  }, [activeView, featuredVideos]);
+
+  useEffect(() => {
+    if (!previousFeaturedVideoId) return;
+    const timer = window.setTimeout(() => setPreviousFeaturedVideoId(null), 1_100);
+    return () => window.clearTimeout(timer);
+  }, [featuredVideoId, previousFeaturedVideoId]);
 
   useEffect(() => {
     const target = loadMoreRef.current;
@@ -2369,7 +2440,11 @@ export default function VideoConnected() {
     setUploadOpen(true);
   };
 
-  const featured = homeVideos.find((video) => video.status === 'ready') ?? null;
+  const featured = featuredVideos.find((video) => video.id === featuredVideoId)
+    ?? featuredVideos[0]
+    ?? null;
+  const previousFeatured = featuredVideos.find((video) => video.id === previousFeaturedVideoId)
+    ?? null;
   const currentUserName = currentUser?.name || currentUser?.username || t('video.user');
   const currentUserAvatar = resolveAvatarUrl(currentUser?.avatar)
     || defaultAvatarDataUrl(currentUserName);
@@ -2583,7 +2658,17 @@ export default function VideoConnected() {
                 {featured && (
                   <section className="video-featured" aria-label={t('video.home.featured')}>
                     <button type="button" className="video-featured-media" onClick={() => openVideo(featured)}>
-                      <img src={featured.poster} alt="" {...lazyImageProps()} />
+                      {featuredVideos.map((video) => (
+                        <img
+                          key={video.id}
+                          className={`video-featured-cover${video.id === featured.id ? ' is-current' : ''}${video.id === previousFeatured?.id ? ' is-previous' : ''}`}
+                          src={video.poster}
+                          alt=""
+                          loading="eager"
+                          decoding="async"
+                          fetchPriority={video.id === featured.id ? 'high' : 'low'}
+                        />
+                      ))}
                       <span className="video-quality">{featured.resolution}</span>
                       <span className="video-featured-play" aria-hidden="true">
                         <Play size={20} strokeWidth={2} fill="currentColor" />
@@ -2712,7 +2797,9 @@ export default function VideoConnected() {
 
             {activeView === 'playlist' && (
               <section className="video-section video-playlist-section">
-                {playlistVideos.length > 0 ? (
+                {!currentUser ? (
+                  <div className="video-empty">{t('video.authRequired')}</div>
+                ) : playlistVideos.length > 0 ? (
                   <div className="video-playlist-grid">
                     {playlistVideos.map((video) => (
                       <VideoCard
@@ -2728,26 +2815,28 @@ export default function VideoConnected() {
                     {playlistQuery.isLoading ? t('video.loading') : t('video.empty')}
                   </div>
                 )}
-                <nav className="video-pagination" aria-label={t('video.playlist.pagination')}>
-                  <span className="video-pagination-status">{t('video.playlist.page', { page: playlistPage })}</span>
-                  <div className="video-pagination-actions">
-                    <button type="button" disabled={playlistPage === 1} onClick={() => void changePlaylistPage(playlistPage - 1)}>
-                      <ChevronLeft size={18} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={
-                        useMockData
-                          ? playlistPage >= mockPlaylistPageCount
-                          : playlistPage === (playlistQuery.data?.pages.length ?? 1)
-                            && !playlistQuery.hasNextPage
-                      }
-                      onClick={() => void changePlaylistPage(playlistPage + 1)}
-                    >
-                      <ChevronRight size={18} />
-                    </button>
-                  </div>
-                </nav>
+                {currentUser && (
+                  <nav className="video-pagination" aria-label={t('video.playlist.pagination')}>
+                    <span className="video-pagination-status">{t('video.playlist.page', { page: playlistPage })}</span>
+                    <div className="video-pagination-actions">
+                      <button type="button" disabled={playlistPage === 1} onClick={() => void changePlaylistPage(playlistPage - 1)}>
+                        <ChevronLeft size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={
+                          useMockData
+                            ? playlistPage >= mockPlaylistPageCount
+                            : playlistPage === (playlistQuery.data?.pages.length ?? 1)
+                              && !playlistQuery.hasNextPage
+                        }
+                        onClick={() => void changePlaylistPage(playlistPage + 1)}
+                      >
+                        <ChevronRight size={18} />
+                      </button>
+                    </div>
+                  </nav>
+                )}
               </section>
             )}
           </div>
@@ -2872,7 +2961,7 @@ export default function VideoConnected() {
                       onChange={(event) => setCollectionCategory(event.target.value)}
                     >
                       <option value="all">{t('video.categories.all')}</option>
-                      {effectiveCategories.map((category) => (
+                      {collectionCategories.map((category) => (
                         <option key={category.slug} value={category.slug}>
                           {language.startsWith('zh') ? category.nameZh : category.nameEn}
                         </option>

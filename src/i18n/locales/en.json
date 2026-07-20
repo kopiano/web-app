@@ -351,7 +351,7 @@
       "createCollection": "Create collection",
       "createCollectionTitle": "Create a collection",
       "createCollectionDescription": "Create a personal video collection and optionally fill it with your videos and saved public videos.",
-      "collectionName": "Collection name",
+      "collectionName": "name",
       "collectionNamePlaceholder": "Enter a collection name",
       "collectionTitleRequired": "Enter a collection name.",
       "includeFavorites": "Include my and saved videos",

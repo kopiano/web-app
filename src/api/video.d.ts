@@ -81,7 +81,7 @@ export interface VideoApiCollection {
 
 export function getVideos(params?: Record<string, unknown>): Promise<VideoPage>;
 export function getVideo(id: string): Promise<VideoApiItem>;
-export function getVideoCategories(input?: { scope?: 'public' | 'accessible' }): Promise<VideoCategory[]>;
+export function getVideoCategories(input?: { scope?: 'public' | 'accessible' | 'mine' }): Promise<VideoCategory[]>;
 export function getVideoCollections(input?: { mine?: boolean }): Promise<VideoApiCollection[]>;
 export function uploadVideo(
   file: File,
