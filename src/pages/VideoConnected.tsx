@@ -358,10 +358,30 @@ const VideoCard = memo(function VideoCard({
   variant?: 'playlist' | 'default';
 }) {
   const isProcessing = video.status === 'uploading' || video.status === 'processing';
+  const [isPreviewActive, setIsPreviewActive] = useState(false);
+  const canPreview = video.status === 'ready' && Boolean(video.src);
   return (
-    <article className={`video-tile is-${variant}${isProcessing ? ' is-processing' : ''}${video.status === 'failed' ? ' is-failed' : ''}`}>
+    <article
+      className={`video-tile is-${variant}${isProcessing ? ' is-processing' : ''}${video.status === 'failed' ? ' is-failed' : ''}${isPreviewActive ? ' is-previewing' : ''}`}
+      onPointerEnter={() => {
+        if (canPreview) setIsPreviewActive(true);
+      }}
+      onPointerLeave={() => setIsPreviewActive(false)}
+    >
       <button type="button" className="video-tile-hit" onClick={() => onPlay(video)}>
         <img src={video.poster} alt="" {...lazyImageProps()} />
+        {isPreviewActive && (
+          <span className="video-tile-preview" aria-hidden="true">
+            <HlsVideo
+              className="video-tile-preview-media"
+              src={video.src}
+              poster={video.poster}
+              active
+              autoPlay
+              controls={false}
+            />
+          </span>
+        )}
         <span className="video-quality">{video.resolution}</span>
         <span className="video-category-tag">{video.category}</span>
         {variant !== 'playlist' && (
