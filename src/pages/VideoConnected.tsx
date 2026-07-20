@@ -1408,6 +1408,8 @@ export default function VideoConnected() {
   );
   const [featuredVideoId, setFeaturedVideoId] = useState<string | null>(null);
   const [previousFeaturedVideoId, setPreviousFeaturedVideoId] = useState<string | null>(null);
+  const [isFeaturedPreviewActive, setIsFeaturedPreviewActive] = useState(false);
+  const [isFeaturedPlayVisible, setIsFeaturedPlayVisible] = useState(false);
   const playlistFilterCategory = watchFromPlaylist
     ? searchParams.get('category') || activeCategory
     : activeCategory;
@@ -1416,6 +1418,7 @@ export default function VideoConnected() {
   const collectionLoadMoreRef = useRef<HTMLDivElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const featuredPlayTimerRef = useRef<number | undefined>(undefined);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadStep, setUploadStep] = useState<UploadStep>('upload');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -1736,6 +1739,7 @@ export default function VideoConnected() {
 
   useEffect(() => {
     if (activeView !== 'home' || featuredVideos.length === 0) return;
+    if (isFeaturedPreviewActive) return;
 
     if (!featuredVideos.some((video) => video.id === featuredVideoIdRef.current)) {
       const initialId = featuredVideos[Math.floor(Math.random() * featuredVideos.length)].id;
@@ -1773,7 +1777,13 @@ export default function VideoConnected() {
       window.clearInterval(intervalId);
       featuredTransitionInFlightRef.current = false;
     };
-  }, [activeView, featuredVideos]);
+  }, [activeView, featuredVideos, isFeaturedPreviewActive]);
+
+  useEffect(() => () => {
+    if (featuredPlayTimerRef.current !== undefined) {
+      window.clearTimeout(featuredPlayTimerRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (!previousFeaturedVideoId) return;
@@ -2717,7 +2727,32 @@ export default function VideoConnected() {
               <>
                 {featured && (
                   <section className="video-featured" aria-label={t('video.home.featured')}>
-                    <button type="button" className="video-featured-media" onClick={() => openVideo(featured)}>
+                    <button
+                      type="button"
+                      className={`video-featured-media${isFeaturedPreviewActive ? ' is-previewing' : ''}`}
+                      onClick={() => openVideo(featured)}
+                      onPointerEnter={() => {
+                        if (featured.status === 'ready' && featured.src) {
+                          setIsFeaturedPreviewActive(true);
+                          setIsFeaturedPlayVisible(true);
+                          if (featuredPlayTimerRef.current !== undefined) {
+                            window.clearTimeout(featuredPlayTimerRef.current);
+                          }
+                          featuredPlayTimerRef.current = window.setTimeout(() => {
+                            setIsFeaturedPlayVisible(false);
+                            featuredPlayTimerRef.current = undefined;
+                          }, 600);
+                        }
+                      }}
+                      onPointerLeave={() => {
+                        setIsFeaturedPreviewActive(false);
+                        setIsFeaturedPlayVisible(false);
+                        if (featuredPlayTimerRef.current !== undefined) {
+                          window.clearTimeout(featuredPlayTimerRef.current);
+                          featuredPlayTimerRef.current = undefined;
+                        }
+                      }}
+                    >
                       {featuredVideos.map((video) => (
                         <img
                           key={video.id}
@@ -2729,8 +2764,26 @@ export default function VideoConnected() {
                           fetchPriority={video.id === featured.id ? 'high' : 'low'}
                         />
                       ))}
+                      {featured.status === 'ready' && featured.src && (
+                        <span
+                          className={`video-featured-preview${isFeaturedPreviewActive ? ' is-active' : ''}`}
+                          aria-hidden="true"
+                        >
+                          <HlsVideo
+                            className="video-featured-preview-media"
+                            src={featured.src}
+                            poster={featured.poster}
+                            active={isFeaturedPreviewActive}
+                            autoPlay={isFeaturedPreviewActive}
+                            controls={false}
+                          />
+                        </span>
+                      )}
                       <span className="video-quality">{featured.resolution}</span>
-                      <span className="video-featured-play" aria-hidden="true">
+                      <span
+                        className={`video-featured-play${isFeaturedPlayVisible ? ' is-visible' : ''}`}
+                        aria-hidden="true"
+                      >
                         <Play size={20} strokeWidth={2} fill="currentColor" />
                       </span>
                     </button>
