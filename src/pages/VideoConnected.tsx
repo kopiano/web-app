@@ -287,6 +287,7 @@ function CategoryNav({
   ariaLabel,
   onChange,
   className = '',
+  includeAll = true,
 }: {
   active: string;
   categories: VideoCategory[];
@@ -295,9 +296,10 @@ function CategoryNav({
   ariaLabel: string;
   onChange: (category: string) => void;
   className?: string;
+  includeAll?: boolean;
 }) {
   const options = [
-    { slug: 'all', label: allLabel },
+    ...(includeAll ? [{ slug: 'all', label: allLabel }] : []),
     ...categories.map((category) => ({
       slug: category.slug,
       label: language.startsWith('zh') ? category.nameZh : category.nameEn,
@@ -1629,6 +1631,20 @@ export default function VideoConnected() {
     : commentsQuery.data ?? [];
   const selectedCollection = effectiveCollections
     .find((collection) => collection.id === selectedCollectionId);
+  const collectionNavigationCategories = useMemo(() => {
+    const categorySlug = selectedCollection?.categorySlug;
+    if (!categorySlug) return [];
+
+    const category = effectiveCategories.find((item) => item.slug === categorySlug);
+    return category
+      ? [category]
+      : [{
+        id: `collection-category-${categorySlug}`,
+        slug: categorySlug,
+        nameZh: categorySlug,
+        nameEn: categorySlug,
+      }];
+  }, [effectiveCategories, selectedCollection?.categorySlug]);
   const filteredCollections = useMemo(() => {
     const normalized = search.trim().toLocaleLowerCase(language);
     if (!normalized) return effectiveCollections;
@@ -1636,6 +1652,12 @@ export default function VideoConnected() {
       collection.title.toLocaleLowerCase(language).includes(normalized)
     ));
   }, [effectiveCollections, language, search]);
+
+  useEffect(() => {
+    if (activeView !== 'favorites') return;
+    const categorySlug = selectedCollection?.categorySlug ?? 'all';
+    if (activeCategory !== categorySlug) setActiveCategory(categorySlug);
+  }, [activeCategory, activeView, selectedCollection?.categorySlug]);
 
   useEffect(() => {
     const target = loadMoreRef.current;
@@ -2485,11 +2507,12 @@ export default function VideoConnected() {
 
             {activeView === 'favorites' && (
               <CategoryNav
-                active={activeCategory}
-                categories={effectiveCategories}
+                active={selectedCollection?.categorySlug ?? activeCategory}
+                categories={collectionNavigationCategories}
                 language={language}
                 allLabel={t('video.categories.all')}
                 ariaLabel={t('video.categories.label')}
+                includeAll={!selectedCollection?.categorySlug}
                 onChange={setActiveCategory}
                 className="is-playlist"
               />
