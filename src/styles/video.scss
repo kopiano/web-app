@@ -1601,8 +1601,7 @@
 .video-watch-player:fullscreen .hls-video video,
 .video-watch-player.is-fullscreen .hls-video video {
   max-height: none;
-  object-fit: cover;
-  object-position: center 0%;
+  object-fit: contain;  // important
 }
 
 .video-watch-player:fullscreen::after,
@@ -3143,8 +3142,8 @@
 
 @keyframes video-watch-fullscreen-enter {
   from {
-    opacity: 0.7;
-    transform: scale(0.94);
+    opacity: 0.9;
+    transform: scale(0.985);
   }
   to {
     opacity: 1;
