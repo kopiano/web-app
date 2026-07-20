@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   useInfiniteQuery,
   useQuery,
@@ -89,7 +89,8 @@ import {
   MOCK_VIDEO_ITEMS,
 } from '@/data/videoMockData';
 import { defaultAvatarDataUrl, resolveAvatarUrl } from '@/lib/avatar';
-import type { RootState } from '@/store/store';
+import { setVideoDetails, setVideoViewCount } from '@/store/videoViewSlice';
+import type { AppDispatch, RootState } from '@/store/store';
 import '@/styles/video.scss';
 
 type VideoView = 'home' | 'library' | 'favorites' | 'playlist' | 'watch';
@@ -232,36 +233,45 @@ function versionedVideoPoster(video: VideoApiItem) {
   return `${video.coverUrl}${separator}preview=${encodeURIComponent(revision)}`;
 }
 
-function toCardVideo(video: VideoApiItem, language: string): CardVideo {
-  const category = firstCategory(video, language);
+function toCardVideo(
+  video: VideoApiItem,
+  language: string,
+  videoOverrides: Record<string, Partial<VideoApiItem>> = {},
+): CardVideo {
+  const effectiveVideo = {
+    ...video,
+    ...videoOverrides[video.id],
+  };
+  const category = firstCategory(effectiveVideo, language);
+  const viewCount = effectiveVideo.viewCount;
   const formatter = new Intl.NumberFormat(language, {
     notation: 'compact',
     maximumFractionDigits: 1,
   });
   return {
-    id: video.id,
-    title: video.title || (language.startsWith('zh') ? '未命名视频' : 'Untitled video'),
-    description: video.description,
-    creator: video.username || (language.startsWith('zh') ? '用户' : 'User'),
-    avatar: video.avatar || defaultAvatarDataUrl(video.username || 'User'),
-    views: `${formatter.format(video.viewCount)} ${language.startsWith('zh') ? '次播放' : 'views'}`,
-    viewCount: video.viewCount,
-    likeCount: video.likeCount,
-    favoriteCount: video.favoriteCount,
-    commentCount: video.commentCount,
-    duration: formatDuration(video.duration),
-    resolution: resolutionFor(video),
+    id: effectiveVideo.id,
+    title: effectiveVideo.title || (language.startsWith('zh') ? '未命名视频' : 'Untitled video'),
+    description: effectiveVideo.description,
+    creator: effectiveVideo.username || (language.startsWith('zh') ? '用户' : 'User'),
+    avatar: effectiveVideo.avatar || defaultAvatarDataUrl(effectiveVideo.username || 'User'),
+    views: `${formatter.format(viewCount)} ${language.startsWith('zh') ? '次播放' : 'views'}`,
+    viewCount,
+    likeCount: effectiveVideo.likeCount,
+    favoriteCount: effectiveVideo.favoriteCount,
+    commentCount: effectiveVideo.commentCount,
+    duration: formatDuration(effectiveVideo.duration),
+    resolution: resolutionFor(effectiveVideo),
     category: category.name,
     categorySlug: category.slug,
-    poster: versionedVideoPoster(video),
-    src: video.status === 'ready' ? video.hlsMasterUrl : '',
-    status: video.status,
-    processingProgress: video.processingProgress,
-    processingError: video.processingError,
-    liked: video.liked,
-    favorited: video.favorited,
-    createdAt: video.createdAt,
-    raw: video,
+    poster: versionedVideoPoster(effectiveVideo),
+    src: effectiveVideo.status === 'ready' ? effectiveVideo.hlsMasterUrl : '',
+    status: effectiveVideo.status,
+    processingProgress: effectiveVideo.processingProgress,
+    processingError: effectiveVideo.processingError,
+    liked: effectiveVideo.liked,
+    favorited: effectiveVideo.favorited,
+    createdAt: effectiveVideo.createdAt,
+    raw: effectiveVideo,
   };
 }
 
@@ -1635,7 +1645,9 @@ export default function VideoConnected() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage || i18n.language || 'en';
   const queryClient = useQueryClient();
+  const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  const videoOverrides = useSelector((state: RootState) => state.videoViews.byVideoId);
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedView = searchParams.get('view') as VideoView | null;
   const activeView = requestedView && VALID_VIEWS.has(requestedView) ? requestedView : 'home';
@@ -1873,8 +1885,8 @@ export default function VideoConnected() {
   );
   const homeVideos = useMemo(
     () => (useMockData ? effectiveMockItems : realHomeItems)
-      .map((video) => toCardVideo(video, language)),
-    [effectiveMockItems, language, realHomeItems, useMockData],
+      .map((video) => toCardVideo(video, language, videoOverrides)),
+    [effectiveMockItems, language, realHomeItems, useMockData, videoOverrides],
   );
   const featuredVideos = useMemo(
     () => homeVideos.filter((video) => video.status === 'ready'),
@@ -1901,13 +1913,13 @@ export default function VideoConnected() {
           && (video.status === 'uploading' || video.status === 'processing')
         )
       ))
-      .map((video) => toCardVideo(video, language));
+      .map((video) => toCardVideo(video, language, videoOverrides));
     const processingCards = processingVideos
       .filter((video) => (
         activeCategory === 'all'
         || video.categories.some((category) => category.slug === activeCategory)
       ))
-      .map((video) => toCardVideo(video, language));
+      .map((video) => toCardVideo(video, language, videoOverrides));
     return [...processingCards, ...cards]
       .filter((video, index, all) => all.findIndex((item) => item.id === video.id) === index)
       .slice(0, 8);
@@ -1920,6 +1932,7 @@ export default function VideoConnected() {
     playlistQuery.data,
     processingVideos,
     useMockData,
+    videoOverrides,
   ]);
   useEffect(() => {
     if (
@@ -1944,7 +1957,7 @@ export default function VideoConnected() {
       : watchPlaylistQuery.data?.pages.flatMap((page) => page.items) ?? [];
     const cards = items
       .filter((video) => video.status === 'ready')
-      .map((video) => toCardVideo(video, language));
+      .map((video) => toCardVideo(video, language, videoOverrides));
     if (cards.length > 0) return cards;
     return playlistFilterCategory === 'all'
       ? homeVideos
@@ -1958,6 +1971,7 @@ export default function VideoConnected() {
     playlistQuery.data,
     watchPlaylistQuery.data,
     useMockData,
+    videoOverrides,
     watchFromPlaylist,
   ]);
   const collectionVideos = useMemo(() => {
@@ -1975,7 +1989,7 @@ export default function VideoConnected() {
       : collectionVideosQuery.data?.pages.flatMap((page) => page.items) ?? [];
     return items
       .filter((video) => video.status === 'ready')
-      .map((video) => toCardVideo(video, language));
+      .map((video) => toCardVideo(video, language, videoOverrides));
   }, [
     activeCategory,
     collectionVideosQuery.data,
@@ -1983,14 +1997,15 @@ export default function VideoConnected() {
     language,
     selectedCollectionId,
     useMockData,
+    videoOverrides,
   ]);
   const mockWatchItem = isMockVideoId(requestedVideoId)
     ? effectiveMockItems.find((video) => video.id === requestedVideoId)
     : undefined;
   const watchVideoItem = mockWatchItem ?? watchQuery.data;
   const watchVideo = useMemo(
-    () => (watchVideoItem ? toCardVideo(watchVideoItem, language) : null),
-    [language, watchVideoItem],
+    () => (watchVideoItem ? toCardVideo(watchVideoItem, language, videoOverrides) : null),
+    [language, videoOverrides, watchVideoItem],
   );
   const [lastWatchVideo, setLastWatchVideo] = useState<CardVideo | null>(null);
   useEffect(() => {
@@ -2247,6 +2262,7 @@ export default function VideoConnected() {
             && version === draftTitleSaveVersionRef.current
           ) {
             queryClient.setQueryData(['video', 'detail', videoId], updated);
+            dispatch(setVideoDetails(updated));
           }
         });
       draftTitleSaveQueueRef.current = save;
@@ -2254,6 +2270,7 @@ export default function VideoConnected() {
 
     return () => window.clearTimeout(timer);
   }, [
+    dispatch,
     queryClient,
     uploadPublishRequested,
     uploadStep,
@@ -2390,34 +2407,73 @@ export default function VideoConnected() {
       { queryKey: ['video', 'collection'] },
       updatePages,
     );
+    queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+      { queryKey: ['video', 'watch-playlist'] },
+      updatePages,
+    );
+  }, [queryClient]);
+
+  const updateCachedVideo = useCallback((updated: VideoApiItem) => {
+    const updatePages = (data: InfiniteData<VideoPage, Cursor> | undefined) => {
+      if (!data) return data;
+      return {
+        ...data,
+        pages: data.pages.map((page) => ({
+          ...page,
+          items: page.items.map((item) => (item.id === updated.id ? updated : item)),
+        })),
+      };
+    };
+
+    queryClient.setQueryData<VideoApiItem>(['video', 'detail', updated.id], updated);
+    queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+      { queryKey: ['video', 'home'] },
+      updatePages,
+    );
+    queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+      { queryKey: ['video', 'playlist'] },
+      updatePages,
+    );
+    queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+      { queryKey: ['video', 'collection'] },
+      updatePages,
+    );
+    queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+      { queryKey: ['video', 'watch-playlist'] },
+      updatePages,
+    );
   }, [queryClient]);
 
   const trackQualifiedVideoView = useCallback(async (videoId: string) => {
     if (isMockVideoId(videoId)) {
       const baseVideo = MOCK_VIDEO_ITEMS.find((item) => item.id === videoId);
       if (!baseVideo) return false;
+      const nextViewCount = (videoOverrides[videoId]?.viewCount
+        ?? mockVideoOverrides[videoId]?.viewCount
+        ?? baseVideo.viewCount) + 1;
       setMockVideoOverrides((previous) => {
         const current = previous[videoId] ?? {};
-        const currentViewCount = current.viewCount ?? baseVideo.viewCount;
         return {
           ...previous,
           [videoId]: {
             ...current,
-            viewCount: currentViewCount + 1,
+            viewCount: nextViewCount,
           },
         };
       });
+      dispatch(setVideoViewCount({ videoId, viewCount: nextViewCount }));
       return true;
     }
 
     try {
       const result = await viewVideo(videoId);
+      dispatch(setVideoViewCount({ videoId, viewCount: result.viewCount }));
       updateCachedVideoViewCount(videoId, result.viewCount);
       return result.counted;
     } catch {
       return false;
     }
-  }, [updateCachedVideoViewCount]);
+  }, [dispatch, mockVideoOverrides, updateCachedVideoViewCount, videoOverrides]);
 
   const invalidateVideoData = useCallback(async (videoId?: string) => {
     await Promise.all([
@@ -2466,14 +2522,16 @@ export default function VideoConnected() {
     }
 
     const updated = await updateVideo(videoId, input);
-    queryClient.setQueryData<VideoApiItem>(['video', 'detail', videoId], updated);
+    dispatch(setVideoDetails(updated));
+    updateCachedVideo(updated);
     void Promise.all([
       queryClient.invalidateQueries({ queryKey: ['video', 'home'] }),
       queryClient.invalidateQueries({ queryKey: ['video', 'playlist'] }),
       queryClient.invalidateQueries({ queryKey: ['video', 'collection'] }),
+      queryClient.invalidateQueries({ queryKey: ['video', 'watch-playlist'] }),
     ]);
     notify(t('video.settings.updated'), 'success');
-  }, [notify, queryClient, t]);
+  }, [dispatch, notify, queryClient, t, updateCachedVideo]);
 
   const createCollection = useCallback(async () => {
     if (!currentUser) {
