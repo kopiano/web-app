@@ -1335,6 +1335,7 @@ export default function VideoConnected() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [search, setSearch] = useState('');
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const collectionLoadMoreRef = useRef<HTMLDivElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -1619,6 +1620,29 @@ export default function VideoConnected() {
     homeQuery.fetchNextPage,
     homeQuery.hasNextPage,
     homeQuery.isFetchingNextPage,
+    useMockData,
+  ]);
+
+  useEffect(() => {
+    const target = collectionLoadMoreRef.current;
+    if (!target || activeView !== 'favorites' || useMockData || !selectedCollectionId) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (
+        entry.isIntersecting
+        && collectionVideosQuery.hasNextPage
+        && !collectionVideosQuery.isFetchingNextPage
+      ) {
+        void collectionVideosQuery.fetchNextPage();
+      }
+    }, { rootMargin: '500px 0px' });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [
+    activeView,
+    collectionVideosQuery.fetchNextPage,
+    collectionVideosQuery.hasNextPage,
+    collectionVideosQuery.isFetchingNextPage,
+    selectedCollectionId,
     useMockData,
   ]);
 
@@ -1920,7 +1944,7 @@ export default function VideoConnected() {
         do {
           const page = await getVideos({
             limit: 50,
-            scope: 'favorites',
+            scope: 'collection',
             ...(collectionCategory !== 'all' ? { category: collectionCategory } : {}),
             ...(cursor
               ? {
@@ -2544,16 +2568,22 @@ export default function VideoConnected() {
                   </div>
                 </div>
                 {collectionVideos.length > 0 ? (
-                  <div className="video-playlist-grid">
-                    {collectionVideos.map((video) => (
-                      <VideoCard
-                        key={video.id}
-                        video={video}
-                        onPlay={openVideo}
-                        onFavorite={toggleFavorite}
-                      />
-                    ))}
-                  </div>
+                  <>
+                    <div className="video-playlist-grid">
+                      {collectionVideos.map((video) => (
+                        <VideoCard
+                          key={video.id}
+                          video={video}
+                          onPlay={openVideo}
+                          onFavorite={toggleFavorite}
+                        />
+                      ))}
+                    </div>
+                    <div ref={collectionLoadMoreRef} className="video-load-more-sentinel" aria-hidden="true" />
+                    {!useMockData && collectionVideosQuery.isFetchingNextPage && (
+                      <div className="video-empty">{t('video.loadingMore')}</div>
+                    )}
+                  </>
                 ) : (
                   <div className="video-empty">
                     {collectionVideosQuery.isLoading ? t('video.loading') : t('video.empty')}
