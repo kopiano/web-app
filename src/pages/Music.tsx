@@ -1,13 +1,10 @@
 import {
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   Check,
   CircleAlert,
   Clock3,
-  Crown,
   Heart,
-  Headphones,
   Home,
   LayoutGrid,
   Library,
@@ -20,10 +17,8 @@ import {
   Plus,
   RefreshCw,
   Shuffle,
-  ShieldCheck,
   SkipBack,
   SkipForward,
-  Sparkles,
   Trash2,
   Volume1,
   Volume2,
@@ -33,17 +28,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
-import QRCode from 'qrcode';
 import bg0 from '@/assets/images/bg-0.webp';
 import playlistDiscArt from '@/assets/images/bg-8.webp';
-import cnyCurrencyIcon from '@/assets/pay/CNY.svg';
-import usdCurrencyIcon from '@/assets/pay/USD.svg';
-import wechatPayMonthlyQr from '@/assets/pay/WechatPay_month.webp';
-import alipayMonthlyQr from '@/assets/pay/Alipay_month.webp';
-import unionPayMonthlyQr from '@/assets/pay/UnionPay_month.webp';
-import wechatPayYearlyQr from '@/assets/pay/WechatPay_year.webp';
-import alipayYearlyQr from '@/assets/pay/Alipay_year.webp';
-import unionPayYearlyQr from '@/assets/pay/UnionPay_year.webp';
 import {
   deleteMusicTrack,
   getMusicLibrary,
@@ -58,7 +44,7 @@ import {
   type MusicTrack,
   type MusicUserLibrary,
 } from '@/api/music';
-import { createProCheckout } from '@/api/subscription';
+import ProUpgradeDialog from '@/components/ProUpgradeDialog';
 import { useMusicPlayback } from '@/context/MusicPlaybackContext';
 import { musicApi, type MusicPageQueryArgs } from '@/store/musicApi';
 import { store, type AppDispatch, type RootState } from '@/store/store';
@@ -70,16 +56,6 @@ type MusicProps = {
 type View = 'home' | 'library' | 'playlist' | 'favorites';
 type PlayMode = 'sequential' | 'shuffle' | 'single';
 type LibraryLayout = 'list' | 'cards';
-type ProDialogStep = 'intro' | 'payment';
-type PaymentMethod = 'wechat_pay' | 'alipay' | 'union_pay';
-type PaymentCurrency = 'CNY' | 'USD';
-type BillingCycle = 'monthly' | 'yearly';
-type StoredProDialogState = {
-  step: ProDialogStep;
-  paymentMethod: PaymentMethod;
-  paymentCurrency: PaymentCurrency;
-  billingCycle: BillingCycle;
-};
 type StoredPlaybackProgress = {
   trackId: string;
   elapsed: number;
@@ -130,7 +106,6 @@ const CURRENT_MUSIC_TRACK_META_KEY = 'music_current_track_meta';
 const CURRENT_MUSIC_PROGRESS_KEY = 'music_current_track_progress';
 const ACTIVE_MUSIC_VIEW_KEY = 'music_active_view';
 const MUSIC_LIBRARY_LAYOUT_KEY = 'music_library_layout';
-const MUSIC_PRO_DIALOG_STATE_KEY = 'music_pro_dialog_state';
 const MUSIC_ADD_PARTICLE_COUNT = 60;
 const MUSIC_ADD_PARTICLE_COLORS = [
   '#ff5f7e',
@@ -156,19 +131,6 @@ const MUSIC_ADD_PARTICLES = Array.from({ length: MUSIC_ADD_PARTICLE_COUNT }, (_,
   };
 });
 
-const PAYMENT_QR_IMAGES: Record<BillingCycle, Record<PaymentMethod, string>> = {
-  monthly: {
-    wechat_pay: wechatPayMonthlyQr,
-    alipay: alipayMonthlyQr,
-    union_pay: unionPayMonthlyQr,
-  },
-  yearly: {
-    wechat_pay: wechatPayYearlyQr,
-    alipay: alipayYearlyQr,
-    union_pay: unionPayYearlyQr,
-  },
-};
-
 const getStoredMusicView = (): View => {
   try {
     const storedView = window.localStorage.getItem(ACTIVE_MUSIC_VIEW_KEY);
@@ -185,28 +147,6 @@ const getStoredLibraryLayout = (): LibraryLayout => {
     return window.localStorage.getItem(MUSIC_LIBRARY_LAYOUT_KEY) === 'cards' ? 'cards' : 'list';
   } catch {
     return 'list';
-  }
-};
-
-const getStoredProDialogState = (): StoredProDialogState | null => {
-  try {
-    const value = window.localStorage.getItem(MUSIC_PRO_DIALOG_STATE_KEY);
-    if (!value) return null;
-    const state = JSON.parse(value) as Partial<StoredProDialogState>;
-    const validMethod = state.paymentMethod === 'wechat_pay'
-      || state.paymentMethod === 'alipay'
-      || state.paymentMethod === 'union_pay';
-    const validCurrency = state.paymentCurrency === 'CNY' || state.paymentCurrency === 'USD';
-    const validCycle = state.billingCycle === 'monthly' || state.billingCycle === 'yearly';
-    if (state.step !== 'payment' || !validMethod || !validCurrency || !validCycle) return null;
-    return {
-      step: 'payment',
-      paymentMethod: state.paymentMethod as PaymentMethod,
-      paymentCurrency: state.paymentCurrency as PaymentCurrency,
-      billingCycle: state.billingCycle as BillingCycle,
-    };
-  } catch {
-    return null;
   }
 };
 
@@ -323,7 +263,6 @@ function Music({ isActive = true }: MusicProps) {
   const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const authInitialized = useSelector((state: RootState) => state.auth.initialized);
-  const [storedProDialog] = useState(getStoredProDialogState);
   const [storedPlaybackProgress] = useState(getStoredPlaybackProgress);
   const [activeView, setActiveView] = useState<View>(getStoredMusicView);
   const [collectionUserId, setCollectionUserId] = useState('');
@@ -341,25 +280,7 @@ function Music({ isActive = true }: MusicProps) {
   const [isUserLibraryLoaded, setIsUserLibraryLoaded] = useState(false);
   const [isUserLibraryLoading, setIsUserLibraryLoading] = useState(false);
   const [userLibraryLoadFailed, setUserLibraryLoadFailed] = useState(false);
-  const [isUpgradeOpen, setIsUpgradeOpen] = useState(Boolean(storedProDialog));
-  const [isStartingCheckout, setIsStartingCheckout] = useState(false);
-  const [upgradeError, setUpgradeError] = useState('');
-  const [proDialogStep, setProDialogStep] = useState<ProDialogStep>(storedProDialog?.step ?? 'intro');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
-    storedProDialog?.paymentMethod ?? 'wechat_pay',
-  );
-  const [, setDisplayedPaymentMethod] = useState<PaymentMethod>(
-    storedProDialog?.paymentMethod ?? 'wechat_pay',
-  );
-  const [paymentCurrency, setPaymentCurrency] = useState<PaymentCurrency>(
-    storedProDialog?.paymentCurrency ?? 'CNY',
-  );
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>(
-    storedProDialog?.billingCycle ?? 'monthly',
-  );
-  const [paymentEmail, setPaymentEmail] = useState('');
-  const [, setPaymentQrUrl] = useState('');
-  const [isPaymentQrPreviewOpen, setIsPaymentQrPreviewOpen] = useState(false);
+  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playbackTrackId, setPlaybackTrackId] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -407,17 +328,6 @@ function Music({ isActive = true }: MusicProps) {
   const libraryTracks = pageTracks;
   const isCollectionView = activeView === 'playlist' || activeView === 'favorites';
   const hasLibraryAccess = hasActiveLibrarySubscription(currentUser);
-  const billingPeriodKey = billingCycle === 'monthly'
-    ? 'music.perMonthShort'
-    : 'music.perYearShort';
-  const selectedCurrencyPrice = paymentCurrency === 'CNY'
-    ? (billingCycle === 'monthly' ? '¥0.10' : '¥1')
-    : (billingCycle === 'monthly' ? '$0.0147' : '$0.147');
-  const proOriginalPrice = paymentCurrency === 'CNY'
-    ? (billingCycle === 'monthly' ? '¥1.00' : '¥10.00')
-    : (billingCycle === 'monthly' ? '$0.147' : '$1.47');
-  const visiblePaymentMethod = paymentMethod;
-  const visiblePaymentQrUrl = PAYMENT_QR_IMAGES[billingCycle][paymentMethod];
   const activeCollection = activeView === 'favorites' ? 'favorites' : 'uploads';
   const collectionOwnerId = collectionUserId || currentUser?.id || '';
   const activeCollectionLibrary = userLibraries.find(
@@ -492,16 +402,8 @@ function Music({ isActive = true }: MusicProps) {
   }, [currentUser, t]);
 
   const openUpgradeDialog = useCallback(() => {
-    setUpgradeError('');
-    setProDialogStep('intro');
-    setPaymentMethod('wechat_pay');
-    setDisplayedPaymentMethod('wechat_pay');
-    setPaymentCurrency('CNY');
-    setBillingCycle('monthly');
-    setPaymentEmail(currentUser?.email?.trim() || '');
-    setPaymentQrUrl('');
     setIsUpgradeOpen(true);
-  }, [currentUser?.email]);
+  }, []);
 
   const openLibraryCollection = useCallback((library: MusicUserLibrary) => {
     const isOwnLibrary = library.userId === currentUser?.id;
@@ -513,59 +415,6 @@ function Music({ isActive = true }: MusicProps) {
     setCollectionUserId(library.userId);
     setActiveView(library.collection === 'favorites' ? 'favorites' : 'playlist');
   }, [currentUser?.id, hasLibraryAccess, openUpgradeDialog]);
-
-  const startProCheckout = useCallback(async () => {
-    if (isStartingCheckout) return;
-    const normalizedEmail = paymentEmail.trim();
-    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      setUpgradeError(t('music.invalidPaymentEmail'));
-      return;
-    }
-    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    setIsStartingCheckout(true);
-    setUpgradeError('');
-    try {
-      window.sessionStorage.setItem('subscription_return_to', returnTo);
-      const checkoutUrl = await createProCheckout(
-        returnTo,
-        paymentMethod,
-        normalizedEmail,
-        paymentCurrency,
-        billingCycle,
-      );
-      const methodColors: Record<PaymentMethod, string> = {
-        wechat_pay: '#55a947',
-        alipay: '#1677ff',
-        union_pay: '#d9272e',
-      };
-      const qrDataUrl = await QRCode.toDataURL(checkoutUrl.orderNo, {
-        width: 360,
-        margin: 2,
-        errorCorrectionLevel: 'M',
-        color: {
-          dark: methodColors[paymentMethod],
-          light: '#ffffffff',
-        },
-      });
-      setDisplayedPaymentMethod(paymentMethod);
-      setPaymentQrUrl(qrDataUrl);
-      window.dispatchEvent(new CustomEvent('app:notification', {
-        detail: {
-          message: t('music.paymentRequestCreated', { orderNo: checkoutUrl.orderNo }),
-          type: 'success',
-        },
-      }));
-    } catch (error: any) {
-      const message = error?.response?.data?.message;
-      setUpgradeError(
-        typeof message === 'string' && message.trim()
-          ? message
-          : t('music.proCheckoutFailed'),
-      );
-    } finally {
-      setIsStartingCheckout(false);
-    }
-  }, [billingCycle, isStartingCheckout, paymentCurrency, paymentEmail, paymentMethod, t]);
 
   const syncProgressVisual = useCallback((value: number, duration: number) => {
     const progress = duration > 0 ? Math.min((value / duration) * 100, 100) : 0;
@@ -732,20 +581,6 @@ function Music({ isActive = true }: MusicProps) {
     document.addEventListener('keydown', closeDialog);
     return () => document.removeEventListener('keydown', closeDialog);
   }, [isUploading, pendingDuplicateUpload]);
-
-  useEffect(() => {
-    if (!isUpgradeOpen || isStartingCheckout) return;
-    const closeDialog = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      if (isPaymentQrPreviewOpen) {
-        setIsPaymentQrPreviewOpen(false);
-        return;
-      }
-      setIsUpgradeOpen(false);
-    };
-    document.addEventListener('keydown', closeDialog);
-    return () => document.removeEventListener('keydown', closeDialog);
-  }, [isPaymentQrPreviewOpen, isStartingCheckout, isUpgradeOpen]);
 
   useEffect(() => {
     if (!authInitialized || !currentUser || hasLibraryAccess || !isViewingProCollection) return;
@@ -1052,28 +887,6 @@ function Music({ isActive = true }: MusicProps) {
       // Keep the selected layout usable when storage is unavailable.
     }
   }, [libraryLayout]);
-
-  useEffect(() => {
-    try {
-      if (!isUpgradeOpen || proDialogStep !== 'payment') {
-        window.localStorage.removeItem(MUSIC_PRO_DIALOG_STATE_KEY);
-        return;
-      }
-      window.localStorage.setItem(MUSIC_PRO_DIALOG_STATE_KEY, JSON.stringify({
-        step: proDialogStep,
-        paymentMethod,
-        paymentCurrency,
-        billingCycle,
-      } satisfies StoredProDialogState));
-    } catch {
-      // Keep checkout usable when storage is unavailable.
-    }
-  }, [billingCycle, isUpgradeOpen, paymentCurrency, paymentMethod, proDialogStep]);
-
-  useEffect(() => {
-    if (!isUpgradeOpen || proDialogStep !== 'payment' || paymentEmail || !currentUser?.email) return;
-    setPaymentEmail(currentUser.email.trim());
-  }, [currentUser?.email, isUpgradeOpen, paymentEmail, proDialogStep]);
 
   useEffect(() => {
     if (isCollectionView) {
@@ -2487,303 +2300,11 @@ function Music({ isActive = true }: MusicProps) {
         </div>
         </div>
       )}
-      {isUpgradeOpen && (
-        <div className="music-pro-overlay" role="presentation">
-          <button
-            type="button"
-            className="music-pro-backdrop"
-            aria-label={t('music.closeProDialog')}
-            disabled={isStartingCheckout}
-            onClick={() => setIsUpgradeOpen(false)}
-          />
-          <div
-            className={`music-pro-dialog${proDialogStep === 'payment' ? ' is-payment' : ''}`}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="music-pro-title"
-            aria-describedby="music-pro-description"
-          >
-            <button
-              type="button"
-              className="music-pro-close"
-              aria-label={t('music.closeProDialog')}
-              disabled={isStartingCheckout}
-              onClick={() => setIsUpgradeOpen(false)}
-            >
-              <X size={17} aria-hidden="true" />
-            </button>
-            <div className="music-pro-step-shell">
-              {proDialogStep === 'intro' ? (
-                <div className="music-pro-step music-pro-intro-step">
-                  <span className="music-pro-crown" aria-hidden="true">
-                    <Crown size={25} strokeWidth={1.8} />
-                  </span>
-                  <p className="music-pro-eyebrow">{t('music.proPlan')}</p>
-                  <h2 id="music-pro-title">{t('music.proUpgradeTitle')}</h2>
-                  <p id="music-pro-description" className="music-pro-description">
-                    {t('music.proUpgradeDescription')}
-                  </p>
-                  <div className="music-pro-benefits">
-                    <span>
-                      <Headphones size={19} aria-hidden="true" />
-                      {t('music.proBenefitLibrary')}
-                    </span>
-                    <span>
-                      <Sparkles size={19} aria-hidden="true" />
-                      {t('music.proBenefitCollections')}
-                    </span>
-                    <span>
-                      <ShieldCheck size={19} aria-hidden="true" />
-                      {t('music.proBenefitSync')}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="music-pro-upgrade"
-                    onClick={() => {
-                      setUpgradeError('');
-                      setProDialogStep('payment');
-                    }}
-                  >
-                    <Crown size={19} aria-hidden="true" />
-                    {t('music.upgradeToPro')}
-                  </button>
-                  <small className="music-pro-footnote">{t('music.proReturnNote')}</small>
-                </div>
-              ) : (
-                <div className="music-pro-step music-pro-payment-step">
-                  <button
-                    type="button"
-                    className="music-pro-payment-back"
-                    aria-label={t('music.backToProOverview')}
-                    disabled={isStartingCheckout}
-                    onClick={() => {
-                      setUpgradeError('');
-                      setProDialogStep('intro');
-                    }}
-                  >
-                    <ArrowLeft size={18} aria-hidden="true" />
-                  </button>
-                  <div className="music-pro-payment-layout">
-                    <div className="music-pro-order">
-                      <h2 id="music-pro-title">{t('music.subscribeToPro')}</h2>
-                      <div className="music-pro-currency" aria-label={t('music.currency')}>
-                        {(['CNY', 'USD'] as PaymentCurrency[]).map((currency) => (
-                          <button
-                            key={currency}
-                            type="button"
-                            className={paymentCurrency === currency ? 'is-active' : ''}
-                            aria-pressed={paymentCurrency === currency}
-                            onClick={() => setPaymentCurrency(currency)}
-                          >
-                            <img
-                              className="music-pro-currency-icon"
-                              src={currency === 'CNY' ? cnyCurrencyIcon : usdCurrencyIcon}
-                              alt=""
-                              aria-hidden="true"
-                            />
-                            <span>{currency}</span>
-                            <strong>
-                              {currency === 'CNY'
-                                ? (billingCycle === 'monthly' ? '¥0.10' : '¥1')
-                                : (billingCycle === 'monthly' ? '$0.0147' : '$0.147')}
-                              <small>{t(billingPeriodKey)}</small>
-                            </strong>
-                          </button>
-                        ))}
-                      </div>
-                      <p className="music-pro-exchange-note">
-                        {t('music.exchangeRateNote')}
-                      </p>
-                      <div
-                        className={`music-pro-billing-toggle is-${billingCycle}`}
-                        aria-label={t('music.billingCycle')}
-                      >
-                        <span className="music-pro-billing-indicator" aria-hidden="true" />
-                        {(['monthly', 'yearly'] as BillingCycle[]).map((cycle) => (
-                          <button
-                            key={cycle}
-                            type="button"
-                            className={billingCycle === cycle ? 'is-active' : ''}
-                            aria-pressed={billingCycle === cycle}
-                            onClick={() => setBillingCycle(cycle)}
-                          >
-                            <span>{t(`music.${cycle}`)}</span>
-                            {cycle === 'yearly' && (
-                              <em className="music-pro-yearly-offer">2 months free</em>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="music-pro-plan-comparison">
-                        <section className="music-pro-plan-card">
-                          <h3>{t('music.freePlan')}</h3>
-                          <p className="music-pro-plan-price">¥0.00</p>
-                          <span className="music-pro-plan-original-price is-placeholder" aria-hidden="true">
-                            ¥0.00
-                          </span>
-                          <p className="music-pro-plan-features-label">{t('music.privileges')}</p>
-                          <ul>
-                            {['chatFeature', 'momentFeature', 'musicListFeature', 'musicFavorityFeature'].map((feature) => (
-                              <li key={feature}>
-                                <Check size={15} aria-hidden="true" />
-                                {t(`music.${feature}`)}
-                              </li>
-                            ))}
-                            <li className="is-unavailable">
-                              <X size={15} aria-hidden="true" />
-                              {t('music.musicLibraryFeature')}
-                            </li>
-                          </ul>
-                        </section>
-                        <section className="music-pro-plan-card is-pro">
-                          <h3>{t('music.proPlanCard')}</h3>
-                          <p className="music-pro-plan-price">
-                            {selectedCurrencyPrice}
-                            <small>{t(billingPeriodKey)}</small>
-                          </p>
-                          <del className="music-pro-plan-original-price">{proOriginalPrice}</del>
-                          <p className="music-pro-plan-features-label">{t('music.privileges')}</p>
-                          <ul>
-                            {[
-                              'chatFeature',
-                              'momentFeature',
-                              'musicListFeature',
-                              'musicFavorityFeature',
-                              'musicLibraryFeature',
-                            ].map((feature) => (
-                              <li key={feature}>
-                                <Check size={15} aria-hidden="true" />
-                                {t(`music.${feature}`)}
-                              </li>
-                            ))}
-                          </ul>
-                        </section>
-                      </div>
-                    </div>
-                    <div className="music-pro-checkout">
-                      <div className={`music-pro-qr is-${visiblePaymentMethod}`}>
-                        {visiblePaymentQrUrl ? (
-                          <button
-                            type="button"
-                            className="music-pro-qr-preview-trigger"
-                            aria-label={t('music.viewPaymentQr')}
-                            onClick={() => setIsPaymentQrPreviewOpen(true)}
-                          >
-                            <img
-                              key={visiblePaymentQrUrl}
-                              className="music-pro-qr-image"
-                              src={visiblePaymentQrUrl}
-                              alt={t('music.paymentQrCode')}
-                            />
-                          </button>
-                        ) : (
-                          <div className="music-pro-qr-placeholder" aria-hidden="true">
-                            <span />
-                            <span />
-                            <span />
-                          </div>
-                        )}
-                      </div>
-                      <p className="music-pro-qr-caption">
-                        {t(visiblePaymentQrUrl ? 'music.scanToPay' : 'music.selectMethodAndPay')}
-                      </p>
-                      <div className="music-pro-field">
-                          <span>{t('music.contactInformation')}</span>
-                        <label className="music-pro-email-input">
-                          <span>{t('music.email')}</span>
-                          <input
-                            type="email"
-                            autoComplete="email"
-                            value={paymentEmail}
-                            placeholder="you@example.com"
-                            disabled={isStartingCheckout}
-                            onChange={(event) => setPaymentEmail(event.target.value)}
-                          />
-                        </label>
-                      </div>
-                      <fieldset className="music-pro-methods">
-                        <legend>{t('music.paymentMethod')}</legend>
-                        {(['wechat_pay', 'alipay', 'union_pay'] as PaymentMethod[]).map((method) => (
-                          <label key={method} className={`music-pro-method is-${method}`}>
-                            <input
-                              type="radio"
-                              name="music-pro-payment-method"
-                              value={method}
-                              checked={paymentMethod === method}
-                              disabled={isStartingCheckout}
-                              onChange={() => setPaymentMethod(method)}
-                            />
-                            <span className="music-pro-radio" aria-hidden="true" />
-                            {method === 'wechat_pay' && (
-                              <svg
-                                className="music-pro-method-logo"
-                                focusable="false"
-                                fill="#65bf46"
-                                viewBox="0 0 16 16"
-                                aria-hidden="true"
-                              >
-                                <path d="m5.82158951 10.2392289c-.07458706.0370453-.15730458.0556955-.24094809.054326-.19411036.0004044-.37251043-.1042744-.4634916-.2719605l-.03714687-.07248977-1.46459966-3.11854655c-.01512596-.03426189-.02150045-.07160842-.01857344-.10881723-.00173271-.06781637.02505287-.13335979.07410324-.18132817.04905038-.04796839.11607222-.07416311.18541829-.07246861.05991821.00135034.11803899.0202774.1668232.05432605l1.72429004 1.19665926c.13428814.07989516.287767.12369848.44491816.12698096.09540276-.00050307.18981611-.01894679.27809496-.05432605l8.08434026-3.51748802c-1.4654439-1.68625423-3.8570268-2.77409627-6.54544686-2.77409627-4.43111472 0-8.00937114 2.91907582-8.00937114 6.52721734 0 1.95821474 1.07540181 3.73512246 2.76254498 4.93244226.19798422.1234931.27637709.3683985.18573434.5802485-.12984519.4895949-.35221984 1.2879732-.35221984 1.3236402-.02294672.0641881-.03548063.1314925-.03714687.1994707-.00149457.0676161.0253489.1328891.07429838.1806653s.11574724.0738997.18488544.0723059c.05476156.0014409.10794137-.0180468.14824977-.0543261l1.74286348-.9975188c.12865107-.0773324.27545557-.1210562.42634473-.1269809.0814565.0032186.1622826.0154046.24094809.0363274.84921252.2423376 1.7294984.3646673 2.61412636.3632745 4.41254124 0 8.00937114-2.9190758 8.00937114-6.52721731-.0072077-1.07252838-.3219348-2.12157031-.9084098-3.02789305l-9.21428039 5.22141056z" />
-                              </svg>
-                            )}
-                            {method === 'alipay' && (
-                              <span className="music-pro-brand-mark" aria-hidden="true">A</span>
-                            )}
-                            {method === 'union_pay' && (
-                              <span className="music-pro-brand-mark" aria-hidden="true">U</span>
-                            )}
-                            <span>{t(`music.${method}`)}</span>
-                          </label>
-                        ))}
-                      </fieldset>
-                      {upgradeError && (
-                        <p className="music-pro-error" role="alert">{upgradeError}</p>
-                      )}
-                      <button
-                        type="button"
-                        className="music-pro-pay"
-                        disabled={isStartingCheckout}
-                        onClick={() => void startProCheckout()}
-                      >
-                        {isStartingCheckout && (
-                          <LoaderCircle size={19} className="is-spinning" aria-hidden="true" />
-                        )}
-                        {t(isStartingCheckout ? 'music.generatingPaymentQr' : 'music.pay')}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      {isPaymentQrPreviewOpen && visiblePaymentQrUrl && (
-        <div
-          className="music-pro-qr-preview-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t('music.paymentQrCode')}
-        >
-          <button
-            type="button"
-            className="music-pro-qr-preview-backdrop"
-            aria-label={t('music.closePaymentQrPreview')}
-            onClick={() => setIsPaymentQrPreviewOpen(false)}
-          />
-          <div className="music-pro-qr-preview-content">
-            <img src={visiblePaymentQrUrl} alt={t('music.paymentQrCode')} />
-            <button
-              type="button"
-              className="music-pro-qr-preview-close"
-              aria-label={t('music.closePaymentQrPreview')}
-              onClick={() => setIsPaymentQrPreviewOpen(false)}
-            >
-              <X size={18} aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-      )}
+      <ProUpgradeDialog
+        open={isUpgradeOpen}
+        email={currentUser?.email}
+        onClose={() => setIsUpgradeOpen(false)}
+      />
       {pendingDuplicateUpload && (
         <div className="music-duplicate-overlay" role="presentation">
           <button

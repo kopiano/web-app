@@ -54,6 +54,7 @@ import {
   X,
 } from 'lucide-react';
 import HlsVideo from '@/components/HlsVideo';
+import ProUpgradeDialog from '@/components/ProUpgradeDialog';
 import {
   createVideoComment,
   createVideoCollection,
@@ -1683,6 +1684,7 @@ export default function VideoConnected() {
   const [collectionIncludeFavorites, setCollectionIncludeFavorites] = useState(false);
   const [collectionBusy, setCollectionBusy] = useState(false);
   const [collectionError, setCollectionError] = useState('');
+  const [isVideoProUpgradeOpen, setIsVideoProUpgradeOpen] = useState(false);
   const [publishedProcessingVideos, setPublishedProcessingVideos] = useState<VideoApiItem[]>([]);
   const [hasVideoRecord, setHasVideoRecord] = useState(() => {
     try {
@@ -1850,6 +1852,12 @@ export default function VideoConnected() {
     : categoriesQuery.data ?? [];
   const playlistCategories = playlistCategoriesQuery.data ?? [];
   const collectionCategories = useMockData ? MOCK_VIDEO_CATEGORIES : playlistCategories;
+  const hasVideoLibraryAccess = Boolean(
+    currentUser
+    && currentUser.plan?.trim().toLowerCase() === 'pro'
+    && currentUser.subscription_status?.trim().toLowerCase() === 'active'
+    && (!currentUser.subscription_end_at || Date.parse(currentUser.subscription_end_at) > Date.now()),
+  );
   const effectiveCollections = collectionsQuery.data && collectionsQuery.data.length > 0
     ? collectionsQuery.data
     : useMockData
@@ -3146,31 +3154,41 @@ export default function VideoConnected() {
               <section className="video-section video-library-section">
                 {filteredCollections.length > 0 ? (
                   <div className="video-library-grid">
-                    {filteredCollections.map((collection: VideoApiCollection) => (
-                      <button
-                        type="button"
-                        key={collection.id}
-                        className="video-collection-card"
-                        onClick={() => setSearchParams({ view: 'favorites', collection: collection.id })}
-                        style={{ '--collection-art': `url(${collection.coverUrl})` } as CSSProperties}
-                      >
-                        <span className="video-collection-shine" aria-hidden="true" />
-                        <img src={collection.avatar || defaultAvatarDataUrl(collection.username)} alt="" {...lazyImageProps()} />
-                        <span className="video-collection-copy">
-                          <small>{t('video.library.folder')}</small>
-                          <strong>{collection.title}</strong>
-                          <span>{collection.username}</span>
-                          <em>
-                            {t('video.library.videoCount', { count: collection.videoCount })}
-                            <i />
-                            {t('video.library.playCount', { count: collection.totalViews })}
-                          </em>
-                        </span>
-                        <span className="video-collection-play-button" aria-hidden="true">
-                          <Play size={20} strokeWidth={2} fill="currentColor" />
-                        </span>
-                      </button>
-                    ))}
+                    {filteredCollections.map((collection: VideoApiCollection) => {
+                      const isOwnCollection = collection.userId === currentUser?.id;
+                      const isProLocked = !isOwnCollection && !hasVideoLibraryAccess;
+                      return (
+                        <button
+                          type="button"
+                          key={collection.id}
+                          className={`video-collection-card${isProLocked ? ' is-pro-locked' : ''}`}
+                          onClick={() => {
+                            if (isProLocked) {
+                              setIsVideoProUpgradeOpen(true);
+                              return;
+                            }
+                            setSearchParams({ view: 'favorites', collection: collection.id });
+                          }}
+                          style={{ '--collection-art': `url(${collection.coverUrl})` } as CSSProperties}
+                        >
+                          <span className="video-collection-shine" aria-hidden="true" />
+                          <img src={collection.avatar || defaultAvatarDataUrl(collection.username)} alt="" {...lazyImageProps()} />
+                          <span className="video-collection-copy">
+                            <small>{t('video.library.folder')}</small>
+                            <strong>{collection.title}</strong>
+                            <span>{collection.username}</span>
+                            <em>
+                              {t('video.library.videoCount', { count: collection.videoCount })}
+                              <i />
+                              {t('video.library.playCount', { count: collection.totalViews })}
+                            </em>
+                          </span>
+                          <span className="video-collection-play-button" aria-hidden="true">
+                            <Play size={20} strokeWidth={2} fill="currentColor" />
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="video-empty">
@@ -3441,6 +3459,11 @@ export default function VideoConnected() {
           )}
         </>
       )}
+      <ProUpgradeDialog
+        open={isVideoProUpgradeOpen}
+        email={currentUser?.email}
+        onClose={() => setIsVideoProUpgradeOpen(false)}
+      />
     </main>
   );
 }
