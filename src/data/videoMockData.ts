@@ -421,6 +421,8 @@ export const MOCK_VIDEO_COLLECTIONS: VideoApiCollection[] = MOCK_COLLECTION_SEED
     title: seed.title,
     description: seed.description,
     visibility: 'public',
+    includeFavorites: false,
+    categorySlug: null,
     videoCount: videos.length,
     totalViews: videos.reduce((total, video) => total + video.viewCount, 0),
     coverUrl: MOCK_VIDEO_ITEMS.find((video) => video.id === mockVideoId(seed.coverVideoId))?.coverUrl ?? '',

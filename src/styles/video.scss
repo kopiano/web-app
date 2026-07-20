@@ -65,9 +65,17 @@
 
 .video-page-header.is-library {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 42rem) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 42rem) minmax(0, 1fr);
   gap: 2rem;
   align-items: center;
+}
+
+.video-page-header.is-library > div:first-child {
+  min-width: 0;
+}
+
+.video-page-header.is-library h1 {
+  font-size: clamp(2.2rem, 3vw, 3.4rem);
 }
 
 .video-page-header.is-library .video-library-header-actions {
@@ -1887,6 +1895,38 @@
   transition: opacity 0.16s ease, transform 0.2s ease;
 }
 
+.video-watch-loop-menu::before {
+  content: "";
+  position: absolute;
+  inset: -0.7rem;
+}
+
+.video-watch-loop-menu button {
+  position: relative;
+  z-index: 1;
+}
+
+.video-watch-loop-icon {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+}
+
+.video-watch-loop-icon > svg,
+.video-watch-loop-icon-number {
+  grid-area: 1 / 1;
+}
+
+.video-watch-loop-icon-number {
+  color: currentColor;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  transform: translateY(0.5px);
+}
+
 .video-watch-settings.is-open .video-watch-loop-menu {
   opacity: 1;
   pointer-events: auto;
@@ -1894,9 +1934,9 @@
 }
 
 .video-watch-loop-menu button.is-active {
-  color: #102019;
-  background: #d9f1d2;
-  box-shadow: 0 0.45rem 1.1rem rgba(35, 88, 52, 0.28);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
 .video-watch-volume-range {

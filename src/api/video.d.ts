@@ -70,6 +70,8 @@ export interface VideoApiCollection {
   title: string;
   description: string;
   visibility: VideoVisibility;
+  includeFavorites: boolean;
+  categorySlug: string | null;
   videoCount: number;
   totalViews: number;
   coverUrl: string;
@@ -109,9 +111,3 @@ export function viewVideo(id: string): Promise<{ counted: boolean; viewCount: nu
 export function createVideoCollection(input: Record<string, unknown>): Promise<VideoApiCollection>;
 export function updateVideoCollection(id: string, input: Record<string, unknown>): Promise<VideoApiCollection>;
 export function deleteVideoCollection(id: string): Promise<void>;
-export function addVideoToCollection(
-  collectionId: string,
-  videoId: string,
-  position?: number,
-): Promise<VideoApiCollection>;
-export function removeVideoFromCollection(collectionId: string, videoId: string): Promise<VideoApiCollection>;

@@ -40,7 +40,7 @@ import {
   MoreHorizontal,
   Pause,
   Play,
-  Repeat1,
+  RefreshCw,
   Search,
   Send,
   Settings2,
@@ -61,7 +61,6 @@ import {
   getVideoCategories,
   getVideoCollections,
   getVideoComments,
-  addVideoToCollection,
   getVideos,
   updateVideo,
   updateVideoCommentLike,
@@ -1067,7 +1066,10 @@ function VideoWatch({
                         title={singleLoop ? t('video.player.singleLoopOn') : t('video.player.singleLoopOff')}
                         onClick={() => setSingleLoop((enabled) => !enabled)}
                       >
-                        <Repeat1 size={18} />
+                        <span className="video-watch-loop-icon" aria-hidden="true">
+                          <RefreshCw size={18} strokeWidth={1.9} />
+                          {singleLoop && <span className="video-watch-loop-icon-number">1</span>}
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -1356,7 +1358,7 @@ export default function VideoConnected() {
   const [collectionTitle, setCollectionTitle] = useState('');
   const [collectionVisibility, setCollectionVisibility] = useState<VideoVisibility>('public');
   const [collectionCategory, setCollectionCategory] = useState('all');
-  const [collectionIncludeFavorites, setCollectionIncludeFavorites] = useState(true);
+  const [collectionIncludeFavorites, setCollectionIncludeFavorites] = useState(false);
   const [collectionBusy, setCollectionBusy] = useState(false);
   const [collectionError, setCollectionError] = useState('');
   const [publishedProcessingVideos, setPublishedProcessingVideos] = useState<VideoApiItem[]>([]);
@@ -1428,7 +1430,7 @@ export default function VideoConnected() {
     queryFn: ({ pageParam }) => pageQuery(pageParam, {
       limit: 20,
       collection_id: selectedCollectionId,
-      ...(currentUser ? { scope: 'accessible' } : {}),
+      scope: 'collection',
       ...(activeCategory !== 'all' ? { category: activeCategory } : {}),
     }),
     getNextPageParam: nextCursor,
@@ -1933,36 +1935,12 @@ export default function VideoConnected() {
     setCollectionBusy(true);
     setCollectionError('');
     try {
-      const collection = await createVideoCollection({
+      await createVideoCollection({
         title,
         visibility: collectionVisibility,
+        include_favorites: collectionIncludeFavorites,
+        category_slug: collectionCategory === 'all' ? null : collectionCategory,
       });
-
-      if (collectionIncludeFavorites) {
-        const favoriteVideos: VideoApiItem[] = [];
-        let cursor: Cursor = null;
-        do {
-          const page = await getVideos({
-            limit: 50,
-            scope: 'collection',
-            ...(collectionCategory !== 'all' ? { category: collectionCategory } : {}),
-            ...(cursor
-              ? {
-                before_created_at: cursor.createdAt,
-                before_id: cursor.id,
-              }
-              : {}),
-          });
-          favoriteVideos.push(...page.items.filter((video) => video.status === 'ready'));
-          cursor = page.hasMore && page.nextBeforeCreatedAt && page.nextBeforeId
-            ? { createdAt: page.nextBeforeCreatedAt, id: page.nextBeforeId }
-            : null;
-        } while (cursor);
-
-        await Promise.all(
-          favoriteVideos.map((video, index) => addVideoToCollection(collection.id, video.id, index)),
-        );
-      }
 
       await queryClient.invalidateQueries({ queryKey: ['video', 'collections'] });
       await queryClient.invalidateQueries({ queryKey: ['video', 'collection'] });
@@ -1970,7 +1948,7 @@ export default function VideoConnected() {
       setCollectionTitle('');
       setCollectionVisibility('public');
       setCollectionCategory('all');
-      setCollectionIncludeFavorites(true);
+      setCollectionIncludeFavorites(false);
       notify(t('video.library.collectionCreated'), 'success');
     } catch (error) {
       setCollectionError(error instanceof Error ? error.message : t('video.library.collectionCreateFailed'));
@@ -2415,6 +2393,10 @@ export default function VideoConnected() {
                         return;
                       }
                       setCollectionError('');
+                      setCollectionTitle('');
+                      setCollectionVisibility('public');
+                      setCollectionCategory('all');
+                      setCollectionIncludeFavorites(false);
                       setCollectionDialogOpen(true);
                     }}
                   >

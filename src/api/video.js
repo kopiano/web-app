@@ -77,6 +77,8 @@ function normalizeCollection(collection) {
     title: String(collection.title || ''),
     description: String(collection.description || ''),
     visibility: collection.visibility === 'private' ? 'private' : 'public',
+    includeFavorites: Boolean(collection.include_favorites),
+    categorySlug: collection.category_slug ? String(collection.category_slug) : null,
     videoCount: Number(collection.video_count) || 0,
     totalViews: Number(collection.total_views) || 0,
     coverUrl: resolveAssetUrl(collection.cover_url),
@@ -331,17 +333,4 @@ export function updateVideoCollection(id, input) {
 
 export function deleteVideoCollection(id) {
   return request.delete(`/video/collections/${encodeURIComponent(id)}`).then(() => undefined)
-}
-
-export function addVideoToCollection(collectionId, videoId, position) {
-  return request.post(`/video/collections/${encodeURIComponent(collectionId)}/items`, {
-    video_id: videoId,
-    position,
-  }).then(response => normalizeCollection(response.data))
-}
-
-export function removeVideoFromCollection(collectionId, videoId) {
-  return request.delete(
-    `/video/collections/${encodeURIComponent(collectionId)}/items/${encodeURIComponent(videoId)}`,
-  ).then(response => normalizeCollection(response.data))
 }
