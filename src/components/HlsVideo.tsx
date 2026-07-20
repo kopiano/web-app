@@ -551,7 +551,7 @@ export default function HlsVideo({
         controls={controls}
         playsInline
         muted
-        preload="metadata"
+        preload={active ? 'metadata' : 'none'}
         poster={poster}
         className={className}
       />

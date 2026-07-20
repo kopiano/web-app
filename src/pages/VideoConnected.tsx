@@ -3168,17 +3168,17 @@ export default function VideoConnected() {
                           fetchPriority={video.id === featured.id ? 'high' : 'low'}
                         />
                       ))}
-                      {featured.status === 'ready' && featured.src && (
+                      {isFeaturedPreviewActive && featured.status === 'ready' && featured.src && (
                         <span
-                          className={`video-featured-preview${isFeaturedPreviewActive ? ' is-active' : ''}`}
+                          className="video-featured-preview is-active"
                           aria-hidden="true"
                         >
                           <HlsVideo
                             className="video-featured-preview-media"
                             src={featured.src}
                             poster={featured.poster}
-                            active={isFeaturedPreviewActive}
-                            autoPlay={isFeaturedPreviewActive}
+                            active
+                            autoPlay
                             controls={false}
                             onViewQualified={() => {
                               void trackQualifiedVideoView(featured.id);
@@ -3318,6 +3318,7 @@ export default function VideoConnected() {
                           video={video}
                           onPlay={openVideo}
                           onFavorite={toggleFavorite}
+                          onViewQualified={trackQualifiedVideoView}
                         />
                       ))}
                     </div>
@@ -3350,6 +3351,7 @@ export default function VideoConnected() {
                         video={video}
                         onPlay={openVideo}
                         onFavorite={toggleFavorite}
+                        onViewQualified={trackQualifiedVideoView}
                       />
                     ))}
                   </div>
