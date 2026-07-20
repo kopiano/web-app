@@ -142,7 +142,16 @@ type UploadDraft = {
 
 type MockVideoOverride = Partial<Pick<
   VideoApiItem,
-  'liked' | 'favorited' | 'likeCount' | 'favoriteCount' | 'viewCount' | 'commentCount'
+  | 'liked'
+  | 'favorited'
+  | 'likeCount'
+  | 'favoriteCount'
+  | 'viewCount'
+  | 'commentCount'
+  | 'title'
+  | 'description'
+  | 'visibility'
+  | 'coverUrl'
 >>;
 
 type ApiRequestError = {
@@ -395,9 +404,6 @@ const VideoCard = memo(function VideoCard({
             className="video-tile-processing"
             role="status"
             aria-label={`Processing ${video.processingProgress}%`}
-            style={{
-              '--video-processing-progress': `${Math.max(0, Math.min(100, video.processingProgress))}%`,
-            } as CSSProperties}
           >
             <LoaderCircle size={20} aria-hidden="true" />
             <strong>{video.processingProgress}%</strong>
@@ -505,13 +511,13 @@ function UploadDialog({
   const isTransferring = step === 'publish' && progress < 100;
   const isProcessingCoverPending = step === 'publish'
     && progress >= 100
-    && processingProgress < 100
     && !processingFailed
-    && !hasCustomCover;
+    && !hasCustomCover
+    && !coverUrl;
 
   useEffect(() => {
     setCoverImageError(false);
-  }, [coverUrl]);
+  }, [coverUrl, processingProgress, processingFailed]);
 
   return createPortal(
     <div className="video-upload-overlay" role="presentation">
@@ -741,6 +747,275 @@ function UploadDialog({
   );
 }
 
+type VideoSettingsPanel = 'detail' | 'delete';
+
+function VideoSettingsDialog({
+  video,
+  panel,
+  isDeleting,
+  deleteError,
+  onPanelChange,
+  onClose,
+  onDelete,
+  onUpdate,
+}: {
+  video: CardVideo;
+  panel: VideoSettingsPanel;
+  isDeleting: boolean;
+  deleteError: string;
+  onPanelChange: (panel: VideoSettingsPanel) => void;
+  onClose: () => void;
+  onDelete: () => Promise<void>;
+  onUpdate: (input: {
+    title: string;
+    description: string;
+    visibility: VideoVisibility;
+    categories: string[];
+    cover: File | null;
+  }) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [title, setTitle] = useState(video.raw.title || '');
+  const [tags, setTags] = useState(video.raw.description || '');
+  const [visibility, setVisibility] = useState<VideoVisibility>(video.raw.visibility || 'public');
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState(video.raw.coverUrl || video.poster);
+  const [coverError, setCoverError] = useState(false);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const coverObjectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setTitle(video.raw.title || '');
+    setTags(video.raw.description || '');
+    setVisibility(video.raw.visibility || 'public');
+    setCoverFile(null);
+    setCoverPreview(video.raw.coverUrl || video.poster);
+    setCoverError(false);
+    setError('');
+    setSaved(false);
+  }, [video.id, video.raw.coverUrl, video.raw.description, video.raw.title, video.raw.visibility, video.poster]);
+
+  useEffect(() => () => {
+    if (coverObjectUrlRef.current) URL.revokeObjectURL(coverObjectUrlRef.current);
+  }, []);
+
+  const chooseCover = (file: File | null) => {
+    if (!file) return;
+    if (coverObjectUrlRef.current) URL.revokeObjectURL(coverObjectUrlRef.current);
+    const objectUrl = URL.createObjectURL(file);
+    coverObjectUrlRef.current = objectUrl;
+    setCoverFile(file);
+    setCoverPreview(objectUrl);
+    setCoverError(false);
+    setSaved(false);
+  };
+
+  const submitUpdate = async () => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      setError(t('video.settings.titleRequired'));
+      return;
+    }
+    const categories = tags
+      .match(/#[\p{L}\p{N}-]+/gu)
+      ?.map((tag) => tag.slice(1).toLowerCase())
+      ?? [];
+    if (categories.length === 0) {
+      setError(t('video.settings.categoryRequired'));
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setSaved(false);
+    try {
+      await onUpdate({
+        title: trimmedTitle,
+        description: tags.trim(),
+        visibility,
+        categories,
+        cover: coverFile,
+      });
+      setSaved(true);
+      setCoverFile(null);
+      onClose();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : t('video.settings.updateFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return createPortal(
+    <div className="video-settings-overlay" role="presentation">
+      <button
+        type="button"
+        className="video-settings-backdrop"
+        aria-label={t('video.settings.close')}
+        onClick={() => {
+          if (!busy && !isDeleting) onClose();
+        }}
+      />
+      <div
+        className={`video-settings-dialog is-${panel}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="video-settings-title"
+      >
+        <button
+          type="button"
+          className="video-settings-close"
+          aria-label={t('video.settings.close')}
+          disabled={busy || isDeleting}
+          onClick={onClose}
+        >
+          <X size={19} />
+        </button>
+        <aside className="video-settings-sidebar">
+          <p className="video-settings-eyebrow">{t('video.settings.title')}</p>
+          <h2 id="video-settings-title">{video.title}</h2>
+          <nav aria-label={t('video.settings.navigation')}>
+            <button
+              type="button"
+              className={panel === 'detail' ? 'is-active' : ''}
+              aria-current={panel === 'detail' ? 'page' : undefined}
+              onClick={() => onPanelChange('detail')}
+            >
+              <Settings2 size={17} />
+              {t('video.settings.detail')}
+            </button>
+            <button
+              type="button"
+              className={panel === 'delete' ? 'is-active is-danger' : 'is-danger'}
+              aria-current={panel === 'delete' ? 'page' : undefined}
+              onClick={() => {
+                setError('');
+                onPanelChange('delete');
+              }}
+            >
+              <X size={17} />
+              {t('video.settings.delete')}
+            </button>
+          </nav>
+        </aside>
+        <div className="video-settings-content">
+          {panel === 'detail' ? (
+            <div className="video-settings-detail">
+              <div className="video-settings-heading">
+                <span className="video-settings-status-icon"><Settings2 size={20} /></span>
+                <div>
+                  <p className="video-settings-eyebrow">{t('video.settings.detail')}</p>
+                  <h3>{t('video.settings.detailTitle')}</h3>
+                </div>
+              </div>
+              <div className="video-settings-form">
+                <div
+                  className={`video-upload-cover-field${coverPreview && !coverError ? ' has-preview' : ' is-empty'}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t('video.settings.cover')}
+                  onClick={() => {
+                    if (!busy) coverInputRef.current?.click();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      if (!busy) coverInputRef.current?.click();
+                    }
+                  }}
+                >
+                  {coverPreview && !coverError ? (
+                    <>
+                      <img src={coverPreview} alt="" onError={() => setCoverError(true)} />
+                      <span className="video-upload-cover-shade" aria-hidden="true">
+                        <ImagePlus size={20} />
+                      </span>
+                    </>
+                  ) : (
+                    <span className="video-upload-cover-empty">
+                      <Camera size={64} strokeWidth={1.45} aria-hidden="true" />
+                    </span>
+                  )}
+                  <input
+                    ref={coverInputRef}
+                    className="video-upload-file-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => chooseCover(event.target.files?.[0] ?? null)}
+                  />
+                </div>
+                <div className="video-upload-fields">
+                  <label>
+                    <span>{t('video.upload.videoTitle')}</span>
+                    <input value={title} maxLength={255} disabled={busy} onChange={(event) => {
+                      setTitle(event.target.value);
+                      setSaved(false);
+                    }} />
+                  </label>
+                  <label>
+                    <span>{t('video.upload.categories')}</span>
+                    <input value={tags} placeholder="#travel #nature" disabled={busy} onChange={(event) => {
+                      setTags(event.target.value);
+                      setSaved(false);
+                    }} />
+                    <small>{t('video.upload.categoryHint')}</small>
+                  </label>
+                  <div className="video-settings-visibility">
+                    <span>{t('video.upload.visibility')}</span>
+                    <div className={`video-upload-visibility is-${visibility}`}>
+                      {(['public', 'private'] as VideoVisibility[]).map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          className={visibility === option ? 'is-active' : ''}
+                          aria-pressed={visibility === option}
+                          disabled={busy}
+                          onClick={() => {
+                            setVisibility(option);
+                            setSaved(false);
+                          }}
+                        >
+                          {t(`video.upload.${option}`)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {error && <p className="video-upload-error" role="alert">{error}</p>}
+              {saved && <p className="video-settings-saved" role="status">{t('video.settings.updated')}</p>}
+              <button type="button" className="video-upload-publish video-settings-update" disabled={busy} onClick={() => void submitUpdate()}>
+                {busy && <LoaderCircle size={17} className="is-spinning" />}
+                {busy ? t('video.settings.updating') : t('video.settings.update')}
+              </button>
+            </div>
+          ) : (
+            <div className="video-settings-delete">
+              <div className="video-delete-icon" aria-hidden="true"><X size={25} /></div>
+              <p className="video-settings-eyebrow is-danger">{t('video.settings.delete')}</p>
+              <h3>{t('video.deleteTitle')}</h3>
+              <p>{t('video.deleteDescription')}</p>
+              {deleteError && <p className="video-delete-error">{deleteError}</p>}
+              <div className="video-delete-actions">
+                <button type="button" className="video-delete-cancel" disabled={isDeleting} onClick={() => onPanelChange('detail')}>
+                  {t('video.deleteCancel')}
+                </button>
+                <button type="button" className="video-delete-confirm" disabled={isDeleting} onClick={() => void onDelete()}>
+                  {isDeleting && <LoaderCircle size={17} className="is-spinning" />}
+                  {isDeleting ? t('video.deleting') : t('video.deleteConfirm')}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function VideoWatch({
   video,
   playlist,
@@ -753,6 +1028,7 @@ function VideoWatch({
   onCommentLike,
   onViewQualified,
   onDelete,
+  onUpdate,
 }: {
   video: CardVideo;
   playlist: CardVideo[];
@@ -765,6 +1041,13 @@ function VideoWatch({
   onCommentLike: (comment: VideoApiComment, active: boolean) => void;
   onViewQualified: (videoId: string) => Promise<boolean>;
   onDelete: (videoId: string) => Promise<void>;
+  onUpdate: (videoId: string, input: {
+    title: string;
+    description: string;
+    visibility: VideoVisibility;
+    categories: string[];
+    cover: File | null;
+  }) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const stageRef = useRef<HTMLDivElement>(null);
@@ -785,7 +1068,8 @@ function VideoWatch({
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [viewIncrementVisible, setViewIncrementVisible] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsPanel, setSettingsPanel] = useState<VideoSettingsPanel>('detail');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const controlsTimerRef = useRef<number | undefined>(undefined);
@@ -1048,11 +1332,15 @@ function VideoWatch({
             ) : (
               <div className="hls-video video-processing-player" style={{ aspectRatio: '16 / 9' }}>
                 <img src={video.poster} alt="" {...lazyImageProps()} />
-                <span>
-                  {video.status === 'failed'
-                    ? t('video.player.failed')
-                    : t('video.player.processing', { progress: video.processingProgress })}
-                </span>
+                {video.status === 'failed' ? (
+                  <span className="video-processing-message">{t('video.player.failed')}</span>
+                ) : (
+                  <span
+                    className="video-processing-spinner"
+                    role="status"
+                    aria-label={t('video.player.processing', { progress: video.processingProgress })}
+                  />
+                )}
               </div>
             )}
             {video.status === 'ready' && (
@@ -1184,7 +1472,8 @@ function VideoWatch({
                   aria-label={t('video.more')}
                   onClick={() => {
                     setDeleteError('');
-                    setIsDeleteDialogOpen(true);
+                    setSettingsPanel('detail');
+                    setIsSettingsOpen(true);
                   }}
                 >
                   <MoreHorizontal size={20} />
@@ -1323,60 +1612,19 @@ function VideoWatch({
           </div>
         </aside>
       </div>
-      {isDeleteDialogOpen && createPortal(
-        <div className="video-delete-overlay" role="presentation">
-          <button
-            type="button"
-            className="video-delete-backdrop"
-            aria-label={t('video.deleteCancel')}
-            onClick={() => {
-              if (!isDeleting) setIsDeleteDialogOpen(false);
-            }}
-          />
-          <section
-            className="video-delete-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="video-delete-title"
-          >
-            <button
-              type="button"
-              className="video-delete-close"
-              aria-label={t('video.deleteCancel')}
-              disabled={isDeleting}
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
-              <X size={20} />
-            </button>
-            <div className="video-delete-icon" aria-hidden="true">
-              <MoreHorizontal size={26} />
-            </div>
-            <p className="video-delete-eyebrow">{t('video.more')}</p>
-            <h2 id="video-delete-title">{t('video.deleteTitle')}</h2>
-            <p>{t('video.deleteDescription')}</p>
-            {deleteError && <p className="video-delete-error">{deleteError}</p>}
-            <div className="video-delete-actions">
-              <button
-                type="button"
-                className="video-delete-cancel"
-                disabled={isDeleting}
-                onClick={() => setIsDeleteDialogOpen(false)}
-              >
-                {t('video.deleteCancel')}
-              </button>
-              <button
-                type="button"
-                className="video-delete-confirm"
-                disabled={isDeleting}
-                onClick={() => void confirmDeleteVideo()}
-              >
-                {isDeleting && <LoaderCircle size={17} className="is-spinning" />}
-                {isDeleting ? t('video.deleting') : t('video.deleteConfirm')}
-              </button>
-            </div>
-          </section>
-        </div>,
-        document.body,
+      {isSettingsOpen && (
+        <VideoSettingsDialog
+          video={video}
+          panel={settingsPanel}
+          isDeleting={isDeleting}
+          deleteError={deleteError}
+          onPanelChange={setSettingsPanel}
+          onClose={() => {
+            if (!isDeleting) setIsSettingsOpen(false);
+          }}
+          onDelete={confirmDeleteVideo}
+          onUpdate={(input) => onUpdate(video.id, input)}
+        />
       )}
     </div>
   );
@@ -1516,6 +1764,7 @@ export default function VideoConnected() {
   const watchQuery = useQuery({
     queryKey: ['video', 'detail', requestedVideoId],
     queryFn: () => getVideo(requestedVideoId as string),
+    placeholderData: (previousData) => previousData,
     enabled: activeView === 'watch'
       && Boolean(requestedVideoId)
       && !isMockVideoId(requestedVideoId),
@@ -1539,11 +1788,17 @@ export default function VideoConnected() {
     ),
   });
   const generatedUploadCoverUrl = useMemo(() => {
-    if (uploadCoverUrl || !uploadStatusQuery.data?.coverUrl) return '';
+    if (
+      uploadCoverUrl
+      || !uploadStatusQuery.data?.coverUrl
+    ) return '';
     const coverUrl = uploadStatusQuery.data.coverUrl;
     const separator = coverUrl.includes('?') ? '&' : '?';
-    const revision = uploadStatusQuery.data.updatedAt
-      || `${uploadStatusQuery.data.status}-${uploadStatusQuery.data.processingProgress}`;
+    const revision = [
+      uploadStatusQuery.data.updatedAt,
+      uploadStatusQuery.data.status,
+      uploadStatusQuery.data.processingProgress,
+    ].filter(Boolean).join('-');
     return `${coverUrl}${separator}preview=${encodeURIComponent(revision)}`;
   }, [uploadCoverUrl, uploadStatusQuery.data]);
   const publishedProcessingQuery = useQuery({
@@ -1572,6 +1827,17 @@ export default function VideoConnected() {
   const useMockData = homeQuery.isSuccess
     && homeSourceItems.length === 0
     && !hasVideoRecord;
+  const watchPlaylistQuery = useInfiniteQuery({
+    queryKey: ['video', 'watch-playlist', playlistFilterCategory, currentUser?.id ?? 'public'],
+    initialPageParam: null as Cursor,
+    queryFn: ({ pageParam }) => pageQuery(pageParam, {
+      limit: 50,
+      scope: 'mine',
+      ...(playlistFilterCategory !== 'all' ? { category: playlistFilterCategory } : {}),
+    }),
+    getNextPageParam: nextCursor,
+    enabled: watchFromPlaylist && Boolean(currentUser) && !useMockData,
+  });
   const effectiveMockItems = useMemo(
     () => MOCK_VIDEO_ITEMS.map((video) => ({
       ...video,
@@ -1647,12 +1913,27 @@ export default function VideoConnected() {
     processingVideos,
     useMockData,
   ]);
+  useEffect(() => {
+    if (
+      !watchFromPlaylist
+      || useMockData
+      || !watchPlaylistQuery.hasNextPage
+      || watchPlaylistQuery.isFetchingNextPage
+    ) return;
+    void watchPlaylistQuery.fetchNextPage();
+  }, [
+    useMockData,
+    watchFromPlaylist,
+    watchPlaylistQuery.fetchNextPage,
+    watchPlaylistQuery.hasNextPage,
+    watchPlaylistQuery.isFetchingNextPage,
+  ]);
   const watchPlaylist = useMemo(() => {
     if (!watchFromPlaylist) return homeVideos;
     if (!currentUser) return [];
     const items = useMockData
       ? mockPlaylistItems
-      : playlistQuery.data?.pages.flatMap((page) => page.items) ?? [];
+      : watchPlaylistQuery.data?.pages.flatMap((page) => page.items) ?? [];
     const cards = items
       .filter((video) => video.status === 'ready')
       .map((video) => toCardVideo(video, language));
@@ -1667,6 +1948,7 @@ export default function VideoConnected() {
     mockPlaylistItems,
     playlistFilterCategory,
     playlistQuery.data,
+    watchPlaylistQuery.data,
     useMockData,
     watchFromPlaylist,
   ]);
@@ -1698,7 +1980,15 @@ export default function VideoConnected() {
     ? effectiveMockItems.find((video) => video.id === requestedVideoId)
     : undefined;
   const watchVideoItem = mockWatchItem ?? watchQuery.data;
-  const watchVideo = watchVideoItem ? toCardVideo(watchVideoItem, language) : null;
+  const watchVideo = useMemo(
+    () => (watchVideoItem ? toCardVideo(watchVideoItem, language) : null),
+    [language, watchVideoItem],
+  );
+  const [lastWatchVideo, setLastWatchVideo] = useState<CardVideo | null>(null);
+  useEffect(() => {
+    if (watchVideo) setLastWatchVideo(watchVideo);
+  }, [watchVideo]);
+  const displayedWatchVideo = watchVideo ?? lastWatchVideo;
   const watchComments = isMockVideoId(requestedVideoId)
     ? mockComments.filter((comment) => comment.videoId === requestedVideoId)
     : commentsQuery.data ?? [];
@@ -2146,6 +2436,37 @@ export default function VideoConnected() {
     notify(t('video.deleted'), 'success');
   }, [invalidateVideoData, queryClient, setSearchParams, t]);
 
+  const updateWatchedVideo = useCallback(async (videoId: string, input: {
+    title: string;
+    description: string;
+    visibility: VideoVisibility;
+    categories: string[];
+    cover: File | null;
+  }) => {
+    if (isMockVideoId(videoId)) {
+      setMockVideoOverrides((previous) => ({
+        ...previous,
+        [videoId]: {
+          ...(previous[videoId] ?? {}),
+          title: input.title,
+          description: input.description,
+          visibility: input.visibility,
+          ...(input.cover ? { coverUrl: URL.createObjectURL(input.cover) } : {}),
+        },
+      }));
+      return;
+    }
+
+    const updated = await updateVideo(videoId, input);
+    queryClient.setQueryData<VideoApiItem>(['video', 'detail', videoId], updated);
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['video', 'home'] }),
+      queryClient.invalidateQueries({ queryKey: ['video', 'playlist'] }),
+      queryClient.invalidateQueries({ queryKey: ['video', 'collection'] }),
+    ]);
+    notify(t('video.settings.updated'), 'success');
+  }, [notify, queryClient, t]);
+
   const createCollection = useCallback(async () => {
     if (!currentUser) {
       notify(t('video.authRequired'), 'error');
@@ -2373,11 +2694,12 @@ export default function VideoConnected() {
   };
 
   const publishUpload = async () => {
+    const videoId = uploadVideoId;
     const categories = uploadTags
       .match(/#[\p{L}\p{N}-]+/gu)
       ?.map((tag) => tag.slice(1).toLowerCase())
       ?? [];
-    if (!uploadVideoId || !uploadTitle.trim()) {
+    if (!videoId || !uploadTitle.trim()) {
       setUploadError(t('video.upload.titleRequired'));
       return;
     }
@@ -2389,7 +2711,7 @@ export default function VideoConnected() {
     setUploadError('');
     const session = uploadSessionRef.current;
     try {
-      const updated = await updateVideo(uploadVideoId, {
+      const updated = await updateVideo(videoId, {
         title: uploadTitle,
         description: uploadTags,
         visibility: uploadVisibility,
@@ -2400,20 +2722,18 @@ export default function VideoConnected() {
       if (session !== uploadSessionRef.current) return;
       uploadPublishRequestedRef.current = true;
       setUploadPublishRequested(true);
-      queryClient.setQueryData(['video', 'detail', uploadVideoId], updated);
+      queryClient.setQueryData(['video', 'detail', videoId], updated);
       if (updated.status !== 'ready') {
         setPublishedProcessingVideos((current) => [
           updated,
           ...current.filter((video) => video.id !== updated.id),
         ]);
-        void invalidateVideoData(uploadVideoId);
+        void invalidateVideoData(videoId);
+      } else {
+        await invalidateVideoData(videoId);
       }
-      if (updated.status === 'ready') {
-        await invalidateVideoData(uploadVideoId);
-        if (session !== uploadSessionRef.current) return;
-        closeUpload();
-        notify(t('video.upload.published'), 'success');
-      }
+      notify(t('video.upload.published'), 'success');
+      closeUpload();
     } catch (error) {
       if (session !== uploadSessionRef.current) return;
       uploadPublishRequestedRef.current = false;
@@ -2443,12 +2763,31 @@ export default function VideoConnected() {
     if (uploaded.status === 'ready') {
       if (uploadFinalizingRef.current) return;
       uploadFinalizingRef.current = true;
-      void invalidateVideoData(uploadVideoId).then(() => {
-        closeUpload();
-        notify(t('video.upload.published'), 'success');
-      }).catch(() => {
-        uploadFinalizingRef.current = false;
-      });
+      setUploadBusy(true);
+      void (async () => {
+        try {
+          if (uploadCoverFile) {
+            const updated = await updateVideo(uploadVideoId, { cover: uploadCoverFile });
+            queryClient.setQueryData(['video', 'detail', uploadVideoId], updated);
+          }
+          await invalidateVideoData(uploadVideoId);
+          closeUpload();
+          notify(t('video.upload.published'), 'success');
+        } catch (error) {
+          const status = (error as ApiRequestError).response?.status;
+          if (status === 413) {
+            setUploadError(t('video.upload.coverTooLarge'));
+          } else if (status === 415) {
+            setUploadError(t('video.upload.coverUnsupported'));
+          } else {
+            setUploadError(t('video.upload.coverFailed'));
+          }
+          uploadPublishRequestedRef.current = false;
+          setUploadPublishRequested(false);
+          setUploadBusy(false);
+          uploadFinalizingRef.current = false;
+        }
+      })();
       return;
     }
     if (uploaded.status === 'failed') {
@@ -2456,7 +2795,9 @@ export default function VideoConnected() {
     }
   }, [
     invalidateVideoData,
+    queryClient,
     uploadPublishRequested,
+    uploadCoverFile,
     uploadStatusQuery.data,
     uploadVideoId,
   ]);
@@ -2495,9 +2836,9 @@ export default function VideoConnected() {
   return (
     <main className="video-page">
       {activeView === 'watch' && (
-        watchVideo ? (
+        displayedWatchVideo ? (
           <VideoWatch
-            video={watchVideo}
+            video={displayedWatchVideo}
             playlist={watchPlaylist}
             comments={watchComments}
             currentUserAvatar={currentUserAvatar}
@@ -2508,14 +2849,14 @@ export default function VideoConnected() {
                 notify(t('video.authRequired'), 'error');
                 return;
               }
-              if (isMockVideoId(watchVideo.id)) {
-                updateMockReaction(watchVideo.id, kind, active);
+              if (isMockVideoId(displayedWatchVideo.id)) {
+                updateMockReaction(displayedWatchVideo.id, kind, active);
                 return;
               }
               try {
-                if (kind === 'like') await updateVideoLike(watchVideo.id, active);
-                else await updateVideoFavorite(watchVideo.id, active);
-                await invalidateVideoData(watchVideo.id);
+                if (kind === 'like') await updateVideoLike(displayedWatchVideo.id, active);
+                else await updateVideoFavorite(displayedWatchVideo.id, active);
+                await invalidateVideoData(displayedWatchVideo.id);
               } catch {
                 notify(t('video.actionFailed'), 'error');
               }
@@ -2525,11 +2866,11 @@ export default function VideoConnected() {
                 notify(t('video.authRequired'), 'error');
                 return;
               }
-              if (isMockVideoId(watchVideo.id)) {
+              if (isMockVideoId(displayedWatchVideo.id)) {
                 const createdAt = new Date().toISOString();
                 const comment: VideoApiComment = {
                   id: `mock-comment-${Date.now()}`,
-                  videoId: watchVideo.id,
+                  videoId: displayedWatchVideo.id,
                   userId: currentUser.id,
                   username: currentUserName,
                   avatar: currentUserAvatar,
@@ -2544,11 +2885,11 @@ export default function VideoConnected() {
                 };
                 setMockComments((previous) => [...previous, comment]);
                 setMockVideoOverrides((previous) => {
-                  const current = previous[watchVideo.id] ?? {};
-                  const baseVideo = MOCK_VIDEO_ITEMS.find((video) => video.id === watchVideo.id);
+                  const current = previous[displayedWatchVideo.id] ?? {};
+                  const baseVideo = MOCK_VIDEO_ITEMS.find((video) => video.id === displayedWatchVideo.id);
                   return {
                     ...previous,
-                    [watchVideo.id]: {
+                    [displayedWatchVideo.id]: {
                       ...current,
                       commentCount: (current.commentCount ?? baseVideo?.commentCount ?? 0) + 1,
                     },
@@ -2557,13 +2898,13 @@ export default function VideoConnected() {
                 return;
               }
               try {
-                await createVideoComment(watchVideo.id, {
+                await createVideoComment(displayedWatchVideo.id, {
                   content,
                   parentId: target?.rootId,
                   replyToUserId: target?.userId,
                 });
-                await queryClient.invalidateQueries({ queryKey: ['video', 'comments', watchVideo.id] });
-                await queryClient.invalidateQueries({ queryKey: ['video', 'detail', watchVideo.id] });
+                await queryClient.invalidateQueries({ queryKey: ['video', 'comments', displayedWatchVideo.id] });
+                await queryClient.invalidateQueries({ queryKey: ['video', 'detail', displayedWatchVideo.id] });
               } catch {
                 notify(t('video.comments.failed'), 'error');
               }
@@ -2573,7 +2914,7 @@ export default function VideoConnected() {
                 notify(t('video.authRequired'), 'error');
                 return;
               }
-              if (isMockVideoId(watchVideo.id) && comment.id.startsWith('mock-comment-')) {
+              if (isMockVideoId(displayedWatchVideo.id) && comment.id.startsWith('mock-comment-')) {
                 setMockComments((previous) => previous.map((item) => (
                   item.id === comment.id
                     ? {
@@ -2587,13 +2928,14 @@ export default function VideoConnected() {
               }
               try {
                 await updateVideoCommentLike(comment.id, active);
-                await queryClient.invalidateQueries({ queryKey: ['video', 'comments', watchVideo.id] });
+                await queryClient.invalidateQueries({ queryKey: ['video', 'comments', displayedWatchVideo.id] });
               } catch {
                 notify(t('video.actionFailed'), 'error');
               }
             }}
             onViewQualified={trackQualifiedVideoView}
             onDelete={deleteWatchedVideo}
+            onUpdate={updateWatchedVideo}
           />
         ) : (
           <div className="video-empty">

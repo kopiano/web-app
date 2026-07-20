@@ -332,6 +332,21 @@
     "deleting": "删除中",
     "deleteFailed": "视频删除失败，请重试。",
     "deleted": "视频已删除。",
+    "settings": {
+      "title": "视频设置",
+      "navigation": "视频设置导航",
+      "detail": "详情",
+      "delete": "删除",
+      "detailTitle": "视频信息",
+      "cover": "视频封面",
+      "close": "关闭视频设置",
+      "update": "更改视频信息",
+      "updating": "更新中...",
+      "updated": "视频信息已更新。",
+      "updateFailed": "视频信息更新失败，请重试。",
+      "titleRequired": "更新前请填写视频标题。",
+      "categoryRequired": "更新前请至少填写一个分类标签。"
+    },
     "nav": {
       "home": "首页",
       "library": "视频库",

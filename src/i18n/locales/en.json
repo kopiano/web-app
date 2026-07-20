@@ -332,6 +332,21 @@
     "deleting": "Deleting",
     "deleteFailed": "Unable to delete this video. Please try again.",
     "deleted": "Video deleted successfully.",
+    "settings": {
+      "title": "Video settings",
+      "navigation": "Video settings navigation",
+      "detail": "Detail",
+      "delete": "Delete",
+      "detailTitle": "Video details",
+      "cover": "Video cover",
+      "close": "Close video settings",
+      "update": "Update video",
+      "updating": "Updating...",
+      "updated": "Video details updated.",
+      "updateFailed": "Unable to update video details. Please try again.",
+      "titleRequired": "Add a title before updating.",
+      "categoryRequired": "Add at least one category tag before updating."
+    },
     "nav": {
       "home": "Home",
       "library": "Library",
