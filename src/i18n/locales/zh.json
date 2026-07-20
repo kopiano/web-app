@@ -348,6 +348,19 @@
       "search": "搜索收藏夹标题",
       "clear": "清空搜索",
       "folder": "收藏夹",
+      "createCollection": "创建收藏夹",
+      "createCollectionTitle": "创建收藏夹",
+      "createCollectionDescription": "创建一个视频收藏夹，可选择自动加入你在播放页收藏的视频。",
+      "collectionName": "收藏夹名称",
+      "collectionNamePlaceholder": "请输入收藏夹名称",
+      "collectionTitleRequired": "请输入收藏夹名称。",
+      "includeFavorites": "展示已收藏视频",
+      "includeFavoritesDescription": "加入你在视频播放页面点击收藏的视频。",
+      "cancelCollection": "取消",
+      "confirmCreateCollection": "确认创建",
+      "creatingCollection": "创建中...",
+      "collectionCreated": "收藏夹创建成功。",
+      "collectionCreateFailed": "收藏夹创建失败，请重试。",
       "videoCount_one": "{{count}} 个视频",
       "videoCount_other": "{{count}} 个视频",
       "playCount": "{{count}} 次播放",
@@ -360,7 +373,7 @@
     },
     "categories": {
       "all": "全部",
-      "label": "视频分类"
+      "label": "分类"
     },
     "player": {
       "error": "视频暂时无法播放。",
@@ -373,6 +386,8 @@
       "unmute": "取消静音",
       "volume": "音量",
       "settings": "播放器设置",
+      "singleLoopOn": "单集循环已开启",
+      "singleLoopOff": "单集循环已关闭",
       "fullscreen": "全屏"
     },
     "queue": {

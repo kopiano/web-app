@@ -26,6 +26,10 @@ import {
   ChevronRight,
   Clock3,
   Expand,
+  FolderPlus,
+  ListFilter,
+  LockKeyhole,
+  Globe2,
   Heart,
   Home,
   ImagePlus,
@@ -36,6 +40,7 @@ import {
   MoreHorizontal,
   Pause,
   Play,
+  Repeat1,
   Search,
   Send,
   Settings2,
@@ -50,11 +55,13 @@ import {
 import HlsVideo from '@/components/HlsVideo';
 import {
   createVideoComment,
+  createVideoCollection,
   deleteVideo,
   getVideo,
   getVideoCategories,
   getVideoCollections,
   getVideoComments,
+  addVideoToCollection,
   getVideos,
   updateVideo,
   updateVideoCommentLike,
@@ -711,6 +718,8 @@ function VideoWatch({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [volumeControlOpen, setVolumeControlOpen] = useState(false);
+  const [loopMenuOpen, setLoopMenuOpen] = useState(false);
+  const [singleLoop, setSingleLoop] = useState(false);
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
@@ -763,6 +772,7 @@ function VideoWatch({
     setDraft('');
     setReplyTarget(null);
     setViewIncrementVisible(false);
+    setSingleLoop(false);
   }, [video.id]);
 
   useEffect(() => {
@@ -831,6 +841,28 @@ function VideoWatch({
       media.removeEventListener('volumechange', sync);
     };
   }, [media, video.raw.duration]);
+
+  useEffect(() => {
+    if (!media) return;
+
+    const handleEnded = () => {
+      if (singleLoop) {
+        media.currentTime = 0;
+        void media.play().catch(() => setIsPlaying(false));
+        return;
+      }
+
+      const currentIndex = playlist.findIndex((item) => item.id === video.id);
+      const nextVideo = playlist
+        .slice(currentIndex >= 0 ? currentIndex + 1 : 0)
+        .find((item) => item.id !== video.id && item.status === 'ready' && Boolean(item.src));
+
+      if (nextVideo) onSelect(nextVideo);
+    };
+
+    media.addEventListener('ended', handleEnded);
+    return () => media.removeEventListener('ended', handleEnded);
+  }, [media, onSelect, playlist, singleLoop, video.id]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1016,7 +1048,29 @@ function VideoWatch({
                       style={{ '--video-volume': `${(isMuted ? 0 : volume) * 100}%` } as CSSProperties}
                     />
                   </div>
-                  <button type="button" aria-label={t('video.player.settings')}><Settings2 size={18} /></button>
+                  <div
+                    className={`video-watch-settings${loopMenuOpen ? ' is-open' : ''}`}
+                    onPointerEnter={() => setLoopMenuOpen(true)}
+                    onPointerLeave={() => setLoopMenuOpen(false)}
+                    onFocus={() => setLoopMenuOpen(true)}
+                    onBlur={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget)) setLoopMenuOpen(false);
+                    }}
+                  >
+                    <button type="button" aria-label={t('video.player.settings')}><Settings2 size={18} /></button>
+                    <div className="video-watch-loop-menu">
+                      <button
+                        type="button"
+                        className={singleLoop ? 'is-active' : ''}
+                        aria-label={singleLoop ? t('video.player.singleLoopOn') : t('video.player.singleLoopOff')}
+                        aria-pressed={singleLoop}
+                        title={singleLoop ? t('video.player.singleLoopOn') : t('video.player.singleLoopOff')}
+                        onClick={() => setSingleLoop((enabled) => !enabled)}
+                      >
+                        <Repeat1 size={18} />
+                      </button>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     aria-label={t('video.player.fullscreen')}
@@ -1297,6 +1351,13 @@ export default function VideoConnected() {
   const [uploadError, setUploadError] = useState('');
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadPublishRequested, setUploadPublishRequested] = useState(false);
+  const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
+  const [collectionTitle, setCollectionTitle] = useState('');
+  const [collectionVisibility, setCollectionVisibility] = useState<VideoVisibility>('public');
+  const [collectionCategory, setCollectionCategory] = useState('all');
+  const [collectionIncludeFavorites, setCollectionIncludeFavorites] = useState(true);
+  const [collectionBusy, setCollectionBusy] = useState(false);
+  const [collectionError, setCollectionError] = useState('');
   const [publishedProcessingVideos, setPublishedProcessingVideos] = useState<VideoApiItem[]>([]);
   const [hasVideoRecord, setHasVideoRecord] = useState(() => {
     try {
@@ -1444,9 +1505,11 @@ export default function VideoConnected() {
     ? MOCK_VIDEO_CATEGORIES
     : categoriesQuery.data ?? [];
   const playlistCategories = playlistCategoriesQuery.data ?? [];
-  const effectiveCollections = useMockData
-    ? MOCK_VIDEO_COLLECTIONS
-    : collectionsQuery.data ?? [];
+  const effectiveCollections = collectionsQuery.data && collectionsQuery.data.length > 0
+    ? collectionsQuery.data
+    : useMockData
+      ? MOCK_VIDEO_COLLECTIONS
+      : collectionsQuery.data ?? [];
   const processingVideos = useMemo(
     () => publishedProcessingVideos
       .map((pending) => (
@@ -1830,6 +1893,75 @@ export default function VideoConnected() {
     setSearchParams({});
     notify(t('video.deleted'), 'success');
   }, [invalidateVideoData, queryClient, setSearchParams, t]);
+
+  const createCollection = useCallback(async () => {
+    if (!currentUser) {
+      notify(t('video.authRequired'), 'error');
+      return;
+    }
+
+    const title = collectionTitle.trim();
+    if (!title) {
+      setCollectionError(t('video.library.collectionTitleRequired'));
+      return;
+    }
+
+    setCollectionBusy(true);
+    setCollectionError('');
+    try {
+      const collection = await createVideoCollection({
+        title,
+        visibility: collectionVisibility,
+      });
+
+      if (collectionIncludeFavorites) {
+        const favoriteVideos: VideoApiItem[] = [];
+        let cursor: Cursor = null;
+        do {
+          const page = await getVideos({
+            limit: 50,
+            scope: 'favorites',
+            ...(collectionCategory !== 'all' ? { category: collectionCategory } : {}),
+            ...(cursor
+              ? {
+                before_created_at: cursor.createdAt,
+                before_id: cursor.id,
+              }
+              : {}),
+          });
+          favoriteVideos.push(...page.items.filter((video) => video.status === 'ready'));
+          cursor = page.hasMore && page.nextBeforeCreatedAt && page.nextBeforeId
+            ? { createdAt: page.nextBeforeCreatedAt, id: page.nextBeforeId }
+            : null;
+        } while (cursor);
+
+        await Promise.all(
+          favoriteVideos.map((video, index) => addVideoToCollection(collection.id, video.id, index)),
+        );
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['video', 'collections'] });
+      await queryClient.invalidateQueries({ queryKey: ['video', 'collection'] });
+      setCollectionDialogOpen(false);
+      setCollectionTitle('');
+      setCollectionVisibility('public');
+      setCollectionCategory('all');
+      setCollectionIncludeFavorites(true);
+      notify(t('video.library.collectionCreated'), 'success');
+    } catch (error) {
+      setCollectionError(error instanceof Error ? error.message : t('video.library.collectionCreateFailed'));
+    } finally {
+      setCollectionBusy(false);
+    }
+  }, [
+    collectionCategory,
+    collectionIncludeFavorites,
+    collectionTitle,
+    collectionVisibility,
+    currentUser,
+    queryClient,
+    t,
+  ]);
 
   const toggleFavorite = useCallback(async (video: CardVideo) => {
     if (!currentUser) {
@@ -2234,20 +2366,38 @@ export default function VideoConnected() {
                 {activeView === 'home' && <p className="video-page-header-subtitle">{t('video.home.subtitle')}</p>}
               </div>
               {activeView === 'library' && (
-                <label className="video-search">
-                  <Search size={17} aria-hidden="true" />
-                  <input
-                    type="search"
-                    value={search}
-                    placeholder={t('video.library.search')}
-                    onChange={(event) => setSearch(event.target.value)}
-                  />
-                  {search && (
-                    <button type="button" className="video-search-clear" aria-label={t('video.library.clear')} onClick={() => setSearch('')}>
-                      <X size={16} strokeWidth={2.4} />
-                    </button>
-                  )}
-                </label>
+                <div className="video-library-header-actions">
+                  <label className="video-search">
+                    <Search size={17} aria-hidden="true" />
+                    <input
+                      type="search"
+                      value={search}
+                      placeholder={t('video.library.search')}
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
+                    {search && (
+                      <button type="button" className="video-search-clear" aria-label={t('video.library.clear')} onClick={() => setSearch('')}>
+                        <X size={16} strokeWidth={2.4} />
+                      </button>
+                    )}
+                  </label>
+                  <button
+                    type="button"
+                    className="video-create-collection-button"
+                    aria-label={t('video.library.createCollection')}
+                    onClick={() => {
+                      if (!currentUser) {
+                        notify(t('video.authRequired'), 'error');
+                        return;
+                      }
+                      setCollectionError('');
+                      setCollectionDialogOpen(true);
+                    }}
+                  >
+                    <FolderPlus size={18} />
+                    <span>{t('video.library.createCollection')}</span>
+                  </button>
+                </div>
               )}
             </header>
 
@@ -2497,6 +2647,131 @@ export default function VideoConnected() {
               onVisibility={setUploadVisibility}
               onPublish={() => void publishUpload()}
             />
+          )}
+
+          {collectionDialogOpen && createPortal(
+            <div className="video-collection-dialog-overlay" role="presentation">
+              <button
+                type="button"
+                className="video-collection-dialog-backdrop"
+                aria-label={t('video.library.cancelCollection')}
+                onClick={() => {
+                  if (!collectionBusy) setCollectionDialogOpen(false);
+                }}
+              />
+              <section
+                className="video-collection-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="video-collection-dialog-title"
+              >
+                <button
+                  type="button"
+                  className="video-collection-dialog-close"
+                  aria-label={t('video.library.cancelCollection')}
+                  disabled={collectionBusy}
+                  onClick={() => setCollectionDialogOpen(false)}
+                >
+                  <X size={20} />
+                </button>
+                <p className="video-collection-dialog-eyebrow">{t('video.library.folder')}</p>
+                <h2 id="video-collection-dialog-title">{t('video.library.createCollectionTitle')}</h2>
+                <p className="video-collection-dialog-description">{t('video.library.createCollectionDescription')}</p>
+
+                <label className="video-collection-field">
+                  <span>{t('video.library.collectionName')}</span>
+                  <input
+                    type="text"
+                    value={collectionTitle}
+                    maxLength={255}
+                    autoFocus
+                    placeholder={t('video.library.collectionNamePlaceholder')}
+                    disabled={collectionBusy}
+                    onChange={(event) => {
+                      setCollectionTitle(event.target.value);
+                      if (collectionError) setCollectionError('');
+                    }}
+                  />
+                </label>
+
+                <fieldset className="video-collection-options">
+                  <legend>{t('video.upload.visibility')}</legend>
+                  <div className="video-collection-visibility">
+                    {(['public', 'private'] as VideoVisibility[]).map((visibility) => (
+                      <button
+                        key={visibility}
+                        type="button"
+                        className={collectionVisibility === visibility ? 'is-active' : ''}
+                        aria-pressed={collectionVisibility === visibility}
+                        disabled={collectionBusy}
+                        onClick={() => setCollectionVisibility(visibility)}
+                      >
+                        {visibility === 'public' ? <Globe2 size={15} /> : <LockKeyhole size={15} />}
+                        {t(`video.upload.${visibility}`)}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+
+                <fieldset className="video-collection-options">
+                  <legend>{t('video.categories.label')}</legend>
+                  <label className="video-collection-category-select">
+                    <ListFilter size={16} aria-hidden="true" />
+                    <select
+                      value={collectionCategory}
+                      disabled={collectionBusy}
+                      aria-label={t('video.categories.label')}
+                      onChange={(event) => setCollectionCategory(event.target.value)}
+                    >
+                      <option value="all">{t('video.categories.all')}</option>
+                      {effectiveCategories.map((category) => (
+                        <option key={category.slug} value={category.slug}>
+                          {language.startsWith('zh') ? category.nameZh : category.nameEn}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </fieldset>
+
+                <label className="video-collection-include">
+                  <input
+                    type="checkbox"
+                    checked={collectionIncludeFavorites}
+                    disabled={collectionBusy}
+                    onChange={(event) => setCollectionIncludeFavorites(event.target.checked)}
+                  />
+                  <span>
+                    <strong>{t('video.library.includeFavorites')}</strong>
+                    <small>{t('video.library.includeFavoritesDescription')}</small>
+                  </span>
+                  <span className="video-collection-switch" aria-hidden="true">
+                    <span />
+                  </span>
+                </label>
+
+                {collectionError && <p className="video-collection-error">{collectionError}</p>}
+                <div className="video-collection-dialog-actions">
+                  <button
+                    type="button"
+                    className="video-collection-cancel"
+                    disabled={collectionBusy}
+                    onClick={() => setCollectionDialogOpen(false)}
+                  >
+                    {t('video.library.cancelCollection')}
+                  </button>
+                  <button
+                    type="button"
+                    className="video-collection-confirm"
+                    disabled={collectionBusy || !collectionTitle.trim()}
+                    onClick={() => void createCollection()}
+                  >
+                    {collectionBusy && <LoaderCircle size={17} className="is-spinning" />}
+                    {collectionBusy ? t('video.library.creatingCollection') : t('video.library.confirmCreateCollection')}
+                  </button>
+                </div>
+              </section>
+            </div>,
+            document.body,
           )}
         </>
       )}

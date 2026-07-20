@@ -348,6 +348,19 @@
       "search": "Search collection titles",
       "clear": "Clear search",
       "folder": "Favorites folder",
+      "createCollection": "Create collection",
+      "createCollectionTitle": "Create a collection",
+      "createCollectionDescription": "Create a personal video collection and optionally fill it with your saved videos.",
+      "collectionName": "Collection name",
+      "collectionNamePlaceholder": "Enter a collection name",
+      "collectionTitleRequired": "Enter a collection name.",
+      "includeFavorites": "Include saved videos",
+      "includeFavoritesDescription": "Add videos you favorited on their watch pages.",
+      "cancelCollection": "Cancel",
+      "confirmCreateCollection": "Create collection",
+      "creatingCollection": "Creating...",
+      "collectionCreated": "Collection created successfully.",
+      "collectionCreateFailed": "Unable to create the collection. Please try again.",
       "videoCount_one": "{{count}} video",
       "videoCount_other": "{{count}} videos",
       "playCount": "{{count}} plays",
@@ -360,7 +373,7 @@
     },
     "categories": {
       "all": "All",
-      "label": "Video categories"
+      "label": "Categories"
     },
     "player": {
       "error": "Unable to play this video.",
@@ -373,6 +386,8 @@
       "unmute": "Unmute",
       "volume": "Volume",
       "settings": "Player settings",
+      "singleLoopOn": "Single-track loop on",
+      "singleLoopOff": "Single-track loop off",
       "fullscreen": "Fullscreen"
     },
     "queue": {
