@@ -1333,8 +1333,17 @@ export default function VideoConnected() {
   const activeView = requestedView && VALID_VIEWS.has(requestedView) ? requestedView : 'home';
   const requestedVideoId = searchParams.get('video');
   const selectedCollectionId = searchParams.get('collection');
+  const watchFromPlaylist = activeView === 'watch' && searchParams.get('from') === 'playlist';
   const playlistPage = Math.max(1, Number(searchParams.get('page')) || 1);
-  const [activeCategory, setActiveCategory] = useState('all');
+  const urlPlaylistCategory = activeView === 'playlist'
+    ? searchParams.get('category') || 'all'
+    : 'all';
+  const [activeCategory, setActiveCategory] = useState(
+    () => searchParams.get('category') || 'all',
+  );
+  const playlistFilterCategory = watchFromPlaylist
+    ? searchParams.get('category') || activeCategory
+    : activeCategory;
   const [search, setSearch] = useState('');
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const collectionLoadMoreRef = useRef<HTMLDivElement>(null);
@@ -1407,12 +1416,12 @@ export default function VideoConnected() {
     getNextPageParam: nextCursor,
   });
   const playlistQuery = useInfiniteQuery({
-    queryKey: ['video', 'playlist', activeCategory, currentUser?.id ?? 'public'],
+    queryKey: ['video', 'playlist', playlistFilterCategory, currentUser?.id ?? 'public'],
     initialPageParam: null as Cursor,
     queryFn: ({ pageParam }) => pageQuery(pageParam, {
       limit: 8,
       scope: currentUser ? 'accessible' : 'public',
-      ...(activeCategory !== 'all' ? { category: activeCategory } : {}),
+      ...(playlistFilterCategory !== 'all' ? { category: playlistFilterCategory } : {}),
     }),
     getNextPageParam: nextCursor,
     refetchInterval: (query) => (
@@ -1422,7 +1431,7 @@ export default function VideoConnected() {
         ? 1200
         : false
     ),
-    enabled: activeView === 'playlist',
+    enabled: activeView === 'playlist' || watchFromPlaylist,
   });
   const collectionVideosQuery = useInfiniteQuery({
     queryKey: ['video', 'collection', selectedCollectionId, activeCategory],
@@ -1528,10 +1537,10 @@ export default function VideoConnected() {
   );
   const mockPlaylistItems = useMemo(
     () => effectiveMockItems.filter((video) => (
-      activeCategory === 'all'
-      || video.categories.some((category) => category.slug === activeCategory)
+      playlistFilterCategory === 'all'
+      || video.categories.some((category) => category.slug === playlistFilterCategory)
     )),
-    [activeCategory, effectiveMockItems],
+    [effectiveMockItems, playlistFilterCategory],
   );
   const mockPlaylistPageCount = Math.max(1, Math.ceil(mockPlaylistItems.length / 8));
   const playlistVideos = useMemo(() => {
@@ -1564,6 +1573,27 @@ export default function VideoConnected() {
     playlistQuery.data,
     processingVideos,
     useMockData,
+  ]);
+  const watchPlaylist = useMemo(() => {
+    if (!watchFromPlaylist) return homeVideos;
+    const items = useMockData
+      ? mockPlaylistItems
+      : playlistQuery.data?.pages.flatMap((page) => page.items) ?? [];
+    const cards = items
+      .filter((video) => video.status === 'ready')
+      .map((video) => toCardVideo(video, language));
+    if (cards.length > 0) return cards;
+    return playlistFilterCategory === 'all'
+      ? homeVideos
+      : homeVideos.filter((video) => video.categorySlug === playlistFilterCategory);
+  }, [
+    homeVideos,
+    language,
+    mockPlaylistItems,
+    playlistFilterCategory,
+    playlistQuery.data,
+    useMockData,
+    watchFromPlaylist,
   ]);
   const collectionVideos = useMemo(() => {
     const mockIds = selectedCollectionId
@@ -1649,6 +1679,11 @@ export default function VideoConnected() {
   ]);
 
   useEffect(() => {
+    if (activeView !== 'playlist' || activeCategory === urlPlaylistCategory) return;
+    setActiveCategory(urlPlaylistCategory);
+  }, [activeCategory, activeView, urlPlaylistCategory]);
+
+  useEffect(() => {
     if (
       activeView === 'playlist'
       && activeCategory !== 'all'
@@ -1656,8 +1691,18 @@ export default function VideoConnected() {
       && !playlistCategoriesQuery.data.some((category) => category.slug === activeCategory)
     ) {
       setActiveCategory('all');
+      const next = new URLSearchParams(searchParams);
+      next.delete('category');
+      next.delete('page');
+      setSearchParams(next);
     }
-  }, [activeCategory, activeView, playlistCategoriesQuery.data]);
+  }, [
+    activeCategory,
+    activeView,
+    playlistCategoriesQuery.data,
+    searchParams,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     try {
@@ -1785,9 +1830,14 @@ export default function VideoConnected() {
   };
 
   const openVideo = useCallback((video: CardVideo) => {
-    setSearchParams({ view: 'watch', video: video.id });
+    const nextParams: Record<string, string> = { view: 'watch', video: video.id };
+    if (activeView === 'playlist') {
+      nextParams.from = 'playlist';
+      if (activeCategory !== 'all') nextParams.category = activeCategory;
+    }
+    setSearchParams(nextParams);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [setSearchParams]);
+  }, [activeCategory, activeView, setSearchParams]);
 
   const updateMockReaction = useCallback((
     videoId: string,
@@ -2248,7 +2298,7 @@ export default function VideoConnected() {
         watchVideo ? (
           <VideoWatch
             video={watchVideo}
-            playlist={homeVideos}
+            playlist={watchPlaylist}
             comments={watchComments}
             currentUserAvatar={currentUserAvatar}
             onBack={() => navigateTo('home')}
@@ -2418,6 +2468,9 @@ export default function VideoConnected() {
                   onChange={(category) => {
                     setActiveCategory(category);
                     const next = new URLSearchParams(searchParams);
+                    next.set('view', 'playlist');
+                    if (category === 'all') next.delete('category');
+                    else next.set('category', category);
                     next.delete('page');
                     setSearchParams(next);
                   }}
