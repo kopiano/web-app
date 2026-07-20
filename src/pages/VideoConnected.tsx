@@ -2488,7 +2488,7 @@ export default function VideoConnected() {
 
   const deleteWatchedVideo = useCallback(async (videoId: string) => {
     if (isMockVideoId(videoId)) {
-      setSearchParams({});
+      returnFromWatch();
       return;
     }
 
@@ -2496,9 +2496,9 @@ export default function VideoConnected() {
     queryClient.removeQueries({ queryKey: ['video', 'detail', videoId] });
     queryClient.removeQueries({ queryKey: ['video', 'comments', videoId] });
     await invalidateVideoData();
-    setSearchParams({});
+    returnFromWatch();
     notify(t('video.deleted'), 'success');
-  }, [invalidateVideoData, queryClient, setSearchParams, t]);
+  }, [invalidateVideoData, queryClient, returnFromWatch, t]);
 
   const updateWatchedVideo = useCallback(async (videoId: string, input: {
     title: string;
