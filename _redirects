@@ -1,0 +1,7 @@
+# Keep SPA navigation working while allowing missing static assets to return
+# the top-level 404.html instead of index.html.
+/chat / 200
+/music / 200
+/video / 200
+/oauth/success / 200
+/subscription/success / 200
