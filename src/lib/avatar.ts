@@ -1,5 +1,7 @@
 import systemNotificationAvatar from '@/assets/images/z-logo.png';
 
+const DEFAULT_API_URL = 'http://localhost:8100/api/';
+
 const SYSTEM_NOTIFICATION_NAMES = new Set([
   'system notifications',
   '系统通知',
@@ -13,8 +15,7 @@ export function resolveAvatarUrl(avatar?: string | null): string {
   if (!avatar) return '';
   if (/^(?:data:|blob:|https?:)/i.test(avatar)) return avatar;
 
-  const apiUrl = import.meta.env.VITE_API_URL;
-  if (!apiUrl) return avatar;
+  const apiUrl = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 
   try {
     return new URL(avatar, new URL(apiUrl).origin).toString();
@@ -53,8 +54,7 @@ export function resolveAssetUrl(asset?: string | null): string {
   if (!asset) return '';
   if (/^(?:data:|blob:|https?:)/i.test(asset)) return asset;
 
-  const apiUrl = import.meta.env.VITE_API_URL;
-  if (!apiUrl) return asset;
+  const apiUrl = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 
   try {
     return new URL(asset, new URL(apiUrl).origin).toString();

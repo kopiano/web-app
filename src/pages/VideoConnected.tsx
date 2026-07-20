@@ -192,6 +192,22 @@ function formatPlaybackTime(value: number) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+function VideoLoadingSpinner({
+  label,
+  compact = false,
+}: {
+  label: string;
+  compact?: boolean;
+}) {
+  return (
+    <span
+      className={`video-list-loading-spinner${compact ? ' is-compact' : ''}`}
+      role="status"
+      aria-label={label}
+    />
+  );
+}
+
 function formatVideoCommentTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -370,11 +386,13 @@ const VideoCard = memo(function VideoCard({
   video,
   onPlay,
   onFavorite,
+  onViewQualified,
   variant = 'playlist',
 }: {
   video: CardVideo;
   onPlay: (video: CardVideo) => void;
   onFavorite: (video: CardVideo) => void;
+  onViewQualified?: (videoId: string) => Promise<boolean>;
   variant?: 'playlist' | 'default';
 }) {
   const isProcessing = video.status === 'uploading' || video.status === 'processing';
@@ -399,6 +417,11 @@ const VideoCard = memo(function VideoCard({
               active
               autoPlay
               controls={false}
+              onViewQualified={onViewQualified
+                ? () => {
+                  void onViewQualified(video.id);
+                }
+                : undefined}
             />
           </span>
         )}
@@ -3007,7 +3030,7 @@ export default function VideoConnected() {
           <div className="video-empty">
             {watchQuery.isError || (isMockVideoId(requestedVideoId) && !mockWatchItem)
               ? t('video.loadFailed')
-              : t('video.loading')}
+              : <VideoLoadingSpinner label={t('video.loading')} />}
           </div>
         )
       )}
@@ -3157,6 +3180,9 @@ export default function VideoConnected() {
                             active={isFeaturedPreviewActive}
                             autoPlay={isFeaturedPreviewActive}
                             controls={false}
+                            onViewQualified={() => {
+                              void trackQualifiedVideoView(featured.id);
+                            }}
                           />
                         </span>
                       )}
@@ -3192,17 +3218,24 @@ export default function VideoConnected() {
                           video={video}
                           onPlay={openVideo}
                           onFavorite={toggleFavorite}
+                          onViewQualified={trackQualifiedVideoView}
                         />
                       ))}
                     </div>
                   ) : (
                     <div className="video-empty">
-                      {homeQuery.isError ? t('video.loadFailed') : homeQuery.isLoading ? t('video.loading') : t('video.empty')}
+                      {homeQuery.isError
+                        ? t('video.loadFailed')
+                        : homeQuery.isLoading
+                          ? <VideoLoadingSpinner label={t('video.loading')} />
+                          : t('video.empty')}
                     </div>
                   )}
                   <div ref={loadMoreRef} className="video-load-more-sentinel" aria-hidden="true" />
                   {!useMockData && homeQuery.isFetchingNextPage && (
-                    <div className="video-empty">{t('video.loadingMore')}</div>
+                    <div className="video-empty">
+                      <VideoLoadingSpinner label={t('video.loadingMore')} compact />
+                    </div>
                   )}
                 </section>
               </>
@@ -3250,7 +3283,9 @@ export default function VideoConnected() {
                   </div>
                 ) : (
                   <div className="video-empty">
-                    {collectionsQuery.isLoading ? t('video.loading') : t('video.library.empty')}
+                    {collectionsQuery.isLoading
+                      ? <VideoLoadingSpinner label={t('video.loading')} />
+                      : t('video.library.empty')}
                   </div>
                 )}
               </section>
@@ -3288,12 +3323,16 @@ export default function VideoConnected() {
                     </div>
                     <div ref={collectionLoadMoreRef} className="video-load-more-sentinel" aria-hidden="true" />
                     {!useMockData && collectionVideosQuery.isFetchingNextPage && (
-                      <div className="video-empty">{t('video.loadingMore')}</div>
+                      <div className="video-empty">
+                        <VideoLoadingSpinner label={t('video.loadingMore')} compact />
+                      </div>
                     )}
                   </>
                 ) : (
                   <div className="video-empty">
-                    {collectionVideosQuery.isLoading ? t('video.loading') : t('video.empty')}
+                    {collectionVideosQuery.isLoading
+                      ? <VideoLoadingSpinner label={t('video.loading')} />
+                      : t('video.empty')}
                   </div>
                 )}
               </section>
@@ -3316,7 +3355,9 @@ export default function VideoConnected() {
                   </div>
                 ) : (
                   <div className="video-empty">
-                    {playlistQuery.isLoading ? t('video.loading') : t('video.empty')}
+                    {playlistQuery.isLoading
+                      ? <VideoLoadingSpinner label={t('video.loading')} />
+                      : t('video.empty')}
                   </div>
                 )}
                 {currentUser && (
