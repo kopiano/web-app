@@ -154,7 +154,6 @@ type ApiRequestError = {
 const VALID_VIEWS = new Set<VideoView>(['home', 'library', 'favorites', 'playlist', 'watch']);
 const UPLOAD_DRAFT_KEY = 'lume-video-upload-draft-v2';
 const VIDEO_RECORD_EXISTS_KEY = 'lume-video-record-exists-v1';
-const VIDEO_VIEW_TTL_MS = 24 * 60 * 60 * 1000;
 const COMMENT_EMOJIS = [
   '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣',
   '😊', '😇', '🙂', '😉', '😍', '😘', '😋', '😎',
@@ -770,7 +769,6 @@ function VideoWatch({
   const { t } = useTranslation();
   const stageRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const viewedRef = useRef(false);
   const [media, setMedia] = useState<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -831,7 +829,6 @@ function VideoWatch({
   }, []);
 
   useEffect(() => {
-    viewedRef.current = false;
     setDraft('');
     setReplyTarget(null);
     setViewIncrementVisible(false);
@@ -1041,8 +1038,6 @@ function VideoWatch({
                 onVideoElement={setMedia}
                 errorLabel={t('video.player.error')}
                 onViewQualified={() => {
-                  if (viewedRef.current) return;
-                  viewedRef.current = true;
                   void onViewQualified(video.id).then((counted) => {
                     if (!counted) return;
                     setViewIncrementVisible(true);
@@ -2100,18 +2095,6 @@ export default function VideoConnected() {
   }, [queryClient]);
 
   const trackQualifiedVideoView = useCallback(async (videoId: string) => {
-    const viewerKey = currentUser?.id ?? 'guest';
-    const storageKey = `lume-video-viewed:${viewerKey}:${videoId}`;
-    const now = Date.now();
-    try {
-      const viewedAt = Number(window.localStorage.getItem(storageKey));
-      if (Number.isFinite(viewedAt) && viewedAt > 0 && now - viewedAt < VIDEO_VIEW_TTL_MS) {
-        return false;
-      }
-    } catch {
-      // View deduplication still works server-side when storage is unavailable.
-    }
-
     if (isMockVideoId(videoId)) {
       const baseVideo = MOCK_VIDEO_ITEMS.find((item) => item.id === videoId);
       if (!baseVideo) return false;
@@ -2126,27 +2109,17 @@ export default function VideoConnected() {
           },
         };
       });
-      try {
-        window.localStorage.setItem(storageKey, String(now));
-      } catch {
-        // Storage is optional for mock data too.
-      }
       return true;
     }
 
     try {
       const result = await viewVideo(videoId);
       updateCachedVideoViewCount(videoId, result.viewCount);
-      try {
-        window.localStorage.setItem(storageKey, String(now));
-      } catch {
-        // The API remains the source of truth if the browser blocks storage.
-      }
       return result.counted;
     } catch {
       return false;
     }
-  }, [currentUser?.id, updateCachedVideoViewCount]);
+  }, [updateCachedVideoViewCount]);
 
   const invalidateVideoData = useCallback(async (videoId?: string) => {
     await Promise.all([
