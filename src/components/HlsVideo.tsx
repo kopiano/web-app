@@ -10,6 +10,7 @@ import {
 } from '@/store/videoPlaybackSlice';
 
 const VIDEO_AUDIO_STORAGE_KEY = 'lume-video-audio-v1';
+const VIDEO_VIEW_QUALIFICATION_MS = 3_000;
 
 interface NavigatorWithUserAgentData extends Navigator {
   userAgentData?: {
@@ -169,7 +170,7 @@ export default function HlsVideo({
     );
     const qualifyView = () => {
       if (qualified) return;
-      if (playedDuration() < 5_000) return;
+      if (playedDuration() < VIDEO_VIEW_QUALIFICATION_MS) return;
 
       qualified = true;
       clearQualificationTimer();
@@ -181,7 +182,7 @@ export default function HlsVideo({
       clearQualificationTimer();
       qualificationTimer = window.setTimeout(
         qualifyView,
-        Math.max(0, 5_000 - playedMilliseconds),
+        Math.max(0, VIDEO_VIEW_QUALIFICATION_MS - playedMilliseconds),
       );
     };
     const stopPlaybackTimer = () => {
