@@ -328,7 +328,7 @@ export default function HlsVideo({
       };
       video.addEventListener('loadedmetadata', handleHlsLoadedMetadata);
       hls = new Hls({
-        // autoStartLoad: true,
+        autoStartLoad: true,
         enableWorker: true,
         lowLatencyMode: false,
         startFragPrefetch: false,

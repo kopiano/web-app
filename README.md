@@ -481,9 +481,12 @@ subscription_end_at   TIMESTAMPTZ,
 减少重渲染，hls生命周期一定要destroy()
 网络不好要重连，监听error，恢复recoverMediaError()，否则播放器直接黑屏
 视频不要提前加载，应该preload="metadata"，而不是auto，播放器配置：preload="metadata"、playsInline、muted 自动播放静音
-视频封面FFmpeg：第2秒截图，第一帧容易黑屏
+视频封面FFmpeg：第2秒截图，第一帧容易黑屏，还是要智能选帧去黑屏等
 页面切后台自动暂停，回来继续播放
 移动端适配需要playsInline，否则直接全屏体验差
 React Query管理分页、缓存和预取，Redux Toolkit（仅管理全局播放状态）
 性能：离开可视区域立即暂停并销毁 HLS 实例，避免多个视频同时缓冲
+采用分块流式写入,最大支持6GB，视频封面最大支持10MB
 
+封面黑屏问题：
+ffmpeg智能选帧而不是选2s的，因为有的可能还是黑屏，要过滤黑屏（blackdetect 或平均亮度）

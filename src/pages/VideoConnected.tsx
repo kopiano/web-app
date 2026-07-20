@@ -31,6 +31,7 @@ import {
   ImagePlus,
   Library,
   ListVideo,
+  LoaderCircle,
   MessageCircle,
   MoreHorizontal,
   Pause,
@@ -310,21 +311,16 @@ const VideoCard = memo(function VideoCard({
   video,
   onPlay,
   onFavorite,
-  onPrefetch,
   variant = 'playlist',
 }: {
   video: CardVideo;
   onPlay: (video: CardVideo) => void;
   onFavorite: (video: CardVideo) => void;
-  onPrefetch: (videoId: string) => void;
   variant?: 'playlist' | 'default';
 }) {
+  const isProcessing = video.status === 'uploading' || video.status === 'processing';
   return (
-    <article
-      className={`video-tile is-${variant}`}
-      onMouseEnter={() => onPrefetch(video.id)}
-      onFocus={() => onPrefetch(video.id)}
-    >
+    <article className={`video-tile is-${variant}${isProcessing ? ' is-processing' : ''}${video.status === 'failed' ? ' is-failed' : ''}`}>
       <button type="button" className="video-tile-hit" onClick={() => onPlay(video)}>
         <img src={video.poster} alt="" {...lazyImageProps()} />
         <span className="video-quality">{video.resolution}</span>
@@ -335,9 +331,20 @@ const VideoCard = memo(function VideoCard({
             {video.duration}
           </span>
         )}
-        <span className="video-tile-play" aria-hidden="true">
-          <Play size={20} fill="currentColor" />
-        </span>
+        {isProcessing ? (
+          <span
+            className="video-tile-processing"
+            role="status"
+            aria-label={`Processing ${video.processingProgress}%`}
+          >
+            <LoaderCircle size={20} aria-hidden="true" />
+            <strong>{video.processingProgress}%</strong>
+          </span>
+        ) : (
+          <span className="video-tile-play" aria-hidden="true">
+            <Play size={20} fill="currentColor" />
+          </span>
+        )}
         <span className="video-tile-details">
           {variant !== 'playlist' && (
             <img src={video.avatar} alt="" className="video-avatar" {...lazyImageProps()} />
@@ -361,6 +368,11 @@ const VideoCard = memo(function VideoCard({
             </span>
           </span>
         </span>
+        {isProcessing && (
+          <span className="video-tile-processing-progress" aria-hidden="true">
+            <i style={{ width: `${Math.max(0, Math.min(100, video.processingProgress))}%` }} />
+          </span>
+        )}
       </button>
       {variant !== 'playlist' && (
         <button
@@ -424,6 +436,8 @@ function UploadDialog({
   onPublish: () => void;
 }) {
   const { t } = useTranslation();
+  const [isDraggingVideo, setIsDraggingVideo] = useState(false);
+  const isTransferring = step === 'publish' && progress < 100;
   return createPortal(
     <div className="video-upload-overlay" role="presentation">
       <button
@@ -433,7 +447,16 @@ function UploadDialog({
         disabled={busy}
         onClick={onClose}
       />
-      <section className={`video-upload-dialog is-${step}`} role="dialog" aria-modal="true">
+      <section
+        className={[
+          'video-upload-dialog',
+          `is-${step}`,
+          isTransferring ? 'is-transferring' : '',
+          publishRequested ? 'is-processing' : '',
+        ].filter(Boolean).join(' ')}
+        role="dialog"
+        aria-modal="true"
+      >
         <button
           type="button"
           className="video-upload-close"
@@ -460,6 +483,11 @@ function UploadDialog({
             <span className="video-upload-progress-track" aria-hidden="true">
               <i style={{ width: `${progress < 100 ? progress : processingProgress}%` }} />
             </span>
+            {progress === 100 && processingProgress >= 100 && (
+              <p className="video-upload-processing-complete">
+                {t('video.upload.processingComplete')}
+              </p>
+            )}
           </div>
         )}
         {step === 'upload' ? (
@@ -475,7 +503,30 @@ function UploadDialog({
               accept="video/*"
               onChange={(event) => onVideo(event.target.files?.[0] ?? null)}
             />
-            <button type="button" className="video-upload-dropzone" onClick={() => videoInputRef.current?.click()}>
+            <button
+              type="button"
+              className={`video-upload-dropzone${isDraggingVideo ? ' is-dragging' : ''}`}
+              onClick={() => videoInputRef.current?.click()}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                setIsDraggingVideo(true);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'copy';
+                setIsDraggingVideo(true);
+              }}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                  setIsDraggingVideo(false);
+                }
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setIsDraggingVideo(false);
+                onVideo(event.dataTransfer.files?.[0] ?? null);
+              }}
+            >
               <Upload size={22} />
               <span>
                 <strong>{videoName || t('video.upload.selectVideo')}</strong>
@@ -542,7 +593,12 @@ function UploadDialog({
                 }}
               >
                 {coverUrl ? (
-                  <img src={coverUrl} alt={t('video.upload.selectedCover')} />
+                  <>
+                    <img src={coverUrl} alt={t('video.upload.selectedCover')} />
+                    <span className="video-upload-cover-shade" aria-hidden="true">
+                      <ImagePlus size={20} />
+                    </span>
+                  </>
                 ) : (
                   <span className="video-upload-cover-empty">
                     <ImagePlus size={28} aria-hidden="true" />
@@ -1142,6 +1198,7 @@ export default function VideoConnected() {
   const [uploadError, setUploadError] = useState('');
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadPublishRequested, setUploadPublishRequested] = useState(false);
+  const [publishedProcessingVideos, setPublishedProcessingVideos] = useState<VideoApiItem[]>([]);
   const [hasVideoRecord, setHasVideoRecord] = useState(() => {
     try {
       return window.localStorage.getItem(VIDEO_RECORD_EXISTS_KEY) === '1';
@@ -1195,6 +1252,13 @@ export default function VideoConnected() {
       ...(activeCategory !== 'all' ? { category: activeCategory } : {}),
     }),
     getNextPageParam: nextCursor,
+    refetchInterval: (query) => (
+      query.state.data?.pages
+        .flatMap((page) => page.items)
+        .some((video) => video.status === 'uploading' || video.status === 'processing')
+        ? 1200
+        : false
+    ),
     enabled: activeView === 'playlist',
   });
   const collectionVideosQuery = useInfiniteQuery({
@@ -1236,6 +1300,19 @@ export default function VideoConnected() {
         : false
     ),
   });
+  const publishedProcessingQuery = useQuery({
+    queryKey: ['video', 'published-processing', publishedProcessingVideos.map((video) => video.id)],
+    queryFn: () => getVideos({ limit: 50, scope: 'accessible' }),
+    enabled: publishedProcessingVideos.length > 0,
+    refetchInterval: (query) => (
+      query.state.data?.items.some((video) => (
+        publishedProcessingVideos.some((pending) => pending.id === video.id)
+        && (video.status === 'uploading' || video.status === 'processing')
+      ))
+        ? 1200
+        : false
+    ),
+  });
 
   const homeSourceItems = useMemo(
     () => homeQuery.data?.pages.flatMap((page) => page.items) ?? [],
@@ -1263,6 +1340,14 @@ export default function VideoConnected() {
   const effectiveCollections = useMockData
     ? MOCK_VIDEO_COLLECTIONS
     : collectionsQuery.data ?? [];
+  const processingVideos = useMemo(
+    () => publishedProcessingVideos
+      .map((pending) => (
+        publishedProcessingQuery.data?.items.find((video) => video.id === pending.id) ?? pending
+      ))
+      .filter((video) => video.status === 'uploading' || video.status === 'processing'),
+    [publishedProcessingQuery.data, publishedProcessingVideos],
+  );
   const homeVideos = useMemo(
     () => (useMockData ? effectiveMockItems : realHomeItems)
       .map((video) => toCardVideo(video, language)),
@@ -1280,14 +1365,31 @@ export default function VideoConnected() {
     const items = useMockData
       ? mockPlaylistItems.slice((playlistPage - 1) * 8, playlistPage * 8)
       : playlistQuery.data?.pages[playlistPage - 1]?.items ?? [];
-    return items
-      .filter((video) => video.status === 'ready')
+    const cards = items
+      .filter((video) => (
+        video.status === 'ready'
+        || (
+          video.owned
+          && (video.status === 'uploading' || video.status === 'processing')
+        )
+      ))
       .map((video) => toCardVideo(video, language));
+    const processingCards = processingVideos
+      .filter((video) => (
+        activeCategory === 'all'
+        || video.categories.some((category) => category.slug === activeCategory)
+      ))
+      .map((video) => toCardVideo(video, language));
+    return [...processingCards, ...cards]
+      .filter((video, index, all) => all.findIndex((item) => item.id === video.id) === index)
+      .slice(0, 8);
   }, [
+    activeCategory,
     language,
     mockPlaylistItems,
     playlistPage,
     playlistQuery.data,
+    processingVideos,
     useMockData,
   ]);
   const collectionVideos = useMemo(() => {
@@ -1491,15 +1593,6 @@ export default function VideoConnected() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [setSearchParams]);
 
-  const prefetchVideo = useCallback((videoId: string) => {
-    if (isMockVideoId(videoId)) return;
-    void queryClient.prefetchQuery({
-      queryKey: ['video', 'detail', videoId],
-      queryFn: () => getVideo(videoId),
-      staleTime: 60_000,
-    });
-  }, [queryClient]);
-
   const updateMockReaction = useCallback((
     videoId: string,
     kind: 'like' | 'favorite',
@@ -1682,14 +1775,32 @@ export default function VideoConnected() {
     metadataVideo.onerror = () => URL.revokeObjectURL(objectUrl);
     metadataVideo.src = objectUrl;
     try {
-      const uploaded = await uploadVideo(file, setUploadProgress, controller.signal);
+      const uploaded = await uploadVideo(
+        file,
+        setUploadProgress,
+        controller.signal,
+        (draftVideo) => {
+          if (session !== uploadSessionRef.current) {
+            void deleteVideo(draftVideo.id);
+            return;
+          }
+          setUploadVideoId(draftVideo.id);
+          setHasVideoRecord(true);
+          try {
+            window.localStorage.setItem(VIDEO_RECORD_EXISTS_KEY, '1');
+          } catch {
+            // The current session still suppresses mock content when storage is unavailable.
+          }
+          queryClient.setQueryData(['video', 'detail', draftVideo.id], draftVideo);
+        },
+      );
       if (session !== uploadSessionRef.current) {
         void deleteVideo(uploaded.id);
         return;
       }
       setUploadVideoId(uploaded.id);
       setUploadProgress(100);
-      setUploadDuration(formatDuration(uploaded.duration));
+      if (uploaded.duration > 0) setUploadDuration(formatDuration(uploaded.duration));
       setHasVideoRecord(true);
       try {
         window.localStorage.setItem(VIDEO_RECORD_EXISTS_KEY, '1');
@@ -1789,6 +1900,13 @@ export default function VideoConnected() {
       uploadPublishRequestedRef.current = true;
       setUploadPublishRequested(true);
       queryClient.setQueryData(['video', 'detail', uploadVideoId], updated);
+      if (updated.status !== 'ready') {
+        setPublishedProcessingVideos((current) => [
+          updated,
+          ...current.filter((video) => video.id !== updated.id),
+        ]);
+        void invalidateVideoData(uploadVideoId);
+      }
       if (updated.status === 'ready') {
         await invalidateVideoData(uploadVideoId);
         if (session !== uploadSessionRef.current) return;
@@ -1842,6 +1960,19 @@ export default function VideoConnected() {
     uploadVideoId,
   ]);
 
+  useEffect(() => {
+    const completedIds = publishedProcessingQuery.data?.items
+      .filter((video) => (
+        publishedProcessingVideos.some((pending) => pending.id === video.id)
+        && video.status === 'ready'
+      ))
+      .map((video) => video.id)
+      ?? [];
+    if (completedIds.length === 0) return;
+    setPublishedProcessingVideos((current) => current.filter((video) => !completedIds.includes(video.id)));
+    void Promise.all(completedIds.map((videoId) => invalidateVideoData(videoId)));
+  }, [invalidateVideoData, publishedProcessingQuery.data, publishedProcessingVideos]);
+
   const openUpload = () => {
     if (!currentUser) {
       notify(t('video.authRequired'), 'error');
@@ -1851,7 +1982,7 @@ export default function VideoConnected() {
     setUploadOpen(true);
   };
 
-  const featured = homeVideos[0] ?? null;
+  const featured = homeVideos.find((video) => video.status === 'ready') ?? null;
   const currentUserName = currentUser?.name || currentUser?.username || t('video.user');
   const currentUserAvatar = resolveAvatarUrl(currentUser?.avatar)
     || defaultAvatarDataUrl(currentUserName);
@@ -2068,7 +2199,6 @@ export default function VideoConnected() {
                           video={video}
                           onPlay={openVideo}
                           onFavorite={toggleFavorite}
-                          onPrefetch={prefetchVideo}
                         />
                       ))}
                     </div>
@@ -2149,7 +2279,6 @@ export default function VideoConnected() {
                         video={video}
                         onPlay={openVideo}
                         onFavorite={toggleFavorite}
-                        onPrefetch={prefetchVideo}
                       />
                     ))}
                   </div>
@@ -2171,7 +2300,6 @@ export default function VideoConnected() {
                         video={video}
                         onPlay={openVideo}
                         onFavorite={toggleFavorite}
-                        onPrefetch={prefetchVideo}
                       />
                     ))}
                   </div>

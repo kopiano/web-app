@@ -85,6 +85,7 @@ export function uploadVideo(
   file: File,
   onUploadProgress?: (percent: number) => void,
   signal?: AbortSignal,
+  onUploadCreated?: (video: VideoApiItem) => void,
 ): Promise<VideoApiItem>;
 export function updateVideo(id: string, input: {
   title?: string;

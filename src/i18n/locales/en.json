@@ -331,7 +331,7 @@
       "playlist": "Playlist"
     },
     "home": {
-      "title": "Browse the entire Lume library",
+      "title": "Browse the entire library",
       "subtitle": "Everything published on Lume. Hover any card — the whole page floats.",
       "featured": "Featured film",
       "today": "Today's Picks"
@@ -396,6 +396,7 @@
       "formats": "MP4, WebM, MOV and other video formats",
       "uploading": "Uploading video",
       "processing": "Processing video {{progress}}%",
+      "processingComplete": "Video processing is complete. Click upload to continue.",
       "video": "Video",
       "duration": "Duration",
       "visibility": "Visibility",

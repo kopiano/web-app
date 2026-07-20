@@ -1,6 +1,9 @@
 import request from './request'
 import { resolveAssetUrl } from '@/lib/avatar'
 
+const MAX_VIDEO_UPLOAD_BYTES = 6 * 1024 * 1024 * 1024
+const VIDEO_UPLOAD_RESUME_KEY = 'lume-video-upload-resume-v1'
+
 function normalizeCategory(category) {
   return {
     id: String(category.id),
@@ -113,18 +116,150 @@ export function getVideoCollections({ mine = false } = {}) {
   })
 }
 
-export function uploadVideo(file, onUploadProgress, signal) {
-  const formData = new FormData()
-  formData.append('video', file, file.name)
-  return request.post('/video/upload', formData, {
-    timeout: 0,
-    signal,
-    onUploadProgress: event => {
-      if (!onUploadProgress) return
-      const total = event.total || file.size || event.loaded
-      onUploadProgress(Math.min(100, Math.round((event.loaded / total) * 100)))
-    },
-  }).then(response => normalizeVideo(response.data))
+function uploadFingerprint(file) {
+  return `${file.name}:${file.size}:${file.lastModified}:${file.type}`
+}
+
+function readUploadResume(file) {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(VIDEO_UPLOAD_RESUME_KEY) || '')
+    if (
+      saved
+      && saved.fingerprint === uploadFingerprint(file)
+      && typeof saved.uploadId === 'string'
+      && typeof saved.videoId === 'string'
+    ) {
+      return saved
+    }
+  } catch {
+    // A corrupt resume value simply starts a fresh upload.
+  }
+  return null
+}
+
+function writeUploadResume(file, session) {
+  try {
+    window.localStorage.setItem(VIDEO_UPLOAD_RESUME_KEY, JSON.stringify({
+      fingerprint: uploadFingerprint(file),
+      uploadId: session.uploadId,
+      videoId: session.video.id,
+    }))
+  } catch {
+    // Resuming remains available for the current page when storage is unavailable.
+  }
+}
+
+function clearUploadResume(file) {
+  try {
+    const saved = readUploadResume(file)
+    if (saved) window.localStorage.removeItem(VIDEO_UPLOAD_RESUME_KEY)
+  } catch {
+    // Nothing to clear when storage is unavailable.
+  }
+}
+
+function normalizeUploadSession(session) {
+  return {
+    uploadId: String(session.upload_id),
+    video: normalizeVideo(session.video),
+    chunkSize: Number(session.chunk_size) || 8 * 1024 * 1024,
+    uploadedBytes: Number(session.uploaded_bytes) || 0,
+    totalBytes: Number(session.total_bytes) || 0,
+    complete: Boolean(session.complete),
+  }
+}
+
+function isAbortError(error, signal) {
+  return Boolean(signal?.aborted)
+    || error?.name === 'AbortError'
+    || error?.code === 'ERR_CANCELED'
+}
+
+export async function uploadVideo(file, onUploadProgress, signal, onUploadCreated) {
+  if (file.size <= 0 || file.size > MAX_VIDEO_UPLOAD_BYTES) {
+    throw new Error('Video files must be between 1 byte and 6 GB.')
+  }
+
+  let session = null
+  const saved = readUploadResume(file)
+  if (saved) {
+    try {
+      const response = await request.get(`/video/uploads/${encodeURIComponent(saved.uploadId)}`, { signal })
+      const candidate = normalizeUploadSession(response.data)
+      if (candidate.totalBytes === file.size && candidate.video.id === saved.videoId) {
+        session = candidate
+      } else {
+        clearUploadResume(file)
+      }
+    } catch (error) {
+      if (isAbortError(error, signal)) throw error
+      clearUploadResume(file)
+    }
+  }
+  if (!session) {
+    const response = await request.post('/video/uploads', {
+      file_name: file.name,
+      content_type: file.type || null,
+      total_bytes: file.size,
+    }, { signal })
+    session = normalizeUploadSession(response.data)
+  }
+
+  writeUploadResume(file, session)
+  onUploadCreated?.(session.video)
+  let uploadedBytes = session.uploadedBytes
+  onUploadProgress?.(Math.min(100, Math.round((uploadedBytes / file.size) * 100)))
+
+  while (uploadedBytes < file.size) {
+    if (signal?.aborted) throw new DOMException('Upload aborted', 'AbortError')
+    const nextOffset = Math.min(file.size, uploadedBytes + session.chunkSize)
+    const chunk = file.slice(uploadedBytes, nextOffset)
+    let retries = 0
+
+    while (true) {
+      try {
+        const response = await request.put(
+          `/video/uploads/${encodeURIComponent(session.uploadId)}/chunk`,
+          chunk,
+          {
+            timeout: 0,
+            signal,
+            headers: {
+              'Content-Type': 'application/offset+octet-stream',
+              'Upload-Offset': String(uploadedBytes),
+            },
+          },
+        )
+        session = normalizeUploadSession(response.data)
+        uploadedBytes = session.uploadedBytes
+        writeUploadResume(file, session)
+        onUploadProgress?.(Math.min(100, Math.round((uploadedBytes / file.size) * 100)))
+        break
+      } catch (error) {
+        if (isAbortError(error, signal)) throw error
+        if (retries >= 2) throw error
+        retries += 1
+        const response = await request.get(
+          `/video/uploads/${encodeURIComponent(session.uploadId)}`,
+          { signal },
+        )
+        session = normalizeUploadSession(response.data)
+        if (session.totalBytes !== file.size || session.complete) break
+        uploadedBytes = session.uploadedBytes
+        writeUploadResume(file, session)
+        onUploadProgress?.(Math.min(100, Math.round((uploadedBytes / file.size) * 100)))
+      }
+    }
+  }
+
+  const response = await request.post(
+    `/video/uploads/${encodeURIComponent(session.uploadId)}/complete`,
+    undefined,
+    { timeout: 0, signal },
+  )
+  clearUploadResume(file)
+  onUploadProgress?.(100)
+  return normalizeVideo(response.data)
 }
 
 export function updateVideo(id, input) {

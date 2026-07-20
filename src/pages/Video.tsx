@@ -517,7 +517,9 @@ function VideoWatchPage({
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
+  const controlsHideTimerRef = useRef<number | undefined>(undefined);
   const [media, setMedia] = useState<HTMLVideoElement | null>(null);
+  const [areControlsVisible, setAreControlsVisible] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
@@ -538,7 +540,33 @@ function VideoWatchPage({
     setComments(VIDEO_COMMENTS);
     setLikedComments(new Set());
     setLikedVideo(false);
+    setAreControlsVisible(false);
   }, [video.id]);
+
+  useEffect(() => () => {
+    if (controlsHideTimerRef.current !== undefined) {
+      window.clearTimeout(controlsHideTimerRef.current);
+    }
+  }, []);
+
+  const showPlayerControls = () => {
+    setAreControlsVisible(true);
+    if (controlsHideTimerRef.current !== undefined) {
+      window.clearTimeout(controlsHideTimerRef.current);
+    }
+    controlsHideTimerRef.current = window.setTimeout(() => {
+      setAreControlsVisible(false);
+      controlsHideTimerRef.current = undefined;
+    }, 5_000);
+  };
+
+  const hidePlayerControls = () => {
+    if (controlsHideTimerRef.current !== undefined) {
+      window.clearTimeout(controlsHideTimerRef.current);
+      controlsHideTimerRef.current = undefined;
+    }
+    setAreControlsVisible(false);
+  };
 
   useEffect(() => {
     const player = stageRef.current;
@@ -681,7 +709,13 @@ function VideoWatchPage({
 
       <div className="video-watch-layout">
         <div className="video-watch-main">
-          <div ref={stageRef} className="video-watch-player">
+          <div
+            ref={stageRef}
+            className={`video-watch-player${areControlsVisible ? ' is-controls-visible' : ''}`}
+            onMouseEnter={showPlayerControls}
+            onMouseMove={showPlayerControls}
+            onMouseLeave={hidePlayerControls}
+          >
             <HlsVideo
               key={video.id}
               src={video.src}
@@ -1043,6 +1077,11 @@ function VideoUploadDialog({
             <span className="video-upload-progress-track" aria-hidden="true">
               <i style={{ width: `${progress}%` }} />
             </span>
+            {progress === 100 && (
+              <p className="video-upload-processing-complete">
+                视频已处理完成，请点击上传
+              </p>
+            )}
           </div>
         )}
 
