@@ -640,11 +640,13 @@ function VideoWatch({
   const [playerHeight, setPlayerHeight] = useState<number>();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenControlsVisible, setFullscreenControlsVisible] = useState(false);
+  const [volumeControlOpen, setVolumeControlOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [viewIncrementVisible, setViewIncrementVisible] = useState(false);
   const fullscreenControlsTimerRef = useRef<number | undefined>(undefined);
+  const volumeControlTimerRef = useRef<number | undefined>(undefined);
 
   const revealFullscreenControls = useCallback(() => {
     if (document.fullscreenElement !== stageRef.current) return;
@@ -657,6 +659,24 @@ function VideoWatch({
       setFullscreenControlsVisible(false);
       fullscreenControlsTimerRef.current = undefined;
     }, 6_000);
+  }, []);
+
+  const showVolumeControl = useCallback(() => {
+    if (volumeControlTimerRef.current !== undefined) {
+      window.clearTimeout(volumeControlTimerRef.current);
+      volumeControlTimerRef.current = undefined;
+    }
+    setVolumeControlOpen(true);
+  }, []);
+
+  const hideVolumeControl = useCallback(() => {
+    if (volumeControlTimerRef.current !== undefined) {
+      window.clearTimeout(volumeControlTimerRef.current);
+    }
+    volumeControlTimerRef.current = window.setTimeout(() => {
+      setVolumeControlOpen(false);
+      volumeControlTimerRef.current = undefined;
+    }, 140);
   }, []);
 
   useEffect(() => {
@@ -697,6 +717,9 @@ function VideoWatch({
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       if (fullscreenControlsTimerRef.current !== undefined) {
         window.clearTimeout(fullscreenControlsTimerRef.current);
+      }
+      if (volumeControlTimerRef.current !== undefined) {
+        window.clearTimeout(volumeControlTimerRef.current);
       }
     };
   }, [revealFullscreenControls]);
@@ -872,8 +895,20 @@ function VideoWatch({
                   </span>
                   <span className="video-watch-control-spacer" />
                   <span className="video-watch-quality">{video.resolution}</span>
-                  <div className="video-watch-volume">
-                    <button type="button" aria-label={isMuted ? t('video.player.unmute') : t('video.player.mute')} onClick={toggleMute}>
+                  <div
+                    className={`video-watch-volume${volumeControlOpen ? ' is-open' : ''}`}
+                    onPointerLeave={hideVolumeControl}
+                    onFocus={showVolumeControl}
+                    onBlur={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget)) hideVolumeControl();
+                    }}
+                  >
+                    <button
+                      type="button"
+                      aria-label={isMuted ? t('video.player.unmute') : t('video.player.mute')}
+                      onPointerEnter={showVolumeControl}
+                      onClick={toggleMute}
+                    >
                       {isMuted ? <VolumeX size={19} /> : <Volume2 size={19} />}
                     </button>
                     <input
@@ -884,6 +919,7 @@ function VideoWatch({
                       step="0.05"
                       value={isMuted ? 0 : volume}
                       aria-label={t('video.player.volume')}
+                      onPointerEnter={showVolumeControl}
                       onChange={(event) => changeVolume(Number(event.target.value))}
                       style={{ '--video-volume': `${(isMuted ? 0 : volume) * 100}%` } as CSSProperties}
                     />

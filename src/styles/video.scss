@@ -1667,15 +1667,16 @@
   box-shadow: 0 0.3rem 1rem rgba(0, 0, 0, 0.34);
 }
 
+// video control
 .video-watch-control-row {
   display: flex;
   align-items: center;
   min-height: 3.2rem;
   gap: 0.5rem;
-  padding: 0.35rem;
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  padding: 0.4rem 0.6rem;
+  // border: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: 2rem;
-  background: rgba(10, 14, 12, 0.28);
+  // background: rgba(10, 14, 12, 0.28);
   -webkit-backdrop-filter: blur(16px) saturate(125%);
   backdrop-filter: blur(16px) saturate(125%);
 }
@@ -1720,15 +1721,6 @@
   height: 3.2rem;
 }
 
-.video-watch-volume::before {
-  content: '';
-  position: absolute;
-  right: -1.1rem;
-  bottom: 100%;
-  left: -1.1rem;
-  height: 15rem;
-}
-
 .video-watch-volume button {
   position: relative;
   z-index: 1;
@@ -1753,8 +1745,7 @@
   transition: opacity 0.16s ease, transform 0.22s ease;
 }
 
-.video-watch-volume:hover .video-watch-volume-range,
-.video-watch-volume:focus-within .video-watch-volume-range {
+.video-watch-volume.is-open .video-watch-volume-range {
   opacity: 1;
   pointer-events: auto;
   transform: translateX(-50%) rotate(-90deg) scaleX(1);
@@ -3404,8 +3395,7 @@
     font-size: 0.86rem;
   }
 
-  .video-watch-volume:hover .video-watch-volume-range,
-  .video-watch-volume:focus-within .video-watch-volume-range {
+  .video-watch-volume.is-open .video-watch-volume-range {
     width: 10rem;
   }
 
