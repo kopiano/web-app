@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft,
   BarChart3,
+  Camera,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -456,6 +457,7 @@ function UploadDialog({
   processingProgress,
   videoName,
   coverUrl,
+  hasCustomCover,
   title,
   tags,
   visibility,
@@ -479,6 +481,7 @@ function UploadDialog({
   processingProgress: number;
   videoName: string;
   coverUrl: string;
+  hasCustomCover: boolean;
   title: string;
   tags: string;
   visibility: VideoVisibility;
@@ -499,7 +502,18 @@ function UploadDialog({
 }) {
   const { t } = useTranslation();
   const [isDraggingVideo, setIsDraggingVideo] = useState(false);
+  const [coverImageError, setCoverImageError] = useState(false);
   const isTransferring = step === 'publish' && progress < 100;
+  const isProcessingCoverPending = step === 'publish'
+    && progress >= 100
+    && processingProgress < 100
+    && !processingFailed
+    && !hasCustomCover;
+
+  useEffect(() => {
+    setCoverImageError(false);
+  }, [coverUrl]);
+
   return createPortal(
     <div className="video-upload-overlay" role="presentation">
       <button
@@ -639,33 +653,39 @@ function UploadDialog({
             </div>
             <div className="video-upload-form">
               <div
-                className={`video-upload-cover-field${coverUrl ? ' has-preview' : ' is-empty'}`}
+                className={`video-upload-cover-field${isProcessingCoverPending ? ' is-processing-placeholder' : coverUrl ? ' has-preview' : ' is-empty'}`}
                 role="button"
                 tabIndex={0}
                 aria-label={t('video.upload.chooseCover')}
-                aria-disabled={publishRequested && !processingFailed}
+                aria-disabled={busy}
                 onClick={() => {
-                  if (!publishRequested || processingFailed) coverInputRef.current?.click();
+                  if (!busy) coverInputRef.current?.click();
                 }}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    if (!publishRequested || processingFailed) coverInputRef.current?.click();
+                    if (!busy) coverInputRef.current?.click();
                   }
                 }}
               >
-                {coverUrl ? (
+                {isProcessingCoverPending ? (
+                  <span className="video-upload-cover-processing" aria-hidden="true">
+                    <Camera size={58} strokeWidth={1.55} />
+                  </span>
+                ) : coverUrl && !coverImageError ? (
                   <>
-                    <img src={coverUrl} alt={t('video.upload.selectedCover')} />
+                    <img
+                      src={coverUrl}
+                      alt=""
+                      onError={() => setCoverImageError(true)}
+                    />
                     <span className="video-upload-cover-shade" aria-hidden="true">
                       <ImagePlus size={20} />
                     </span>
                   </>
                 ) : (
                   <span className="video-upload-cover-empty">
-                    <ImagePlus size={28} aria-hidden="true" />
-                    <strong>{t('video.upload.chooseCover')}</strong>
-                    <small>{t('video.upload.coverHint')}</small>
+                    <Camera size={64} strokeWidth={1.45} aria-hidden="true" />
                   </span>
                 )}
                 <input
@@ -2309,6 +2329,26 @@ export default function VideoConnected() {
     setUploadCoverFile(file);
     setUploadCoverUrl(previewUrl);
     if (coverInputRef.current) coverInputRef.current.value = '';
+
+    if (!uploadVideoId || !uploadPublishRequestedRef.current) return;
+
+    setUploadBusy(true);
+    try {
+      const updated = await updateVideo(uploadVideoId, { cover: file });
+      queryClient.setQueryData(['video', 'detail', uploadVideoId], updated);
+      await invalidateVideoData(uploadVideoId);
+    } catch (error) {
+      const status = (error as ApiRequestError).response?.status;
+      if (status === 413) {
+        setUploadError(t('video.upload.coverTooLarge'));
+      } else if (status === 415) {
+        setUploadError(t('video.upload.coverUnsupported'));
+      } else {
+        setUploadError(t('video.upload.publishFailed'));
+      }
+    } finally {
+      setUploadBusy(false);
+    }
   };
 
   const closeUpload = () => {
@@ -2886,6 +2926,7 @@ export default function VideoConnected() {
               processingProgress={uploadStatusQuery.data?.processingProgress ?? 0}
               videoName={uploadVideoName}
               coverUrl={uploadCoverUrl || generatedUploadCoverUrl}
+              hasCustomCover={Boolean(uploadCoverUrl)}
               title={uploadTitle}
               tags={uploadTags}
               visibility={uploadVisibility}

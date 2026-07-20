@@ -3823,6 +3823,16 @@
   transform: scale(0.99);
 }
 
+.video-upload-cover-field.is-processing-placeholder,
+.video-upload-cover-field.is-processing-placeholder:hover,
+.video-upload-cover-field.is-processing-placeholder:focus-visible {
+  cursor: pointer;
+  box-shadow:
+    0 0 0 1px rgba(121, 121, 121, 0.82),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+  transform: none;
+}
+
 .video-upload-cover-field > img {
   position: absolute;
   inset: 0;
@@ -3898,13 +3908,9 @@
 }
 
 .video-upload-cover-empty svg {
-  width: 3.2rem;
-  height: 3.2rem;
-  padding: 0.7rem;
-  border: 1px solid rgba(255, 255, 255, 0.88);
-  border-radius: 1rem;
+  width: 4rem;
+  height: 4rem;
   color: #2f6954;
-  background: rgba(255, 255, 255, 0.72);
 }
 
 .video-upload-cover-empty small {
@@ -3912,6 +3918,17 @@
   font-size: 0.73rem;
   font-weight: 550;
   display: none;
+}
+
+.video-upload-cover-processing {
+  display: grid;
+  place-items: center;
+  color: rgba(45, 94, 74, 0.72);
+}
+
+.video-upload-cover-processing svg {
+  width: 3.65rem;
+  height: 3.65rem;
 }
 
 .video-upload-fields {
