@@ -175,6 +175,18 @@ function formatPlaybackTime(value: number) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+function formatVideoCommentTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const pad = (part: number) => String(part).padStart(2, '0');
+  const datePart = date.getFullYear() === new Date().getFullYear()
+    ? `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    : `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+  return `${datePart} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 function resolutionFor(video: VideoApiItem): CardVideo['resolution'] {
   if ((video.width ?? 0) >= 3840 || (video.height ?? 0) >= 2160) return '4K';
   if ((video.width ?? 0) >= 2048 || (video.height ?? 0) >= 1440) return '2K';
@@ -1126,7 +1138,7 @@ function VideoWatch({
                 <article key={comment.id} className="video-comment">
                   <img src={comment.avatar || defaultAvatarDataUrl(comment.username)} alt="" {...lazyImageProps()} />
                   <div>
-                    <header><strong>{comment.username}</strong><time>{new Date(comment.createdAt).toLocaleString()}</time></header>
+                    <header><strong>{comment.username}</strong><time>{formatVideoCommentTime(comment.createdAt)}</time></header>
                     <p>{comment.content}</p>
                     <footer>
                       <button type="button" className={comment.liked ? 'is-liked' : ''} onClick={() => onCommentLike(comment, !comment.liked)}>
@@ -1144,7 +1156,7 @@ function VideoWatch({
                           <article key={reply.id} className="video-comment-reply">
                             <img src={reply.avatar || defaultAvatarDataUrl(reply.username)} alt="" {...lazyImageProps()} />
                             <div>
-                              <header><strong>{reply.username}</strong><time>{new Date(reply.createdAt).toLocaleString()}</time></header>
+                              <header><strong>{reply.username}</strong><time>{formatVideoCommentTime(reply.createdAt)}</time></header>
                               <p>{reply.content}</p>
                               <footer>
                                 <button type="button" className={reply.liked ? 'is-liked' : ''} onClick={() => onCommentLike(reply, !reply.liked)}>

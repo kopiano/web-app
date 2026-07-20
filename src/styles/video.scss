@@ -2081,6 +2081,11 @@
   min-width: 3.15rem;
   padding: 0;
   justify-content: center;
+  transition: background-color .3s ease;
+}
+.video-watch-more:hover {
+  border: 1px solid #cccccc;
+  background-color: #ababab38;
 }
 
 .video-delete-overlay {
