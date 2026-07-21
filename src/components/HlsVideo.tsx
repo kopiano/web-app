@@ -108,29 +108,13 @@ export default function HlsVideo({
   const persistPlaybackPositionRef = useRef<(force?: boolean) => void>(() => undefined);
   const [playbackError, setPlaybackError] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isDocumentVisible, setIsDocumentVisible] = useState(!document.hidden);
   const [isInViewport, setIsInViewport] = useState(false);
   const hasDimensions = Boolean(width && height && width > 0 && height > 0);
   const aspectRatio = hasDimensions ? `${width} / ${height}` : '16 / 9';
-  const shouldAttachMedia = active && isDocumentVisible && isInViewport;
+  const shouldAttachMedia = active && isInViewport;
   const playbackStorageKey = playbackId ? `lume-video-progress:${playbackId}` : null;
   autoPlayRef.current = autoPlay;
   onViewQualifiedRef.current = onViewQualified;
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      const video = videoRef.current;
-      if (document.hidden) {
-        resumeAfterInterruptionRef.current = Boolean(video && !video.paused && !video.ended);
-        setIsDocumentVisible(false);
-        return;
-      }
-      setIsDocumentVisible(true);
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
