@@ -2496,26 +2496,6 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   }
 }
 
-.music-pro-payment-back {
-  width: 2.8rem;
-  height: 2.8rem;
-  margin: 0 0 1rem;
-  padding: 0;
-  border: 1px solid rgba(29, 34, 42, 0.09);
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: #333942;
-  background: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
-  transition: transform 180ms ease, background 180ms ease;
-}
-
-.music-pro-payment-back:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.92);
-  transform: translateX(-0.15rem);
-}
-
 .music-pro-payment-layout {
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(21rem, 1.05fr);
@@ -2549,7 +2529,7 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
 .music-pro-currency button {
   position: relative;
   isolation: isolate;
-  min-height: 3rem;
+  // height: 3rem;
   padding: 12px;
   width: 100%;
   overflow: hidden;
@@ -2782,11 +2762,12 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
 
 .music-pro-checkout {
   min-width: 0;
-  padding: 1.4rem;
+  padding: 2rem 4rem;
   border: 1px solid rgba(255, 255, 255, 0.78);
   border-radius: 1.6rem;
   background: rgba(255, 255, 255, 0.38);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  margin-top: 50px;
 }
 
 .music-pro-qr {
@@ -2956,6 +2937,7 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   font-size: 16px;
   font-weight: 690;
   letter-spacing: 0.7px;
+  margin-top: 20px;
 }
 
 .music-pro-email-input {
@@ -3109,8 +3091,7 @@ main.music-page .music-library-hero.is-playing .music-library-disc {
   transform: translateY(-0.1rem);
 }
 
-.music-pro-pay:disabled,
-.music-pro-payment-back:disabled {
+.music-pro-pay:disabled {
   cursor: wait;
   opacity: 0.68;
 }

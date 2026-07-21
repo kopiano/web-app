@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowLeft,
   Check,
   Crown,
   Headphones,
@@ -183,18 +182,6 @@ export default function ProUpgradeDialog({
               </div>
             ) : (
               <div className="music-pro-step music-pro-payment-step">
-                <button
-                  type="button"
-                  className="music-pro-payment-back"
-                  aria-label={t('music.backToProOverview')}
-                  disabled={isStartingCheckout}
-                  onClick={() => {
-                    setError('');
-                    setStep('intro');
-                  }}
-                >
-                  <ArrowLeft size={18} aria-hidden="true" />
-                </button>
                 <div className="music-pro-payment-layout">
                   <div className="music-pro-order">
                     <h2 id="music-pro-title">{t('music.subscribeToPro')}</h2>
@@ -235,29 +222,31 @@ export default function ProUpgradeDialog({
                       ))}
                     </div>
                     <div className="music-pro-plan-comparison">
-                      <section className="music-pro-plan-card">
+                      <div className="music-pro-plan-card">
                         <h3>{t('music.freePlan')}</h3>
                         <p className="music-pro-plan-price">¥0.00</p>
                         <span className="music-pro-plan-original-price is-placeholder" aria-hidden="true">¥0.00</span>
                         <p className="music-pro-plan-features-label">{t('music.privileges')}</p>
                         <ul>
-                          {['chatFeature', 'momentFeature', 'musicListFeature', 'musicFavorityFeature'].map((feature) => (
+                          {['chatFeature', 'momentFeature', 'musicListFeature', 'musicFavorityFeature', 'videoCommendFeature', 'videoPlaylistFeature'].map((feature) => (
                             <li key={feature}><Check size={15} aria-hidden="true" />{t(`music.${feature}`)}</li>
                           ))}
                           <li className="is-unavailable"><X size={15} aria-hidden="true" />{t('music.musicLibraryFeature')}</li>
+                          <li className="is-unavailable"><X size={15} aria-hidden="true" />{t('music.videoLibraryFeature')}</li>
                         </ul>
-                      </section>
-                      <section className="music-pro-plan-card is-pro">
+                      </div>
+                      <div className="music-pro-plan-card is-pro">
                         <h3>{t('music.proPlanCard')}</h3>
                         <p className="music-pro-plan-price">{selectedCurrencyPrice}<small>{t(billingPeriodKey)}</small></p>
                         <del className="music-pro-plan-original-price">{proOriginalPrice}</del>
                         <p className="music-pro-plan-features-label">{t('music.privileges')}</p>
                         <ul>
-                          {['chatFeature', 'momentFeature', 'musicListFeature', 'musicFavorityFeature', 'musicLibraryFeature'].map((feature) => (
+                          {['chatFeature', 'momentFeature', 'musicListFeature', 'musicFavorityFeature', 'videoCommendFeature', 'videoPlaylistFeature', 'musicLibraryFeature'].map((feature) => (
                             <li key={feature}><Check size={15} aria-hidden="true" />{t(`music.${feature}`)}</li>
                           ))}
+                          <li><Check size={15} aria-hidden="true" />{t('music.videoLibraryFeature')}</li>
                         </ul>
-                      </section>
+                      </div>
                     </div>
                   </div>
                   <div className="music-pro-checkout">
