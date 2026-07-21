@@ -153,8 +153,9 @@ git restore --staged .
 
 ### 更改提交代码用户名
 ```sh
-GIT_ASKPASS= GIT_TERMINAL_PROMPT=1 \
-git -c credential.helper= push origin main
+git remote set-url origin https://kopiano@github.com/kopiano/web-app.git
+  GIT_ASKPASS= GIT_TERMINAL_PROMPT=1 \
+  git -c credential.helper= push origin main
 Username for 'https://github.com': kopiano
 Password for 'https://kopiano@github.com': <token>
 ```
