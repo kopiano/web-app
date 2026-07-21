@@ -10,11 +10,11 @@ cd dist
 # cp index.html 404.html
 
 # 如果是发布到自定义域名
-# echo 'kopiano.cc > A
+echo 'kopiano.cc' > CNAME
 
 git init
-git add -A
-git commit -m 'deploy web-app'
+git add .
+git commit -m 'deploy'
 
 git push -f https://github.com/kopiano/web-app.git HEAD:gh-pages
 
