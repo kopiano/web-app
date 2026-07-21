@@ -17,6 +17,7 @@ import { logout as logoutRequest } from '@/api/auth';
 import ProfileModal from '@/components/ui/ProfileModal';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { rememberAuthReturnTo } from '@/lib/auth';
+import { getVideoReturnTo } from '@/lib/videoNavigation';
 
 function padTimePart(value: number) {
   return String(value).padStart(2, '0');
@@ -194,7 +195,7 @@ export default function Header() {
           <li><NavLink to="/" end className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>{t('header.overview')}</NavLink></li>
           <li><NavLink to="/chat" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>{t('header.chat')}</NavLink></li>
           <li><NavLink to="/music" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>{t('header.music')}</NavLink></li>
-          <li><NavLink to="/video" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>{t('header.video')}</NavLink></li>
+          <li><NavLink to={getVideoReturnTo()} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>{t('header.video')}</NavLink></li>
         </ul>
 
         <div className="header-actions">

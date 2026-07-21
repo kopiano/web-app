@@ -89,6 +89,7 @@ import {
   MOCK_VIDEO_ITEMS,
 } from '@/data/videoMockData';
 import { defaultAvatarDataUrl, resolveAvatarUrl } from '@/lib/avatar';
+import { rememberVideoReturnTo } from '@/lib/videoNavigation';
 import { setVideoDetails, setVideoViewCount } from '@/store/videoViewSlice';
 import type { AppDispatch, RootState } from '@/store/store';
 import '@/styles/video.scss';
@@ -1741,6 +1742,11 @@ export default function VideoConnected() {
   const featuredVideoIdRef = useRef<string | null>(null);
   const featuredPreloadedPostersRef = useRef(new Set<string>());
   const featuredTransitionInFlightRef = useRef(false);
+
+  useEffect(() => {
+    const query = searchParams.toString();
+    rememberVideoReturnTo(`/video${query ? `?${query}` : ''}`);
+  }, [searchParams]);
 
   useEffect(() => () => {
     uploadAbortControllerRef.current?.abort();
