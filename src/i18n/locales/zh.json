@@ -327,6 +327,7 @@
     "empty": "暂无视频。",
     "user": "用户",
     "authRequired": "请登录后继续操作。",
+    "publisherOnlyEdit": "只有视频发布者才能更改视频详情信息！",
     "actionFailed": "操作失败，请重试。",
     "deleteTitle": "删除这个视频？",
     "deleteDescription": "该视频、评论、点赞和已上传的文件将被永久删除。",

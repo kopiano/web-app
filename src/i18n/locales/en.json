@@ -327,6 +327,7 @@
     "empty": "No videos yet.",
     "user": "User",
     "authRequired": "Please sign in to continue.",
+    "publisherOnlyEdit": "Only the video publisher can change video details.",
     "actionFailed": "Unable to update the video. Please try again.",
     "deleteTitle": "Delete this video?",
     "deleteDescription": "This video, its comments, reactions, and uploaded files will be permanently removed.",

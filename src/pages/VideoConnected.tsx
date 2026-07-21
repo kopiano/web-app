@@ -1064,6 +1064,8 @@ function VideoWatch({
   onViewQualified,
   onDelete,
   onUpdate,
+  canEdit,
+  onEditDenied,
 }: {
   video: CardVideo;
   playlist: CardVideo[];
@@ -1083,6 +1085,8 @@ function VideoWatch({
     categories: string[];
     cover: File | null;
   }) => Promise<void>;
+  canEdit: boolean;
+  onEditDenied: () => void;
 }) {
   const { t } = useTranslation();
   const stageRef = useRef<HTMLDivElement>(null);
@@ -1506,6 +1510,10 @@ function VideoWatch({
                   className="video-watch-more"
                   aria-label={t('video.more')}
                   onClick={() => {
+                    if (!canEdit) {
+                      onEditDenied();
+                      return;
+                    }
                     setDeleteError('');
                     setSettingsPanel('detail');
                     setIsSettingsOpen(true);
@@ -3031,6 +3039,8 @@ export default function VideoConnected() {
             onViewQualified={trackQualifiedVideoView}
             onDelete={deleteWatchedVideo}
             onUpdate={updateWatchedVideo}
+            canEdit={Boolean(currentUser?.id && displayedWatchVideo.raw.userId === currentUser.id)}
+            onEditDenied={() => notify(t('video.publisherOnlyEdit'), 'error')}
           />
         ) : (
           <div className="video-empty">
