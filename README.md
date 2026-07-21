@@ -151,6 +151,14 @@ git push --force-with-lease origin main
 git restore --staged .
 ```
 
+### 更改提交代码用户名
+```sh
+GIT_ASKPASS= GIT_TERMINAL_PROMPT=1 \
+git -c credential.helper= push origin main
+Username for 'https://github.com': kopiano
+Password for 'https://kopiano@github.com': <token>
+```
+
 ## Chat
 ### 获取联系人列表 (所有用户和群聊)
 * 内容：联系人名称、头像、最后一条消息、未读消息数等
