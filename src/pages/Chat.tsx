@@ -2013,14 +2013,16 @@ function Chat() {
                 </div>
               ))}
               {currentUser && visibleContacts.length === 0 && (
-                <div className="contacts-state" role={contactsError ? 'alert' : 'status'}>
-                  <span>
-                    {contactsLoading || !contactsInitialized
-                      ? t('chat.loadingContacts')
-                      : contactsError
-                        ? t('chat.loadContactsFailed')
-                        : t('chat.noContacts')}
-                  </span>
+                <div
+                  className={`contacts-state${contactsLoading || !contactsInitialized ? ' loading' : ''}`}
+                  role={contactsError ? 'alert' : 'status'}
+                  aria-label={contactsLoading || !contactsInitialized ? t('chat.loadingContacts') : undefined}
+                >
+                  {contactsLoading || !contactsInitialized ? (
+                    <span className="chat-loading-spinner" aria-hidden="true" />
+                  ) : (
+                    <span>{contactsError ? t('chat.loadContactsFailed') : t('chat.noContacts')}</span>
+                  )}
                   {contactsError && (
                     <button
                       type="button"
@@ -2078,7 +2080,9 @@ function Chat() {
                                 className="group-member-avatar"
                               >
                                 <img
-                                  src={resolveChatAvatarUrl(member.avatar, member.username)}
+                                  src={member.user_id === currentUser?.id
+                                    ? currentUserAvatar
+                                    : resolveChatAvatarUrl(member.avatar, member.username)}
                                   alt={member.username}
                                 />
                                 {member.online && <span className="group-member-online" aria-hidden="true" />}

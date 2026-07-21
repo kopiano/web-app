@@ -256,6 +256,17 @@ $chat-margin-left: 100px;
     text-align: center;
 }
 
+.contacts-state.loading {
+    min-height: 72px;
+    justify-content: center;
+}
+
+.contacts-state.loading .chat-loading-spinner {
+    width: 24px;
+    height: 24px;
+    border-width: 3px;
+}
+
 .contacts-retry {
     border: 0;
     padding: 0;
