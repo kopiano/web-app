@@ -6,8 +6,8 @@ pnpm run build
 # 进入生成的文件夹
 cd dist
 
-# 复制 index.html 做 404.html（解决 SPA 路由刷新白屏）
-# cp index.html 404.html
+# 复制 index.html 做 404.html（解决 GitHub Pages SPA 路由刷新白屏）
+cp index.html 404.html
 
 # 如果是发布到自定义域名
 echo 'kopiano.cc' > CNAME
