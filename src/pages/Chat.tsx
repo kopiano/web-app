@@ -126,7 +126,9 @@ const CONTACT_PRESENCE_REFRESH_INTERVAL_MS = 30_000;
 const MOMENT_IMPRESSION_DELAY_MS = 1_000;
 const MOMENT_IMPRESSION_VISIBILITY_RATIO = 0.6;
 const MAX_VISIBLE_GROUP_AVATARS = 20;
-const MAX_GROUP_AVATAR_BYTES = 50 * 1024 * 1024;
+// Keep the encoded JSON request below the backend's 7 MB body limit.
+const MAX_GROUP_AVATAR_BYTES = 4 * 1024 * 1024;
+const GROUP_AVATAR_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
 interface ShareCandidate {
   userId: string;
@@ -262,20 +264,73 @@ function fallbackAvatar(name: string) {
 }
 
 async function groupAvatarFileToDataUrl(file: File) {
-  if (!file.type.startsWith('image/') || file.size > MAX_GROUP_AVATAR_BYTES) {
+  if (!GROUP_AVATAR_TYPES.has(file.type) || file.size > MAX_GROUP_AVATAR_BYTES) {
     throw new Error('invalid-avatar');
   }
 
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => (
-      typeof reader.result === 'string'
-        ? resolve(reader.result)
-        : reject(new Error('invalid-avatar'))
-    );
-    reader.onerror = () => reject(new Error('invalid-avatar'));
-    reader.readAsDataURL(file);
-  });
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error('invalid-avatar'));
+      element.src = sourceUrl;
+    });
+    const scale = Math.min(1, 512 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('invalid-avatar');
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    const dataUrl = canvas.toDataURL('image/webp', 0.86);
+    const base64Length = dataUrl.length - dataUrl.indexOf(',') - 1;
+    const decodedBytes = Math.ceil((base64Length * 3) / 4);
+    if (decodedBytes > MAX_GROUP_AVATAR_BYTES) throw new Error('invalid-avatar');
+    return dataUrl;
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function groupAvatarDataUrlIsValid(value: string) {
+  return /^data:image\/(?:png|jpeg|webp|gif);base64,[a-z0-9+/]+=*$/i.test(value);
+}
+
+function getApiErrorStatus(error: unknown) {
+  return (error as { response?: { status?: number } })?.response?.status;
+}
+
+function getApiErrorMessage(error: unknown) {
+  return (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+}
+
+function createGroupErrorMessage(error: unknown, fallback: string, badRequestMessage: string) {
+  const status = getApiErrorStatus(error);
+  const message = getApiErrorMessage(error);
+  if (message) return message;
+  if (status === 400) return badRequestMessage;
+  return fallback;
+}
+
+function validateCreateGroupMemberIds(memberIds: string[]) {
+  return memberIds.length > 0 && memberIds.every(isUuid);
+}
+
+function validateCreateGroupAvatar(value: string) {
+  return groupAvatarDataUrlIsValid(value);
+}
+
+function isCreateGroupPayloadValid(name: string, memberIds: string[], avatar: string) {
+  return name.length > 0
+    && name.length <= 255
+    && validateCreateGroupMemberIds(memberIds)
+    && validateCreateGroupAvatar(avatar);
 }
 
 function messageWebSocketUrl() {
@@ -1349,6 +1404,7 @@ function Chat() {
 
   async function handleCreateGroup() {
     const trimmedName = groupName.trim();
+    const memberIds = Array.from(createMemberIds);
     if (!trimmedName) {
       setGroupCreateError(t('chat.groupNameRequired'));
       return;
@@ -1357,9 +1413,13 @@ function Chat() {
       setGroupCreateError(t('chat.groupAvatarRequired'));
       return;
     }
-    if (createMemberIds.size === 0) {
+    if (memberIds.length === 0) {
       setGroupCreateError(t('chat.selectGroupMembers'));
       setCreateGroupStep(1);
+      return;
+    }
+    if (!isCreateGroupPayloadValid(trimmedName, memberIds, groupAvatar)) {
+      setGroupCreateError(t('chat.createGroupInvalid'));
       return;
     }
 
@@ -1368,7 +1428,7 @@ function Chat() {
     try {
       const result = await createGroup({
         name: trimmedName,
-        member_ids: Array.from(createMemberIds),
+        member_ids: memberIds,
         avatar: groupAvatar,
       });
       await dispatch(refreshContacts()).unwrap();
@@ -1378,8 +1438,12 @@ function Chat() {
       const draftKey = createGroupDraftKey();
       if (draftKey) localStorage.removeItem(draftKey);
       notify(t('chat.groupCreated'), 'success');
-    } catch {
-      setGroupCreateError(t('chat.createGroupFailed'));
+    } catch (error) {
+      setGroupCreateError(createGroupErrorMessage(
+        error,
+        t('chat.createGroupFailed'),
+        t('chat.createGroupInvalid'),
+      ));
     } finally {
       setGroupCreating(false);
     }
@@ -3189,7 +3253,7 @@ function Chat() {
                   <input
                     ref={groupAvatarInputRef}
                     type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
                     hidden
                     onChange={event => void handleGroupAvatarChange(event)}
                   />
