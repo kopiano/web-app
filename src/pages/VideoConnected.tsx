@@ -1235,12 +1235,21 @@ function VideoWatch({
         return;
       }
 
-      const currentIndex = playlist.findIndex((item) => item.id === video.id);
-      const nextVideo = playlist
-        .slice(currentIndex >= 0 ? currentIndex + 1 : 0)
-        .find((item) => item.id !== video.id && item.status === 'ready' && Boolean(item.src));
+      const playableVideos = playlist.filter((item) => item.status === 'ready' && Boolean(item.src));
+      if (!playableVideos.length) return;
 
-      if (nextVideo) onSelect(nextVideo);
+      const currentIndex = playableVideos.findIndex((item) => item.id === video.id);
+      const nextIndex = currentIndex >= 0
+        ? (currentIndex + 1) % playableVideos.length
+        : 0;
+      const nextVideo = playableVideos[nextIndex];
+
+      if (nextVideo.id === video.id) {
+        media.currentTime = 0;
+        void media.play().catch(() => setIsPlaying(false));
+      } else {
+        onSelect(nextVideo);
+      }
     };
 
     media.addEventListener('ended', handleEnded);
