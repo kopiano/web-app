@@ -12,6 +12,7 @@ export interface ChatApiContact {
   chat_type: 'private' | 'public';
   avatar?: string | null;
   username: string;
+  role?: string | null;
   online?: boolean | null;
   is_pro?: boolean;
   content?: string | null;

@@ -7,10 +7,14 @@ import {
   ArrowRight,
   Camera,
   Check,
+  BrainCircuit,
+  FileAudio,
+  FileText,
   Maximize2,
   Plus,
   Search,
   Share2,
+  Sparkles,
   Users,
   X,
 } from 'lucide-react';
@@ -70,6 +74,7 @@ interface Contact {
   time: string;
   online?: boolean;
   isPro?: boolean;
+  role?: string | null;
   members?: ChatApiMember[];
 }
 
@@ -597,6 +602,12 @@ function Chat() {
   const [groupAvatar, setGroupAvatar] = useState('');
   const [groupCreating, setGroupCreating] = useState(false);
   const [groupCreateError, setGroupCreateError] = useState('');
+  const [isModelTrainingOpen, setIsModelTrainingOpen] = useState(false);
+  const [modelNickname, setModelNickname] = useState('');
+  const [warFiles, setWarFiles] = useState<File[]>([]);
+  const [listTextFile, setListTextFile] = useState<File | null>(null);
+  const warFilesInputRef = useRef<HTMLInputElement>(null);
+  const listTextFileInputRef = useRef<HTMLInputElement>(null);
   const [inputText, setInputText] = useState('');
   const guestMessages = mockMessages;
   const [showEmoji, setShowEmoji] = useState(false);
@@ -665,6 +676,8 @@ function Chat() {
     () => visibleContacts.find(contact => contact.id === activeContact) || null,
     [activeContact, visibleContacts],
   );
+  const isSelectedSystemUser = activeContactInfo?.type === 'user'
+    && activeContactInfo.role === 'system';
   const activeConversationId = activeContactInfo?.id || '';
   const activeConversationCache = useSelector(
     (state: RootState) => state.chat.conversations[activeConversationId],
@@ -1376,6 +1389,20 @@ function Chat() {
     setGroupName('');
     setGroupAvatar('');
     setGroupCreateError('');
+  }
+
+  function closeModelTrainingDialog() {
+    setIsModelTrainingOpen(false);
+  }
+
+  function handleWarFilesChange(event: React.ChangeEvent<HTMLInputElement>) {
+    setWarFiles(Array.from(event.target.files || []));
+    event.target.value = '';
+  }
+
+  function handleListTextFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    setListTextFile(event.target.files?.[0] || null);
+    event.target.value = '';
   }
 
   function toggleCreateGroupMember(userId: string) {
@@ -2132,6 +2159,17 @@ function Chat() {
                       </div>
                     </div>
                     <div className="messages-header-actions">
+                      {isSelectedSystemUser && (
+                        <button
+                          type="button"
+                          className="model-training-trigger"
+                          aria-label={t('chat.configureModelTraining')}
+                          onClick={() => setIsModelTrainingOpen(true)}
+                        >
+                          <BrainCircuit size={16} strokeWidth={2.1} aria-hidden="true" />
+                          <span>{t('chat.modelButton')}</span>
+                        </button>
+                      )}
                       {activeContactInfo.type === 'group' && (
                         <div className="group-members-toolbar">
                           <div
@@ -2171,15 +2209,30 @@ function Chat() {
                     </div>
                   </>
                 ) : (
-                  isConversationLoading ? (
-                    <div className="messages-header-loading" role="status" aria-label={t('chat.loadingConversation')}>
-                      <span className="chat-loading-spinner" aria-hidden="true" />
+                  <>
+                    {isConversationLoading ? (
+                      <div className="messages-header-loading" role="status" aria-label={t('chat.loadingConversation')}>
+                        <span className="chat-loading-spinner" aria-hidden="true" />
+                      </div>
+                    ) : (
+                      <div className="messages-header-info">
+                        <div className="messages-header-name">{t('chat.noContacts')}</div>
+                      </div>
+                    )}
+                    <div className="messages-header-actions">
+                      {isSelectedSystemUser && (
+                        <button
+                          type="button"
+                          className="model-training-trigger"
+                          aria-label={t('chat.configureModelTraining')}
+                          onClick={() => setIsModelTrainingOpen(true)}
+                        >
+                          <BrainCircuit size={16} strokeWidth={2.1} aria-hidden="true" />
+                          <span>{t('chat.modelButton')}</span>
+                        </button>
+                      )}
                     </div>
-                  ) : (
-                    <div className="messages-header-info">
-                      <div className="messages-header-name">{t('chat.noContacts')}</div>
-                    </div>
-                  )
+                  </>
                 )}
               </div>
               <div ref={msgListRef} className="msg-list" onScroll={handleMessageListScroll}>
@@ -3302,6 +3355,137 @@ function Chat() {
                   <p className="create-group-error" role="alert">{groupCreateError}</p>
                 )}
               </section>
+            </div>
+          </div>
+        </div>
+      )}
+      {isModelTrainingOpen && isSelectedSystemUser && (
+        <div className="group-share-overlay model-training-overlay" role="presentation">
+          <button
+            type="button"
+            className="group-share-backdrop"
+            aria-label={t('chat.closeModelTrainingDialog')}
+            onClick={closeModelTrainingDialog}
+          />
+          <div
+            className="group-share-dialog model-training-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="model-training-title"
+            aria-describedby="model-training-description"
+          >
+            <button
+              type="button"
+              className="group-share-close"
+              aria-label={t('chat.closeModelTrainingDialog')}
+              onClick={closeModelTrainingDialog}
+            >
+              <X size={17} aria-hidden="true" />
+            </button>
+
+            <div className="group-share-heading">
+              <span className="group-share-icon model-training-icon" aria-hidden="true">
+                <Sparkles size={24} strokeWidth={1.8} />
+              </span>
+              <div className="group-share-heading-copy">
+                <p className="group-share-eyebrow">{t('chat.modelTrainingEyebrow')}</p>
+                <h2 id="model-training-title">{t('chat.modelTrainingTitle')}</h2>
+                <p id="model-training-description" className="group-share-description">
+                  {t('chat.modelTrainingDescription')}
+                </p>
+              </div>
+            </div>
+
+            <div className="model-training-form">
+              <label className="create-group-field create-group-name-field model-training-name-field">
+                <span>{t('chat.modelNickname')}</span>
+                <input
+                  type="text"
+                  value={modelNickname}
+                  placeholder={t('chat.modelNicknamePlaceholder')}
+                  onChange={event => setModelNickname(event.target.value)}
+                />
+              </label>
+
+              <div className="model-training-upload-grid">
+                <div className="model-training-upload-card">
+                  <div className="model-training-upload-copy">
+                    <span className="model-training-upload-icon" aria-hidden="true">
+                      <FileAudio size={19} strokeWidth={1.8} />
+                    </span>
+                    <div>
+                      <strong>{t('chat.warAudioFiles')}</strong>
+                      <small>{t('chat.warAudioDescription')}</small>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="model-training-file-button"
+                    onClick={() => warFilesInputRef.current?.click()}
+                  >
+                    <Plus size={16} strokeWidth={2.2} aria-hidden="true" />
+                    {t('chat.chooseWarFiles')}
+                  </button>
+                  <input
+                    ref={warFilesInputRef}
+                    type="file"
+                    accept=".war,audio/*"
+                    multiple
+                    hidden
+                    onChange={handleWarFilesChange}
+                  />
+                  <div className={`model-training-file-status${warFiles.length ? ' has-files' : ''}`}>
+                    {warFiles.length
+                      ? t('chat.warFilesSelected', { count: warFiles.length })
+                      : t('chat.noWarFiles')}
+                  </div>
+                </div>
+
+                <div className="model-training-upload-card">
+                  <div className="model-training-upload-copy">
+                    <span className="model-training-upload-icon" aria-hidden="true">
+                      <FileText size={19} strokeWidth={1.8} />
+                    </span>
+                    <div>
+                      <strong>{t('chat.listTextFile')}</strong>
+                      <small>{t('chat.listTextDescription')}</small>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="model-training-file-button"
+                    onClick={() => listTextFileInputRef.current?.click()}
+                  >
+                    <Plus size={16} strokeWidth={2.2} aria-hidden="true" />
+                    {t('chat.chooseListTextFile')}
+                  </button>
+                  <input
+                    ref={listTextFileInputRef}
+                    type="file"
+                    accept=".txt,.list"
+                    hidden
+                    onChange={handleListTextFileChange}
+                  />
+                  <div className={`model-training-file-status${listTextFile ? ' has-files' : ''}`}>
+                    {listTextFile?.name || t('chat.noListTextFile')}
+                  </div>
+                </div>
+              </div>
+
+              <div className="model-training-summary">
+                <BrainCircuit size={17} strokeWidth={1.8} aria-hidden="true" />
+                <span>{t('chat.modelTrainingSummary')}</span>
+              </div>
+
+              <button
+                type="button"
+                className="group-dialog-primary model-training-submit"
+                onClick={() => notify(t('chat.modelTrainingPreviewOnly'), 'warning')}
+              >
+                <Sparkles size={16} strokeWidth={2} aria-hidden="true" />
+                {t('chat.publishModel')}
+                <ArrowRight size={16} strokeWidth={2} aria-hidden="true" />
+              </button>
             </div>
           </div>
         </div>

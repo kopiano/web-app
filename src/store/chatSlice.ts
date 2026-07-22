@@ -20,6 +20,7 @@ export interface ChatContact {
   avatar: string
   lastMsg: string
   time: string
+  role?: string | null
   lastMessageTime: string | null
   online?: boolean
   isPro: boolean
@@ -40,6 +41,7 @@ interface ApiContact {
   chat_type: 'private' | 'public'
   avatar?: string | null
   username: string
+  role?: string | null
   online?: boolean | null
   is_pro?: boolean
   content?: string | null
@@ -229,6 +231,7 @@ function formatContact(contact: ApiContact): ChatContact | null {
       : resolveAvatarUrl(contact.avatar) || fallbackAvatar(contact),
     lastMsg: contact.content || '',
     time: formatLatestMessageTime(contact.last_message_time || null),
+    role: contact.role ?? null,
     lastMessageTime: contact.last_message_time || null,
     online: contact.online ?? undefined,
     isPro: Boolean(contact.is_pro),
