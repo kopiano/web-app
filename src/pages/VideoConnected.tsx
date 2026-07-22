@@ -1235,7 +1235,8 @@ function VideoWatch({
         return;
       }
 
-      const playableVideos = playlist.filter((item) => item.status === 'ready' && Boolean(item.src));
+      // Playlist responses may omit the playable URL; the detail query loads it after selection.
+      const playableVideos = playlist.filter((item) => item.status === 'ready');
       if (!playableVideos.length) return;
 
       const currentIndex = playableVideos.findIndex((item) => item.id === video.id);
