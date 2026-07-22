@@ -290,7 +290,7 @@ export default function Header() {
                   <button
                     className="dropdown-action-item"
                     onClick={() => setProfileOpen(false)}
-                    disabled={isExternalAccount}
+                    disabled
                     // title={isExternalAccount ? 'GitHub accounts cannot be edited here.' : 'Settings'}
                   >
                     <SettingsIcon />
