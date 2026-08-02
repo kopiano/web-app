@@ -3214,7 +3214,7 @@ export default function VideoConnected() {
                           className={`video-featured-cover${video.id === featured.id ? ' is-current' : ''}${video.id === previousFeatured?.id ? ' is-previous' : ''}`}
                           src={video.poster}
                           alt=""
-                          loading="eager"
+                          loading={video.id === featured.id ? 'eager' : 'lazy'}
                           decoding="async"
                           fetchPriority={video.id === featured.id ? 'high' : 'low'}
                         />
