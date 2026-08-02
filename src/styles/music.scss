@@ -369,7 +369,7 @@
 }
 
 .music-feature-card {
-  --music-feature-radius: 3rem;
+  --music-feature-radius: 2rem;
   position: relative;
   min-height: clamp(10rem, 30vw, 20rem);
   padding: clamp(1rem, 5vw, 3rem);
@@ -888,7 +888,7 @@
   justify-content: space-between;
   gap: 1rem;
   padding-left: 30px;
-  border-radius: 0 0 calc(3rem - 1px) calc(3rem - 1px);
+  border-radius: 0 0 calc(2rem - 1px) calc(2rem - 1px);
   background: rgba(255,255,255,0.26);
   backdrop-filter: blur(9px) !important;
   -webkit-backdrop-filter: blur(9px) !important;
