@@ -16,6 +16,96 @@
 * video
 * chat
 
+## Character voice workflow
+
+The chat page now exposes two controls next to the system character:
+
+* `TTS Train` uploads the original audio files from an official Honkai: Star
+  Rail voice asset package and its existing `.list`/`.txt` transcript file to
+  the voice API in the sibling `rust-app` backend. No FFmpeg conversion,
+  audio extraction, denoising, or speech-to-text step is performed. The API creates
+  `../rust-app/src/assets/train/<nickname>/audio/` and preserves the uploaded
+  List filename, then queues
+  GPT-SoVITS training.
+  A completed training command
+  must produce:
+
+  ```text
+  ../rust-app/src/assets/train/<nickname>/models/<nickname>.ckpt
+  ../rust-app/src/assets/train/<nickname>/models/<nickname>.pth
+  ```
+
+* `LLM` accepts the model name, API token, and OpenAI-compatible request URL.
+  The connection test and subsequent DeepSeek requests are made by the backend,
+  so the token is not sent to the existing chat API. The token is kept in
+  `sessionStorage` only.
+
+Once an LLM is connected and the voice model status is `ready`, sending a
+message to the system character calls the LLM, sends the response to
+GPT-SoVITS, appends the returned text, and starts audio playback automatically.
+Each generated message also has a native audio player for replay.
+
+### Run the voice services
+
+The GPT-SoVITS services and Docker Compose configuration live in
+`../rust-app`. Configure the GPT-SoVITS variables in that repository's
+`.env`, then start the backend stack there:
+
+```sh
+cd ../rust-app
+docker compose up --build
+```
+
+`GPT_SOVITS_TRAIN_COMMAND` is executed inside the GPT-SoVITS trainer container.
+It receives these placeholders:
+
+* `{model_id}`
+* `{model_dir}`
+* `{list_file}`
+* `{output_dir}`
+
+The command is intentionally configurable because GPT-SoVITS training scripts
+and GPU checkpoints vary by release. The API marks the model `ready` only when
+the command exits successfully and both `<nickname>.ckpt` and `<nickname>.pth`
+exist. The frontend must use `VITE_API_URL=http://localhost:8100/api/`
+when running Vite locally. Voice requests are authenticated through the Rust
+API; the FastAPI voice service is only accessed internally by Docker.
+
+### Low-latency character TTS
+
+Character speech uses an authenticated WebSocket at `/api/tts/ws`. The Rust
+API splits replies at punctuation, requests complete short WAV segments from
+the internal voice service, and sends each segment as one binary WebSocket
+frame. The chat player starts after the first segment and continues through
+the remaining segment queue. If the WebSocket cannot connect before any audio
+arrives, the frontend falls back to the existing `/api/tts/stream` AAC stream.
+
+Configure the voice API in `../rust-app/.env`:
+
+```dotenv
+# Comma-separated model IDs to cache and warm when the voice service starts.
+VOICE_PRELOAD_MODELS=character-v1
+VOICE_PRELOAD_WARMUP=true
+VOICE_TTS_CHUNK_MAX_CHARACTERS=48
+VOICE_TTS_CACHE_ENABLED=true
+```
+
+Switching a character's active voice model also starts an asynchronous warmup.
+The FastAPI service keeps one shared HTTP connection pool, caches speaker
+artifact/reference lookups until their source files change, and avoids
+reloading GPT/SoVITS weights while the same model remains active.
+
+Frontend compatibility flags:
+
+```dotenv
+VITE_CHARACTER_TTS_WEBSOCKET=true
+VITE_CHARACTER_TTS_STREAMING=true
+```
+
+Set `VITE_CHARACTER_TTS_WEBSOCKET=false` to use the previous HTTP streaming
+path directly. Set both flags to `false` to use sequential generated audio
+URLs.
+
 ### packages
 ```sh
 pnpm create tauri-app web-app --template react-ts # tarui, react, typescript
@@ -330,24 +420,9 @@ google chrome无法保证同时保持滚动播放和不静音，要开静音vide
 游客可以浏览所有动态，可以统计浏览量，点赞和评论按钮不可点击，点击会提示需要登录后才能使用
 
 ### 二次元角色语音
-TTS：文本转语音
-LLM:
-DeepSeek API / Qwen API
+TTS：文本转语音GPT-SoVITS
+LLM: DeepSeek API / Qwen API
 
-TTS:
-GPT-SoVITS
-
-头像:
-PNG
-
-
-文字
-   ↓
-TTS（生成普通声音）
-   ↓
-RVC
-   ↓
-转换成目标角色音色
 
 
 React 前端
@@ -370,47 +445,46 @@ mp3/wav
     ▼
 React Audio 播放
 
-角色语音素材
-
-        ↓
-
-FFmpeg 提取
-
-        ↓
-
-UVR5 去BGM
-
-        ↓
-
-VAD 自动切句
-
-        ↓
-
-降噪
-
-        ↓
-
-音量标准化
-
-        ↓
-
-ASR 自动识别文字
-
-        ↓
-
-人工检查
-
-        ↓
-
 GPT-SoVITS训练
 
+崩铁官网下载的官方语音素材不需要 FFmpeg 操作，例如提取、降噪、音量标准化或
+重新提取文字。上传原始音频和素材包自带的标注文件后，直接进入 GPT-SoVITS 训练。
 
-训练后文件为：
-models/
-└── character01/
-      ├── character.ckpt
-      └── character.pth
 
+素材包中的 List 文件：
+001.wav|character|zh|你好，欢迎回来。
+002.wav|character|zh|今天也一起去冒险吧。
+003.wav|character|zh|准备出发了吗？
+也就是：
+音频文件 | 说话人 | 语言 | 音频对应文字
+war音频文件从官方网站下载比如米游社
+
+训练数据和训练后文件为：
+src/assets/train/<nickname>/
+    │
+    ├── audio/
+    │   ├── 001.wav
+    │   ├── 002.wav
+    │   └── 003.wav
+    │
+    │── <上传的 List 文件名>
+    └── models/
+        ├── <nickname>.ckpt
+        └── <nickname>.pth
+
+保留多个训练模型版本
+src/assets/train/<nickname>/
+    |---v1
+        │
+        ├── audio/
+        │   ├── *.wav
+        │   ├── *.wav
+        │   └── *.wav
+        │
+        │── *.list
+        └── models/
+            ├── <nickname>.ckpt
+            └── <nickname>.pth
 
 完美还原**的性格和语言风格
 高质量语音克隆：
@@ -424,24 +498,89 @@ models/
 低延迟实时处理
 高准确率语音转文字
 
+ 具体分工：
 
-数据格式示例
-你的上传应该类似：
-character01/
+  - Rust app
+      - JWT 鉴权
+      - 用户与昵称绑定
+      - 多文件上传
+      - 文件大小、格式、配额校验
+      - 训练任务状态
+      - 调用 LLM
+      - 调用内部 FastAPI
 
-├── audio/
-│
-│   ├── 001.wav
-│   ├── 002.wav
-│   └── 003.wav
-│
-└── dataset.list
-dataset.list：
-001.wav|你好，欢迎回来。
-002.wav|今天也一起去冒险吧。
-003.wav|准备出发了吗？
-也就是：
-音频文件 | 音频对应文字
+  - FastAPI
+      - 保留 GPT-SoVITS 相关逻辑
+      - 训练桥接
+      - TTS 推理
+      - 内部服务接口，不暴露公网
+
+```py
+# Please install OpenAI SDK first: `pip3 install openai`
+import os
+from openai import OpenAI
+
+client = OpenAI(
+    api_key=os.environ.get('DEEPSEEK_API_KEY'),
+    base_url="https://api.deepseek.com")
+
+response = client.chat.completions.create(
+    model="deepseek-v4-flash",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant"},
+        {"role": "user", "content": "Hello"},
+    ],
+    stream=False,
+    reasoning_effort="low",
+    extra_body={"thinking": {"type": "enabled"}}
+)
+
+print(response.choices[0].message.content)
+```
+自定义域名必须加入，且重启api
+ALLOWED_LLM_HOSTS=api.deepseek.com,api.openai.com,api.example.com
+
+架构如下：
+  所以三个服务的职责是：
+
+  - gpt-sovits-api：API 编排、LLM 请求、任务管理
+  - gpt-sovits-trainer：训练模型
+  - gpt-sovits：加载模型并进行 TTS 推理
+
+  本地 Rust 只需要配置：
+
+  VOICE_API_URL=http://127.0.0.1:8200
+```
+
+
+模型版本表
+```sql
+CREATE TABLE character_voice_model (
+    id UUID PRIMARY KEY,
+    character_id UUID,
+    version INT,
+    name VARCHAR(50),
+    ckpt_path TEXT,
+    pth_path TEXT,
+    status VARCHAR(20),
+    created_at TIMESTAMP
+);
+```
+把自动回复拆成两层：LLM 连接后先保证文字回复；选择 Character 且语音模型可用时，再额外生成并播放 TTS。
+
+LLM迁移到Rust中
+Python：语音训练、推理和 TTS
+
+语音生成慢：一般只需100-300ms
+GPT-SoVITS
++
+模型常驻
++
+speaker缓存
++
+文本切片
++
+WebSocket流式
 
 ## music
 ### 转码
@@ -613,4 +752,3 @@ React Query管理分页、缓存和预取，Redux Toolkit（仅管理全局播�
 
 封面黑屏问题：
 ffmpeg智能选帧而不是选2s的，因为有的可能还是黑屏，要过滤黑屏（blackdetect 或平均亮度）
-

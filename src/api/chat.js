@@ -18,6 +18,15 @@ export function sendMessage(input) {
   })
 }
 
+export function sendAutomaticReply(input) {
+  return request.post('/message/automatic-reply', input).then(response => {
+    if (response.data && typeof response.data === 'object' && typeof response.data.id === 'number') {
+      return response.data
+    }
+    throw new Error('Invalid automatic reply response')
+  })
+}
+
 export function sendImageMessage(input) {
   const formData = new FormData()
   formData.append('chat_type', input.chat_type)

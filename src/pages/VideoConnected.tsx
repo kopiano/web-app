@@ -1842,10 +1842,11 @@ export default function VideoConnected() {
     queryKey: ['video', 'detail', uploadVideoId],
     queryFn: () => getVideo(uploadVideoId as string),
     enabled: Boolean(uploadVideoId) && uploadOpen,
+    refetchOnMount: 'always',
     refetchInterval: (query) => (
-      query.state.data?.status === 'uploading' || query.state.data?.status === 'processing'
-        ? 1200
-        : false
+      query.state.data?.status === 'ready' || query.state.data?.status === 'failed'
+        ? false
+        : 1200
     ),
   });
   const generatedUploadCoverUrl = useMemo(() => {
@@ -1866,14 +1867,18 @@ export default function VideoConnected() {
     queryKey: ['video', 'published-processing', publishedProcessingVideos.map((video) => video.id)],
     queryFn: () => getVideos({ limit: 50, scope: 'accessible' }),
     enabled: publishedProcessingVideos.length > 0,
-    refetchInterval: (query) => (
-      query.state.data?.items.some((video) => (
-        publishedProcessingVideos.some((pending) => pending.id === video.id)
-        && (video.status === 'uploading' || video.status === 'processing')
-      ))
+    refetchOnMount: 'always',
+    refetchInterval: (query) => {
+      if (publishedProcessingVideos.length === 0) return false;
+      const items = query.state.data?.items;
+      if (!items) return 1200;
+      return publishedProcessingVideos.some((pending) => {
+        const current = items.find((video) => video.id === pending.id);
+        return !current || current.status === 'uploading' || current.status === 'processing';
+      })
         ? 1200
-        : false
-    ),
+        : false;
+    },
   });
 
   const homeSourceItems = useMemo(
@@ -2713,16 +2718,22 @@ export default function VideoConnected() {
         void deleteVideo(uploaded.id);
         return;
       }
+      const latest = await queryClient.fetchQuery({
+        queryKey: ['video', 'detail', uploaded.id],
+        queryFn: () => getVideo(uploaded.id),
+        staleTime: 0,
+      });
       setUploadVideoId(uploaded.id);
       setUploadProgress(100);
-      if (uploaded.duration > 0) setUploadDuration(formatDuration(uploaded.duration));
+      if (latest.duration > 0) setUploadDuration(formatDuration(latest.duration));
       setHasVideoRecord(true);
       try {
         window.localStorage.setItem(VIDEO_RECORD_EXISTS_KEY, '1');
       } catch {
         // The current session still suppresses mock content when storage is unavailable.
       }
-      queryClient.setQueryData(['video', 'detail', uploaded.id], uploaded);
+      updateCachedVideo(latest);
+      void invalidateVideoData(latest.id);
     } catch {
       if (controller.signal.aborted || session !== uploadSessionRef.current) return;
       setUploadError(t('video.upload.failed'));
@@ -2770,7 +2781,8 @@ export default function VideoConnected() {
 
   const closeUpload = () => {
     const uploadId = uploadVideoId;
-    const shouldDeleteDraft = Boolean(uploadId) && !uploadPublishRequestedRef.current;
+    const wasPublished = uploadPublishRequestedRef.current;
+    const shouldDeleteDraft = Boolean(uploadId) && !wasPublished;
     uploadSessionRef.current += 1;
     draftTitleSaveVersionRef.current += 1;
     uploadAbortControllerRef.current?.abort();
@@ -2803,6 +2815,9 @@ export default function VideoConnected() {
         .catch(() => {
           // The server owns cleanup of a partially uploaded record if deletion cannot be completed here.
         });
+    }
+    if (wasPublished) {
+      window.location.reload();
     }
   };
 
@@ -2916,6 +2931,11 @@ export default function VideoConnected() {
   ]);
 
   useEffect(() => {
+    const currentItems = publishedProcessingQuery.data?.items ?? [];
+    currentItems
+      .filter((video) => publishedProcessingVideos.some((pending) => pending.id === video.id))
+      .forEach((video) => updateCachedVideo(video));
+
     const completedIds = publishedProcessingQuery.data?.items
       .filter((video) => (
         publishedProcessingVideos.some((pending) => pending.id === video.id)
@@ -2926,7 +2946,12 @@ export default function VideoConnected() {
     if (completedIds.length === 0) return;
     setPublishedProcessingVideos((current) => current.filter((video) => !completedIds.includes(video.id)));
     void Promise.all(completedIds.map((videoId) => invalidateVideoData(videoId)));
-  }, [invalidateVideoData, publishedProcessingQuery.data, publishedProcessingVideos]);
+  }, [
+    invalidateVideoData,
+    publishedProcessingQuery.data,
+    publishedProcessingVideos,
+    updateCachedVideo,
+  ]);
 
   const openUpload = () => {
     if (!currentUser) {

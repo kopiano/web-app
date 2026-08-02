@@ -29,6 +29,12 @@ export interface SendMessageInput {
   client_message_id: string;
 }
 
+export interface SendAutomaticReplyInput {
+  sender_id: string;
+  content: string;
+  client_message_id: string;
+}
+
 export interface SendImageMessageInput {
   chat_type: 'private' | 'public';
   receiver_id?: string;
@@ -86,6 +92,7 @@ export interface AddGroupMembersResult {
 
 export function getMessageUserInfo(): Promise<ChatApiContact[]>;
 export function sendMessage(input: SendMessageInput): Promise<ChatApiMessage>;
+export function sendAutomaticReply(input: SendAutomaticReplyInput): Promise<ChatApiMessage>;
 export function sendImageMessage(input: SendImageMessageInput): Promise<ChatApiMessage>;
 export function getMessageHistory(query: MessageHistoryQuery): Promise<ChatApiMessage[]>;
 export function createGroup(input: CreateGroupInput): Promise<CreateGroupResult>;

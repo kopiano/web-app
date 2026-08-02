@@ -60,6 +60,11 @@ export interface ChatMessage {
   sendImageRequest?: SendImageMessageInput
   imageUrl?: string
   imageName?: string
+  audioUrl?: string
+  audioStreamUrl?: string
+  audioSegments?: string[]
+  audioStatus?: 'generating' | 'ready' | 'failed'
+  audioAutoPlay?: boolean
   createdAt?: string
 }
 
@@ -384,15 +389,22 @@ const chatSlice = createSlice({
     ) => {
       const cache = state.conversations[action.payload.conversationId]
         ||= emptyConversationCache()
-      cache.messages = cache.messages.map(message => (
-        message.id === action.payload.temporaryId
-        || Boolean(
-          action.payload.message.clientMessageId
-          && message.clientMessageId === action.payload.message.clientMessageId,
-        )
-          ? action.payload.message
-          : message
-      ))
+      cache.messages = mergeMessages(
+        [],
+        cache.messages.map(message => (
+          message.id === action.payload.temporaryId
+          || Boolean(
+            action.payload.message.clientMessageId
+            && message.clientMessageId === action.payload.message.clientMessageId,
+          )
+            ? {
+                ...message,
+                ...action.payload.message,
+                status: action.payload.message.status || message.status,
+              }
+            : message
+        )),
+      )
     },
     patchConversationMessage: (
       state,

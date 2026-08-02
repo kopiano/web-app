@@ -4,14 +4,22 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
+  AudioLines,
   ArrowRight,
   Camera,
   Check,
+  CheckCircle2,
   BrainCircuit,
+  ChevronDown,
+  CircleAlert,
   FileAudio,
   FileText,
+  LoaderCircle,
   Maximize2,
+  Pause,
   Plus,
+  Play,
+  Settings2,
   Search,
   Share2,
   Sparkles,
@@ -28,9 +36,25 @@ import {
 import {
   addGroupMembers,
   createGroup,
+  sendAutomaticReply,
   sendImageMessage,
   sendMessage,
 } from '@/api/chat';
+import {
+  acknowledgeVoiceTrainingJob,
+  characterTtsStreamUrl,
+  createVoiceTrainingJob,
+  generateCharacterTts,
+  getCharacterBinding,
+  getCharacterModels,
+  getCharacters,
+  getVoiceTrainingJob,
+  saveCharacterBinding,
+  streamCharacterTts,
+  streamLlmReply,
+  switchCharacterModel,
+  testLlmConnection,
+} from '@/api/voice';
 import {
   createMoment,
   createMomentComment,
@@ -49,6 +73,11 @@ import type {
   SendImageMessageInput,
   SendMessageInput,
 } from '@/api/chat';
+import type {
+  CharacterSummary,
+  CharacterVoiceModelOption,
+  LlmConfigInput,
+} from '@/api/voice';
 import type { MomentApiItem, MomentUploadProgress } from '@/api/moment';
 import type { RootState, AppDispatch } from '@/store/store';
 import {
@@ -126,6 +155,12 @@ const ACTIVE_CONTACT_KEY = 'chat_active_contact';
 const ACTIVE_TAB_KEY = 'chat_tab';
 const SHARE_GROUP_DRAFT_KEY = 'chat_group_share_draft';
 const CREATE_GROUP_DRAFT_KEY = 'chat_create_group_draft';
+const LLM_CONFIG_KEY = 'character_llm_config';
+const LLM_DIALOG_DRAFT_KEY = 'character_llm_dialog_draft';
+const MODEL_TRAINING_DRAFT_KEY = 'character_voice_training_draft';
+const SELECTED_CHARACTER_KEY = 'character_selected';
+const VOICE_MODEL_KEY = 'character_voice_model';
+const VOICE_TRAINING_JOB_KEY = 'character_voice_training_job';
 const WEBSOCKET_HEARTBEAT_INTERVAL_MS = 25_000;
 const CONTACT_PRESENCE_REFRESH_INTERVAL_MS = 30_000;
 const MOMENT_IMPRESSION_DELAY_MS = 1_000;
@@ -134,6 +169,415 @@ const MAX_VISIBLE_GROUP_AVATARS = 20;
 // Keep the encoded JSON request below the backend's 7 MB body limit.
 const MAX_GROUP_AVATAR_BYTES = 4 * 1024 * 1024;
 const GROUP_AVATAR_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+
+function takeReadySpeechText(
+  text: string,
+  flush = false,
+  maxCharacters = 28,
+): { chunks: string[]; remainder: string } {
+  const chunks: string[] = [];
+  let current = '';
+  for (const character of text) {
+    current += character;
+    const currentLength = current.trim().length;
+    const isBoundary = /[。！？!?；;，,：:\n]/u.test(character);
+    if ((isBoundary && currentLength >= 6) || currentLength >= maxCharacters) {
+      if (current.trim()) chunks.push(current.trim());
+      current = '';
+    }
+  }
+  if (flush && current.trim()) {
+    chunks.push(current.trim());
+    current = '';
+  }
+  return { chunks, remainder: current };
+}
+
+interface VoiceMessagePlayerProps {
+  audioStreamUrl?: string;
+  audioSegments?: string[];
+  status?: Message['audioStatus'];
+  autoPlay?: boolean;
+  onStreamReady?: () => void;
+  onStreamError?: () => void;
+  onAutoPlayStarted?: () => void;
+  onAutoPlayBlocked?: () => void;
+  label: string;
+  generatingLabel: string;
+  bufferingLabel: string;
+  readyLabel: string;
+  failedLabel: string;
+}
+
+function VoiceMessagePlayer({
+  audioStreamUrl,
+  audioSegments,
+  status,
+  autoPlay,
+  onStreamReady,
+  onStreamError,
+  onAutoPlayStarted,
+  onAutoPlayBlocked,
+  label,
+  generatingLabel,
+  bufferingLabel,
+  readyLabel,
+  failedLabel,
+}: VoiceMessagePlayerProps) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const streamStateReportedRef = useRef<'ready' | 'failed' | null>(null);
+  const autoPlayRef = useRef(Boolean(autoPlay));
+  const autoPlayAttemptedRef = useRef('');
+  const queuedSegmentPlayRef = useRef<number | null>(null);
+  const waitingForSegmentRef = useRef<number | null>(null);
+  const [activeSegment, setActiveSegment] = useState(0);
+  const [isUsingStream, setIsUsingStream] = useState(Boolean(audioStreamUrl));
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const segments = audioSegments || [];
+  const segmentUrl = isUsingStream && audioStreamUrl
+    ? audioStreamUrl
+    : segments[activeSegment] || '';
+
+  useEffect(() => {
+    autoPlayRef.current = Boolean(autoPlay);
+    if (!autoPlay) autoPlayAttemptedRef.current = '';
+  }, [autoPlay]);
+
+  useEffect(() => {
+    setActiveSegment(current => Math.min(current, Math.max(0, segments.length - 1)));
+  }, [segments.length]);
+
+  useEffect(() => {
+    streamStateReportedRef.current = null;
+    if (audioStreamUrl) {
+      setActiveSegment(0);
+      setIsUsingStream(true);
+    }
+  }, [audioStreamUrl]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+    setCurrentTime(0);
+    setDuration(0);
+    setIsPlaying(false);
+    setIsBuffering(false);
+    if (segmentUrl) audio.load();
+    const shouldContinueSegments = (
+      !isUsingStream
+      && queuedSegmentPlayRef.current === activeSegment
+    );
+    if (
+      segmentUrl
+      && ((isUsingStream && autoPlayRef.current) || shouldContinueSegments)
+    ) {
+      const attemptKey = shouldContinueSegments
+        ? `continue:${activeSegment}:${segmentUrl}`
+        : `stream:${segmentUrl}`;
+      if (autoPlayAttemptedRef.current === attemptKey) return;
+      autoPlayAttemptedRef.current = attemptKey;
+      queuedSegmentPlayRef.current = null;
+      void audio.play()
+        .then(() => {
+          setIsPlaying(true);
+          if (!shouldContinueSegments) onAutoPlayStarted?.();
+        })
+        .catch(() => {
+          setIsPlaying(false);
+          if (!shouldContinueSegments) onAutoPlayBlocked?.();
+        });
+    }
+  }, [activeSegment, isUsingStream, segmentUrl]);
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.playbackRate = playbackRate;
+  }, [playbackRate, segmentUrl]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (
+      isUsingStream
+      || !autoPlay
+      || !segmentUrl
+      || activeSegment !== 0
+      || status === 'failed'
+    ) {
+      return;
+    }
+    const attemptKey = `segment:${segmentUrl}`;
+    if (!audio || autoPlayAttemptedRef.current === attemptKey) return;
+    autoPlayAttemptedRef.current = attemptKey;
+    void audio.play()
+      .then(() => {
+        setIsPlaying(true);
+        onAutoPlayStarted?.();
+      })
+      .catch(() => {
+        setIsPlaying(false);
+        onAutoPlayBlocked?.();
+      });
+  }, [activeSegment, autoPlay, isUsingStream, segmentUrl, status]);
+
+  useEffect(() => {
+    const nextSegment = waitingForSegmentRef.current;
+    if (nextSegment === null) return;
+    if (nextSegment < segments.length) {
+      waitingForSegmentRef.current = null;
+      setIsBuffering(false);
+      selectSegment(nextSegment, true);
+    } else if (status !== 'generating') {
+      waitingForSegmentRef.current = null;
+      setIsBuffering(false);
+      setIsPlaying(false);
+    }
+  }, [segments.length, status]);
+
+  function togglePlayback() {
+    const audio = audioRef.current;
+    if (!audio || !segmentUrl) return;
+    if (audio.paused) {
+      void audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+    } else {
+      audio.pause();
+      setIsPlaying(false);
+    }
+  }
+
+  function selectSegment(nextSegment: number, autoplay = false) {
+    if (isUsingStream || nextSegment < 0 || nextSegment >= segments.length) return;
+    if (autoplay) queuedSegmentPlayRef.current = nextSegment;
+    setActiveSegment(nextSegment);
+  }
+
+  function handleEnded() {
+    if (isUsingStream) {
+      queuedSegmentPlayRef.current = 0;
+      setIsUsingStream(false);
+      if (segments.length === 0 && status === 'generating') {
+        waitingForSegmentRef.current = 0;
+        setIsBuffering(true);
+      } else if (segments.length === 0) {
+        queuedSegmentPlayRef.current = null;
+        setIsPlaying(false);
+        setCurrentTime(0);
+      }
+    } else if (activeSegment < segments.length - 1) {
+      selectSegment(activeSegment + 1, true);
+    } else if (status === 'generating') {
+      waitingForSegmentRef.current = activeSegment + 1;
+      setIsBuffering(true);
+    } else {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    }
+  }
+
+  function cyclePlaybackRate() {
+    const nextRate = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1;
+    setPlaybackRate(nextRate);
+    if (audioRef.current) audioRef.current.playbackRate = nextRate;
+  }
+
+  function formatAudioTime(value: number) {
+    if (!Number.isFinite(value) || value < 0) return '0:00';
+    return `${Math.floor(value / 60)}:${Math.floor(value % 60).toString().padStart(2, '0')}`;
+  }
+
+  const hasDuration = Number.isFinite(duration) && duration > 0;
+  const progressPercent = hasDuration
+    ? Math.min(100, Math.max(0, (currentTime / duration) * 100))
+    : 0;
+  const statusLabel = isBuffering
+    ? bufferingLabel
+    : status === 'generating'
+      ? generatingLabel
+      : status === 'failed'
+        ? failedLabel
+        : readyLabel;
+  const formattedTime = hasDuration
+    ? `${formatAudioTime(currentTime)} / ${formatAudioTime(duration)}`
+    : statusLabel;
+  const hasMultipleSegments = !isUsingStream && segments.length > 1;
+
+  function seek(event: React.MouseEvent<HTMLButtonElement>) {
+    const audio = audioRef.current;
+    if (!audio || duration <= 0) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
+    audio.currentTime = ratio * duration;
+    setCurrentTime(audio.currentTime);
+  }
+
+  return (
+    <div
+      className={`voice-message-player is-${status || 'ready'}${isPlaying ? ' is-playing' : ''}${isBuffering ? ' is-buffering' : ''}`}
+      aria-label={`${label}: ${statusLabel}`}
+    >
+      <button
+        type="button"
+        className="voice-message-play"
+        disabled={!segmentUrl || status === 'failed'}
+        onClick={togglePlayback}
+        aria-label={isPlaying ? `Pause ${label}` : `Play ${label}`}
+        title={isPlaying ? `Pause ${label}` : `Play ${label}`}
+      >
+        {status === 'failed'
+          ? <CircleAlert size={17} strokeWidth={2} aria-hidden="true" />
+          : isBuffering
+            ? <LoaderCircle className="voice-message-spinner" size={17} strokeWidth={2.2} aria-hidden="true" />
+            : status === 'generating' && !segmentUrl
+              ? <AudioLines size={17} strokeWidth={2.1} aria-hidden="true" />
+              : isPlaying
+                ? <Pause size={15} fill="currentColor" aria-hidden="true" />
+                : <Play size={15} fill="currentColor" aria-hidden="true" />}
+      </button>
+      <div className="voice-message-track">
+        <button
+          type="button"
+          className="voice-message-waveform"
+          disabled={!hasDuration}
+          onClick={seek}
+          aria-label={`${label}: ${formattedTime}`}
+          title={statusLabel}
+        >
+          {Array.from({ length: 30 }, (_, index) => {
+            const position = ((index + 1) / 30) * 100;
+            return (
+              <i
+                key={index}
+                className={position <= progressPercent ? 'is-active' : ''}
+                style={{ '--wave-height': `${30 + ((index * 23) % 66)}%` } as React.CSSProperties}
+              />
+            );
+          })}
+        </button>
+        <div className="voice-message-meta">
+          <span className="voice-message-time">{formattedTime}</span>
+          <span className="voice-message-context" aria-live="polite">
+            {(isBuffering || (status === 'generating' && hasDuration)) && (
+              <span className={`voice-message-state${isBuffering ? ' is-buffering' : ''}`}>
+                {isBuffering
+                  ? <LoaderCircle className="voice-message-spinner" size={10} strokeWidth={2.4} aria-hidden="true" />
+                  : <i aria-hidden="true" />}
+                {isBuffering ? bufferingLabel : generatingLabel}
+              </span>
+            )}
+            {!isBuffering && status !== 'generating' && hasMultipleSegments && (
+              <span
+                className="voice-message-segment"
+                aria-label={`${label}: ${activeSegment + 1} / ${segments.length}`}
+              >
+                {activeSegment + 1}/{segments.length}
+              </span>
+            )}
+          </span>
+          <button
+            type="button"
+            className="voice-message-rate"
+            disabled={!segmentUrl || status === 'failed'}
+            onClick={cyclePlaybackRate}
+            aria-label={`${label}: ${playbackRate}x`}
+            title={`${playbackRate}x`}
+          >
+            {playbackRate}x
+          </button>
+        </div>
+      </div>
+      <audio
+        ref={audioRef}
+        className="voice-message-audio"
+        src={segmentUrl}
+        crossOrigin="use-credentials"
+        preload="metadata"
+        onLoadedMetadata={event => {
+          event.currentTarget.playbackRate = playbackRate;
+          setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0);
+        }}
+        onDurationChange={event => {
+          if (Number.isFinite(event.currentTarget.duration)) {
+            setDuration(event.currentTarget.duration);
+          }
+        }}
+        onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime)}
+        onPlay={() => setIsPlaying(true)}
+        onPlaying={() => {
+          setIsPlaying(true);
+          setIsBuffering(false);
+        }}
+        onPause={() => {
+          setIsPlaying(false);
+          setIsBuffering(false);
+        }}
+        onCanPlay={() => {
+          setIsPlaying(current => current || !audioRef.current?.paused);
+          if (isUsingStream && streamStateReportedRef.current === null) {
+            streamStateReportedRef.current = 'ready';
+            onStreamReady?.();
+          }
+        }}
+        onWaiting={() => setIsBuffering(true)}
+        onError={() => {
+          setIsPlaying(false);
+          setIsBuffering(false);
+          if (isUsingStream && streamStateReportedRef.current === null) {
+            streamStateReportedRef.current = 'failed';
+            onStreamError?.();
+          }
+        }}
+        onEnded={handleEnded}
+        aria-label={label}
+      />
+    </div>
+  );
+}
+
+function formatVoiceTrainingError(error: string, t: TFunction) {
+  const detail = error.trim();
+  if (!detail) return t('chat.modelTrainingFailed');
+
+  if (
+    /\bWinError\s*2\b/i.test(detail)
+    || /系统找不到指定的文件/.test(detail)
+    || /The system cannot find the file specified/i.test(detail)
+  ) {
+    return t('chat.modelTrainingMissingFile', { error: detail });
+  }
+
+  return detail;
+}
+
+function isTrainingVersionDirectoryConflict(error: unknown) {
+  const apiMessage = getApiErrorMessage(error) || '';
+  const errorMessage = error instanceof Error ? error.message : '';
+  return /training version directory already exists|version directory already exists|训练版本目录已存在/i
+    .test(`${apiMessage} ${errorMessage}`);
+}
+
+function uniqueTrainingVersionName(versionName: string) {
+  const suffix = `retry-${Date.now().toString(36)}`;
+  return `${versionName.slice(0, Math.max(1, 80 - suffix.length - 1))}-${suffix}`;
+}
+
+function contactCharacterSelectionKey(
+  userId?: string | number | null,
+  contactUserId?: string | number | null,
+) {
+  return `${SELECTED_CHARACTER_KEY}:${userId || 'guest'}:${contactUserId || 'none'}`;
+}
+
+function voiceModelStorageKey(userId?: string | number | null) {
+  return `${VOICE_MODEL_KEY}:${userId || 'guest'}`;
+}
+
+function voiceTrainingJobStorageKey(userId?: string | number | null) {
+  return `${VOICE_TRAINING_JOB_KEY}:${userId || 'guest'}`;
+}
 
 interface ShareCandidate {
   userId: string;
@@ -156,6 +600,64 @@ interface CreateGroupDraft {
   avatar: string;
 }
 
+interface StoredLlmConfig extends LlmConfigInput {
+  connected: boolean;
+}
+
+interface LlmDialogDraft {
+  open: boolean;
+}
+
+interface ModelTrainingDraft {
+  open: boolean;
+  nickname: string;
+  versionName: string;
+}
+
+interface LlmPreset {
+  id: string;
+  model_name: string;
+  api_request_url: string;
+  effort: string;
+}
+
+const LLM_PRESETS: LlmPreset[] = [
+  {
+    id: 'deepseek-v4-flash',
+    model_name: 'deepseek-v4-flash',
+    api_request_url: 'https://api.deepseek.com',
+    effort: 'low',
+  },
+  {
+    id: 'custom',
+    model_name: '',
+    api_request_url: '',
+    effort: '',
+  },
+];
+
+const EMPTY_LLM_CONFIG: StoredLlmConfig = {
+  model_name: 'deepseek-v4-flash',
+  api_token: '',
+  api_request_url: 'https://api.deepseek.com',
+  effort: 'low',
+  connected: false,
+};
+
+function normalizeLlmConfig(config: Partial<StoredLlmConfig>): StoredLlmConfig {
+  const modelName = typeof config.model_name === 'string'
+    ? config.model_name
+    : EMPTY_LLM_CONFIG.model_name;
+  const effort = typeof config.effort === 'string' ? config.effort : '';
+  return {
+    ...EMPTY_LLM_CONFIG,
+    ...config,
+    effort: effort.trim() || (
+      modelName.trim().toLowerCase() === 'deepseek-v4-flash' ? 'low' : ''
+    ),
+  };
+}
+
 function readLocalDraft<T>(key: string): T | null {
   try {
     const value = localStorage.getItem(key);
@@ -171,6 +673,15 @@ function writeLocalDraft(key: string, value: unknown) {
     return true;
   } catch {
     return false;
+  }
+}
+
+function readSessionDraft<T>(key: string): T | null {
+  try {
+    const value = sessionStorage.getItem(key);
+    return value ? JSON.parse(value) as T : null;
+  } catch {
+    return null;
   }
 }
 
@@ -312,7 +823,20 @@ function getApiErrorStatus(error: unknown) {
 }
 
 function getApiErrorMessage(error: unknown) {
-  return (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  const data = (error as {
+    response?: {
+      data?: {
+        message?: string;
+        detail?: string | Array<{ msg?: string }>;
+      };
+    };
+  })?.response?.data;
+  if (data?.message) return data.message;
+  if (typeof data?.detail === 'string') return data.detail;
+  if (Array.isArray(data?.detail)) {
+    return data.detail.map(item => item.msg).filter(Boolean).join(', ');
+  }
+  return undefined;
 }
 
 function createGroupErrorMessage(error: unknown, fallback: string, badRequestMessage: string) {
@@ -602,10 +1126,53 @@ function Chat() {
   const [groupAvatar, setGroupAvatar] = useState('');
   const [groupCreating, setGroupCreating] = useState(false);
   const [groupCreateError, setGroupCreateError] = useState('');
-  const [isModelTrainingOpen, setIsModelTrainingOpen] = useState(false);
-  const [modelNickname, setModelNickname] = useState('');
+  const [isModelTrainingOpen, setIsModelTrainingOpen] = useState(
+    () => readLocalDraft<ModelTrainingDraft>(MODEL_TRAINING_DRAFT_KEY)?.open ?? false,
+  );
+  const [isLlmConfigOpen, setIsLlmConfigOpen] = useState(
+    () => readLocalDraft<LlmDialogDraft>(LLM_DIALOG_DRAFT_KEY)?.open ?? false,
+  );
+  const [modelNickname, setModelNickname] = useState(
+    () => readLocalDraft<ModelTrainingDraft>(MODEL_TRAINING_DRAFT_KEY)?.nickname ?? '',
+  );
+  const [modelVersionName, setModelVersionName] = useState(
+    () => readLocalDraft<ModelTrainingDraft>(MODEL_TRAINING_DRAFT_KEY)?.versionName ?? '',
+  );
   const [warFiles, setWarFiles] = useState<File[]>([]);
   const [listTextFile, setListTextFile] = useState<File | null>(null);
+  const [voiceUploadProgress, setVoiceUploadProgress] = useState({
+    percent: 0,
+    successful: 0,
+  });
+  const [modelTraining, setModelTraining] = useState(false);
+  const [modelTrainingError, setModelTrainingError] = useState('');
+  const [activeVoiceModelId, setActiveVoiceModelId] = useState('');
+  const [activeVoiceTrainingJobId, setActiveVoiceTrainingJobId] = useState('');
+  const [voiceModelStatus, setVoiceModelStatus] = useState('');
+  const [voiceModelErrorDetail, setVoiceModelErrorDetail] = useState('');
+  const [voiceModelProgress, setVoiceModelProgress] = useState(0);
+  const [voiceModelStage, setVoiceModelStage] = useState('');
+  const [characters, setCharacters] = useState<CharacterSummary[]>([]);
+  const [voiceModelOptions, setVoiceModelOptions] = useState<CharacterVoiceModelOption[]>([]);
+  const [selectedVoiceModelVersion, setSelectedVoiceModelVersion] = useState('');
+  const [voiceModelSwitching, setVoiceModelSwitching] = useState(false);
+  const [selectedCharacterId, setSelectedCharacterId] = useState('');
+  const [characterBindingSaving, setCharacterBindingSaving] = useState(false);
+  const [llmConfig, setLlmConfig] = useState<StoredLlmConfig>(
+    () => (
+      normalizeLlmConfig(readSessionDraft<StoredLlmConfig>(LLM_CONFIG_KEY) || {})
+    ),
+  );
+  const [llmConnecting, setLlmConnecting] = useState(false);
+  const [selectedLlmPreset, setSelectedLlmPreset] = useState('deepseek-v4-flash');
+  const [llmConfigError, setLlmConfigError] = useState('');
+  const [llmConnectionStatus, setLlmConnectionStatus] = useState<
+    'success' | 'failed' | ''
+  >(() => {
+    const savedConfig = readSessionDraft<StoredLlmConfig>(LLM_CONFIG_KEY);
+    return savedConfig?.connected ? 'success' : '';
+  });
+  const [voiceReplyLoading, setVoiceReplyLoading] = useState(false);
   const warFilesInputRef = useRef<HTMLInputElement>(null);
   const listTextFileInputRef = useRef<HTMLInputElement>(null);
   const [inputText, setInputText] = useState('');
@@ -635,6 +1202,147 @@ function Chat() {
   const [commentTexts, setCommentTexts] = useState<Record<string, string>>({});
   const [showCommentInput, setShowCommentInput] = useState<Record<string, boolean>>({});
   const [commentEmojiPost, setCommentEmojiPost] = useState<string | null>(null);
+
+  useEffect(() => {
+    writeLocalDraft(MODEL_TRAINING_DRAFT_KEY, {
+      open: isModelTrainingOpen,
+      nickname: modelNickname,
+      versionName: modelVersionName,
+    } satisfies ModelTrainingDraft);
+  }, [isModelTrainingOpen, modelNickname, modelVersionName]);
+
+  useEffect(() => {
+    writeLocalDraft(LLM_DIALOG_DRAFT_KEY, {
+      open: isLlmConfigOpen,
+    } satisfies LlmDialogDraft);
+  }, [isLlmConfigOpen]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(LLM_CONFIG_KEY, JSON.stringify(llmConfig));
+    } catch {
+      // Session storage can be unavailable in private browsing contexts.
+    }
+  }, [llmConfig]);
+
+  useEffect(() => {
+    const userId = currentUser?.id;
+    setActiveVoiceModelId(localStorage.getItem(voiceModelStorageKey(userId)) || '');
+    setActiveVoiceTrainingJobId(
+      localStorage.getItem(voiceTrainingJobStorageKey(userId)) || '',
+    );
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const contactUserId = activeContact.startsWith('user:')
+      ? contactIdFromConversation(activeContact)
+      : '';
+
+    setSelectedCharacterId('');
+    if (!contactUserId || activeContact.startsWith('mock:')) {
+      setCharacters([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void Promise.all([getCharacters(), getCharacterBinding(contactUserId)])
+      .then(([items, binding]) => {
+        if (cancelled) return;
+        setCharacters(items);
+        const boundCharacterId = binding?.character_id || '';
+        const fallbackCharacterId = items.find(
+          character => character.train_status === 'ready' && character.voice_model,
+        )?.id || '';
+        setSelectedCharacterId(
+          items.some(character => character.id === boundCharacterId)
+            ? boundCharacterId
+            : fallbackCharacterId,
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        void getCharacters()
+          .then(items => {
+            if (cancelled) return;
+            setCharacters(items);
+            const cachedCharacterId = localStorage.getItem(
+              contactCharacterSelectionKey(currentUser?.id, contactUserId),
+            );
+            const fallbackCharacterId = items.find(
+              character => character.train_status === 'ready' && character.voice_model,
+            )?.id || '';
+            setSelectedCharacterId(
+              items.some(character => character.id === cachedCharacterId)
+                ? cachedCharacterId || ''
+                : fallbackCharacterId,
+            );
+          })
+          .catch(() => {
+            if (!cancelled) setCharacters([]);
+          });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeContact, currentUser?.id]);
+
+  useEffect(() => {
+    const contactUserId = activeContact.startsWith('user:')
+      ? contactIdFromConversation(activeContact)
+      : '';
+    if (selectedCharacterId && contactUserId) {
+      localStorage.setItem(
+        contactCharacterSelectionKey(currentUser?.id, contactUserId),
+        selectedCharacterId,
+      );
+    }
+    const selectedCharacter = characters.find(
+      character => character.id === selectedCharacterId,
+    );
+    const modelId = selectedCharacter?.voice_model || '';
+    if (modelId) {
+      setActiveVoiceModelId(modelId);
+      setVoiceModelStatus(selectedCharacter?.train_status || '');
+      localStorage.setItem(voiceModelStorageKey(currentUser?.id), modelId);
+    } else {
+      setActiveVoiceModelId('');
+      setVoiceModelStatus(selectedCharacter?.train_status || '');
+    }
+  }, [
+    activeContact,
+    characters,
+    currentUser?.id,
+    selectedCharacterId,
+  ]);
+
+  useEffect(() => {
+    if (!selectedCharacterId) {
+      setVoiceModelOptions([]);
+      setSelectedVoiceModelVersion('');
+      return;
+    }
+
+    let cancelled = false;
+    void getCharacterModels(selectedCharacterId)
+      .then(models => {
+        if (cancelled) return;
+        setVoiceModelOptions(models);
+        const active = models.find(model => model.active);
+        setSelectedVoiceModelVersion(active?.id || '');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setVoiceModelOptions([]);
+        setSelectedVoiceModelVersion('');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCharacterId]);
+
   const viewedPostsRef = useRef(new Set<string>());
   const [animatingLikes, setAnimatingLikes] = useState<Set<string>>(new Set());
   const [activeIndicatorTop, setActiveIndicatorTop] = useState(0);
@@ -645,6 +1353,7 @@ function Chat() {
   const groupAvatarInputRef = useRef<HTMLInputElement>(null);
   const msgListRef = useRef<HTMLDivElement>(null);
   const msgEndRef = useRef<HTMLDivElement>(null);
+  const messageListNearBottomRef = useRef(true);
   const lastScrolledConversationRef = useRef('');
   const wasHistoryLoadingRef = useRef(false);
   const wasHistoryLoadingMoreRef = useRef(false);
@@ -665,6 +1374,9 @@ function Chat() {
   const commentInputRefs = useRef(new Map<string, HTMLInputElement>());
   const processingFailureNotifiedRef = useRef(new Set<string>());
   const processingCompletionTimersRef = useRef(new Map<string, number>());
+  const voiceModelNoticeRef = useRef('');
+  const voiceReplyInFlightRef = useRef(false);
+  const voiceAudioContextRef = useRef<AudioContext | null>(null);
   const restoredGroupDialogDraftsRef = useRef(new Set<string>());
   const momentLikeRequestsRef = useRef(new Set<string>());
   const momentCommentRequestsRef = useRef(new Set<string>());
@@ -678,6 +1390,37 @@ function Chat() {
   );
   const isSelectedSystemUser = activeContactInfo?.type === 'user'
     && activeContactInfo.role === 'system';
+  const canSwitchVoiceModel = currentUser?.role === 'admin'
+    || currentUser?.role === 'super_admin';
+  const voiceModelButtonState = voiceModelStatus === 'ready'
+    ? ' is-ready'
+    : ['queued', 'uploading', 'training', 'downloading'].includes(voiceModelStatus)
+      ? ' is-training'
+      : voiceModelStatus === 'failed'
+        ? ' is-failed'
+        : '';
+  const voiceModelButtonTitle = voiceModelStatus === 'ready'
+    ? t('chat.modelTrainingReady', { model: activeVoiceModelId })
+    : ['queued', 'uploading', 'training', 'downloading'].includes(voiceModelStatus)
+      ? t('chat.modelTrainingInProgress', { model: activeVoiceModelId })
+      : voiceModelStatus === 'failed'
+        ? t('chat.modelTrainingFailed')
+        : t('chat.configureModelTraining');
+  const trainingProgressVisible = modelTraining || Boolean(
+    activeVoiceTrainingJobId
+    && ['queued', 'uploading', 'training', 'downloading', 'ready', 'failed'].includes(
+      voiceModelStatus,
+    ),
+  );
+  const trainingProgressPercent = modelTraining
+    ? Math.max(1, Math.round(voiceUploadProgress.percent * 0.4))
+    : voiceModelStatus === 'ready'
+      ? 100
+      : ['uploading', 'training', 'downloading'].includes(voiceModelStatus)
+        ? Math.max(1, Math.min(99, voiceModelProgress || 1))
+        : voiceModelStatus === 'queued'
+          ? Math.max(1, voiceModelProgress || 1)
+          : 0;
   const activeConversationId = activeContactInfo?.id || '';
   const activeConversationCache = useSelector(
     (state: RootState) => state.chat.conversations[activeConversationId],
@@ -1280,8 +2023,12 @@ function Chat() {
   ]);
 
   function handleMessageListScroll(event: React.UIEvent<HTMLDivElement>) {
+    const messageList = event.currentTarget;
+    messageListNearBottomRef.current = (
+      messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight <= 96
+    );
     if (
-      event.currentTarget.scrollTop > 80
+      messageList.scrollTop > 80
       || !currentUser
       || !activeContactInfo
       || activeContactInfo.id.startsWith('mock:')
@@ -1292,7 +2039,7 @@ function Chat() {
       return;
     }
 
-    historyLoadMoreScrollHeightRef.current = event.currentTarget.scrollHeight;
+    historyLoadMoreScrollHeightRef.current = messageList.scrollHeight;
     historyLoadMoreConversationRef.current = activeContactInfo.id;
     dispatch(fetchConversationHistory({
       conversationId: activeContactInfo.id,
@@ -1307,6 +2054,81 @@ function Chat() {
     setActiveContact(contactId);
     if (currentUser) {
       localStorage.setItem(`${ACTIVE_CONTACT_KEY}:${currentUser.id}`, contactId);
+    }
+  }
+
+  async function handleCharacterChange(characterId: string) {
+    const contactUserId = activeContactInfo?.type === 'user'
+      ? contactIdFromConversation(activeContactInfo.id)
+      : '';
+    if (!currentUser || !contactUserId || activeContactInfo?.id.startsWith('mock:')) {
+      setSelectedCharacterId(characterId);
+      return;
+    }
+
+    const previousCharacterId = selectedCharacterId;
+    setSelectedCharacterId(characterId);
+    localStorage.setItem(
+      contactCharacterSelectionKey(currentUser.id, contactUserId),
+      characterId,
+    );
+    setCharacterBindingSaving(true);
+    try {
+      await saveCharacterBinding(contactUserId, characterId || null);
+    } catch (error) {
+      setSelectedCharacterId(previousCharacterId);
+      if (previousCharacterId) {
+        localStorage.setItem(
+          contactCharacterSelectionKey(currentUser.id, contactUserId),
+          previousCharacterId,
+        );
+      } else {
+        localStorage.removeItem(
+          contactCharacterSelectionKey(currentUser.id, contactUserId),
+        );
+      }
+      notify(getApiErrorMessage(error) || t('chat.characterSaveFailed'), 'error');
+    } finally {
+      setCharacterBindingSaving(false);
+    }
+  }
+
+  async function handleVoiceModelChange(modelId: string) {
+    if (!selectedCharacterId || !modelId || voiceModelSwitching) return;
+    const previousModelId = selectedVoiceModelVersion;
+    const requestedModel = voiceModelOptions.find(model => model.id === modelId);
+    setSelectedVoiceModelVersion(modelId);
+    setVoiceModelSwitching(true);
+    try {
+      await switchCharacterModel(selectedCharacterId, modelId);
+      const [models, updatedCharacters] = await Promise.all([
+        getCharacterModels(selectedCharacterId),
+        getCharacters(),
+      ]);
+      const active = models.find(model => model.active);
+      setVoiceModelOptions(models);
+      setSelectedVoiceModelVersion(active?.id || modelId);
+      setCharacters(updatedCharacters);
+      const selectedCharacter = updatedCharacters.find(
+        character => character.id === selectedCharacterId,
+      );
+      if (selectedCharacter?.voice_model) {
+        setActiveVoiceModelId(selectedCharacter.voice_model);
+        setVoiceModelStatus(selectedCharacter.train_status);
+        localStorage.setItem(
+          voiceModelStorageKey(currentUser?.id),
+          selectedCharacter.voice_model,
+        );
+      }
+      notify(
+        t('chat.voiceModelSwitched', { model: requestedModel?.name || modelId }),
+        'success',
+      );
+    } catch (error) {
+      setSelectedVoiceModelVersion(previousModelId);
+      notify(getApiErrorMessage(error) || t('chat.voiceModelSwitchFailed'), 'error');
+    } finally {
+      setVoiceModelSwitching(false);
     }
   }
 
@@ -1392,11 +2214,14 @@ function Chat() {
   }
 
   function closeModelTrainingDialog() {
+    if (modelTraining) return;
     setIsModelTrainingOpen(false);
+    setModelTrainingError('');
   }
 
   function handleWarFilesChange(event: React.ChangeEvent<HTMLInputElement>) {
     setWarFiles(Array.from(event.target.files || []));
+    setVoiceUploadProgress({ percent: 0, successful: 0 });
     event.target.value = '';
   }
 
@@ -1404,6 +2229,444 @@ function Chat() {
     setListTextFile(event.target.files?.[0] || null);
     event.target.value = '';
   }
+
+  async function handleStartModelTraining() {
+    const nickname = modelNickname.trim();
+    const versionName = modelVersionName.trim();
+    if (
+      !nickname
+      || !versionName
+      || warFiles.length === 0
+      || warFiles.some(file => file.size === 0)
+      || !listTextFile
+      || listTextFile.size === 0
+    ) {
+      setModelTrainingError(t('chat.modelTrainingFilesRequired'));
+      return;
+    }
+
+    setModelTraining(true);
+    setModelTrainingError('');
+    setVoiceUploadProgress({ percent: 1, successful: 0 });
+    const uploadTotalBytes = [...warFiles, listTextFile].reduce(
+      (total, file) => total + file.size,
+      0,
+    );
+    const uploadFallbackTimer = window.setInterval(() => {
+      setVoiceUploadProgress(current => (
+        current.percent >= 95
+          ? current
+          : { ...current, percent: Math.min(95, current.percent + 1) }
+      ));
+    }, 500);
+    try {
+      const submitTraining = (requestedVersionName: string) => createVoiceTrainingJob({
+        nickname,
+        versionName: requestedVersionName,
+        audioFiles: warFiles,
+        listFile: listTextFile,
+        onUploadProgress: progress => {
+          const total = progress.total || uploadTotalBytes;
+          const percent = total > 0
+            ? Math.min(100, Math.round((progress.loaded / total) * 100))
+            : 0;
+          setVoiceUploadProgress(current => ({ ...current, percent }));
+        },
+      });
+      let submittedVersionName = versionName;
+      let job;
+      try {
+        job = await submitTraining(submittedVersionName);
+      } catch (error) {
+        if (!isTrainingVersionDirectoryConflict(error)) throw error;
+        submittedVersionName = uniqueTrainingVersionName(versionName);
+        setModelVersionName(submittedVersionName);
+        setModelTrainingError(t('chat.modelTrainingVersionConflictRetry', {
+          version: submittedVersionName,
+        }));
+        job = await submitTraining(submittedVersionName);
+      }
+      setVoiceUploadProgress({
+        percent: 100,
+        successful: warFiles.length,
+      });
+      setActiveVoiceTrainingJobId(job.id);
+      setActiveVoiceModelId(job.model_id);
+      setVoiceModelStatus(job.status);
+      setVoiceModelErrorDetail(job.error || '');
+      setVoiceModelProgress(job.progress || 0);
+      setVoiceModelStage(job.stage || '');
+      localStorage.setItem(voiceTrainingJobStorageKey(currentUser?.id), job.id);
+      notify(t('chat.modelTrainingQueued', { model: job.model_id }), 'success');
+    } catch (error) {
+      const apiError = getApiErrorMessage(error);
+      setModelTrainingError(
+        apiError === 'Another training job is already running'
+          ? t('chat.modelTrainingBusy')
+          : apiError || t('chat.modelTrainingFailed'),
+      );
+    } finally {
+      window.clearInterval(uploadFallbackTimer);
+      setModelTraining(false);
+    }
+  }
+
+  async function handleConnectLlm() {
+    const normalizedConfig = {
+      model_name: llmConfig.model_name.trim(),
+      api_token: llmConfig.api_token.trim(),
+      api_request_url: llmConfig.api_request_url.trim(),
+      effort: llmConfig.effort.trim() || (
+        llmConfig.model_name.trim().toLowerCase() === 'deepseek-v4-flash' ? 'low' : ''
+      ),
+    };
+    if (
+      !normalizedConfig.model_name
+      || !normalizedConfig.api_token
+      || !normalizedConfig.api_request_url
+      || !normalizedConfig.effort
+    ) {
+      setLlmConfigError(t('chat.llmConfigRequired'));
+      return;
+    }
+
+    setLlmConnecting(true);
+    setLlmConfigError('');
+    setLlmConnectionStatus('');
+    try {
+      await testLlmConnection(normalizedConfig);
+      const connectedConfig = { ...normalizedConfig, connected: true };
+      setLlmConfig(connectedConfig);
+      setLlmConnectionStatus('success');
+      notify(t('chat.llmConnected'), 'success');
+    } catch (error) {
+      setLlmConfigError(getApiErrorMessage(error) || t('chat.llmConnectionFailed'));
+      setLlmConfig(current => ({ ...current, connected: false }));
+      setLlmConnectionStatus('failed');
+    } finally {
+      setLlmConnecting(false);
+    }
+  }
+
+  async function createAutomaticReply(
+    conversationId: string,
+    userText: string,
+    messages: Message[],
+    userMessagePersistence: Promise<boolean>,
+  ) {
+    if (voiceReplyInFlightRef.current) {
+      return;
+    }
+    if (!llmConfig.connected) {
+      setIsLlmConfigOpen(true);
+      notify(t('chat.llmRequiredForVoice'), 'warning');
+      return;
+    }
+    const characterId = selectedCharacterId;
+    const selectedCharacter = characters.find(character => character.id === characterId);
+    const shouldGenerateVoice = Boolean(
+      selectedCharacter
+      && selectedCharacter.voice_model
+      && selectedCharacter.train_status === 'ready',
+    );
+    if (!currentUser) {
+      notify(t('chat.signInToSend'), 'warning');
+      return;
+    }
+    const clientMessageId = crypto.randomUUID();
+    const temporaryId = `llm:${clientMessageId}`;
+    let temporaryReplyCreated = false;
+    let voiceMessageId: string | number = temporaryId;
+    let pendingSpeechText = '';
+    let queuedTts = Promise.resolve();
+    let ttsError: unknown = null;
+    let firstSpeechStreamUrl = '';
+    const audioSegments: string[] = [];
+    const ttsInput = shouldGenerateVoice ? {
+      character_id: characterId,
+      model_id: selectedVoiceModelVersion || undefined,
+      language: (i18n.resolvedLanguage || i18n.language).startsWith('zh') ? 'zh' as const : 'en' as const,
+      speed_factor: 1,
+    } : null;
+
+    const patchVoiceMessage = (changes: Partial<ChatMessage>) => {
+      dispatch(patchConversationMessage({
+        conversationId,
+        messageId: voiceMessageId,
+        changes,
+      }));
+    };
+    const generateSpeechChunk = async (text: string) => {
+      if (!ttsInput) return;
+      const segmentCountBeforeRequest = audioSegments.length;
+      if (import.meta.env.VITE_CHARACTER_TTS_WEBSOCKET !== 'false') {
+        try {
+          await streamCharacterTts({ ...ttsInput, text }, {
+            onSegment: segment => {
+              audioSegments.push(segment.audio_url);
+              patchVoiceMessage({
+                audioSegments: [...audioSegments],
+                audioStatus: 'generating',
+              });
+            },
+          });
+          return;
+        } catch (error) {
+          if (audioSegments.length > segmentCountBeforeRequest) return;
+        }
+      }
+      const generated = await generateCharacterTts({ ...ttsInput, text });
+      if (!generated.audio_url) {
+        throw new Error('Character TTS response has no audio URL');
+      }
+      audioSegments.push(generated.audio_url);
+      patchVoiceMessage({
+        audioSegments: [...audioSegments],
+        audioStatus: 'generating',
+      });
+    };
+    const queueSpeechText = (delta: string, flush = false) => {
+      if (!ttsInput || ttsError) return;
+      pendingSpeechText += delta;
+      const ready = takeReadySpeechText(pendingSpeechText, flush);
+      pendingSpeechText = ready.remainder;
+      ready.chunks.forEach(text => {
+        if (
+          !firstSpeechStreamUrl
+          && import.meta.env.VITE_CHARACTER_TTS_STREAMING !== 'false'
+        ) {
+          firstSpeechStreamUrl = characterTtsStreamUrl({ ...ttsInput, text });
+          patchVoiceMessage({
+            audioStreamUrl: firstSpeechStreamUrl,
+            audioStatus: 'generating',
+          });
+          return;
+        }
+        queuedTts = queuedTts.then(async () => {
+          if (ttsError) return;
+          try {
+            await generateSpeechChunk(text);
+          } catch (error) {
+            ttsError = error;
+            patchVoiceMessage({ audioStatus: 'failed' });
+          }
+        });
+      });
+    };
+
+    voiceReplyInFlightRef.current = true;
+    setVoiceReplyLoading(true);
+    try {
+      const result = await streamLlmReply({
+        message: userText,
+        history: messages
+          .filter(message => message.text.trim() && message.status !== 'failed')
+          .slice(-8)
+          .map(message => ({
+            role: message.from === 'me' ? 'user' as const : 'assistant' as const,
+            content: message.text.trim(),
+          })),
+        llm: {
+          model_name: llmConfig.model_name,
+          api_token: llmConfig.api_token,
+          api_request_url: llmConfig.api_request_url,
+          effort: llmConfig.effort,
+        },
+        character_id: characterId || undefined,
+        prefer_low_latency: true,
+      }, (_delta, text) => {
+        if (!temporaryReplyCreated) {
+          temporaryReplyCreated = true;
+          const createdAt = new Date();
+          dispatch(appendConversationMessage({
+            conversationId,
+            message: {
+              id: temporaryId,
+              text,
+              from: 'them',
+              time: createdAt.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              createdAt: createdAt.toISOString(),
+              status: 'sending',
+              clientMessageId,
+              audioStatus: shouldGenerateVoice ? 'generating' : undefined,
+              audioAutoPlay: shouldGenerateVoice,
+            },
+          }));
+        } else {
+          dispatch(patchConversationMessage({
+            conversationId,
+            messageId: temporaryId,
+            changes: { text },
+          }));
+        }
+        queueSpeechText(_delta);
+      });
+      queueSpeechText('', true);
+      if (!temporaryReplyCreated) {
+        temporaryReplyCreated = true;
+        const createdAt = new Date();
+        dispatch(appendConversationMessage({
+          conversationId,
+          message: {
+            id: temporaryId,
+            text: result.text,
+            from: 'them',
+            time: createdAt.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            createdAt: createdAt.toISOString(),
+            status: 'sending',
+            clientMessageId,
+            audioStatus: shouldGenerateVoice ? 'generating' : undefined,
+            audioAutoPlay: shouldGenerateVoice,
+          },
+        }));
+      }
+      if (!await userMessagePersistence) {
+        throw new Error(t('chat.automaticReplyNotSaved'));
+      }
+      const persisted = await sendAutomaticReply({
+        sender_id: contactIdFromConversation(conversationId),
+        content: result.text,
+        client_message_id: clientMessageId,
+      });
+      const persistedReply = toChatMessage(persisted, currentUser.id);
+      if (!persistedReply) {
+        throw new Error('Automatic reply response has no content');
+      }
+      dispatch(replaceConversationMessage({
+        conversationId,
+        temporaryId,
+        message: {
+          ...persistedReply,
+          status: 'sent',
+          audioStatus: shouldGenerateVoice ? 'generating' : undefined,
+          audioStreamUrl: firstSpeechStreamUrl || undefined,
+          audioSegments: shouldGenerateVoice ? [...audioSegments] : undefined,
+        },
+      }));
+      voiceMessageId = persisted.id;
+      if (shouldGenerateVoice) {
+        await queuedTts;
+        patchVoiceMessage({
+          audioSegments: [...audioSegments],
+          audioStatus: ttsError ? 'failed' : 'ready',
+        });
+        if (ttsError) {
+          notify(getApiErrorMessage(ttsError) || t('chat.ttsReplyFailed'), 'warning');
+        }
+      }
+    } catch (error) {
+      if (temporaryReplyCreated) {
+        dispatch(patchConversationMessage({
+          conversationId,
+          messageId: temporaryId,
+          changes: { status: 'failed' },
+        }));
+      }
+      notify(
+        getApiErrorMessage(error)
+        || (error instanceof Error ? error.message : '')
+        || t('chat.llmReplyFailed'),
+        'error',
+      );
+    } finally {
+      voiceReplyInFlightRef.current = false;
+      setVoiceReplyLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!activeVoiceTrainingJobId) {
+      setVoiceModelStatus('');
+      setVoiceModelProgress(0);
+      setVoiceModelStage('');
+      return;
+    }
+
+    let cancelled = false;
+    let timer: number | undefined;
+    const loadStatus = async () => {
+      try {
+        const job = await getVoiceTrainingJob(activeVoiceTrainingJobId);
+        if (cancelled) return;
+        setActiveVoiceModelId(job.model_id);
+        setVoiceModelStatus(job.status);
+        setVoiceModelErrorDetail(job.status === 'failed' ? job.error || '' : '');
+        setVoiceModelProgress(job.progress || 0);
+        setVoiceModelStage(job.stage || '');
+        const noticeKey = `${job.id}:${job.status}`;
+        if (job.status === 'ready' && voiceModelNoticeRef.current !== noticeKey) {
+          localStorage.setItem(voiceModelStorageKey(currentUser?.id), job.model_id);
+          if (!job.acknowledged) {
+            void acknowledgeVoiceTrainingJob(job.id).catch(() => {
+              // The next ready-state refresh can retry the idempotent acknowledgement.
+            });
+          }
+          try {
+            const updatedCharacters = await getCharacters();
+            if (cancelled) return;
+            setCharacters(updatedCharacters);
+            const trainedCharacter = updatedCharacters.find(character => (
+              character.voice_model === job.model_id
+              && character.train_status === 'ready'
+            ));
+            const contactUserId = activeContact.startsWith('user:')
+              ? contactIdFromConversation(activeContact)
+              : '';
+            if (trainedCharacter) {
+              setSelectedCharacterId(trainedCharacter.id);
+              setActiveVoiceModelId(job.model_id);
+              setVoiceModelStatus('ready');
+              void getCharacterModels(trainedCharacter.id)
+                .then(models => {
+                  if (cancelled) return;
+                  const activeModel = models.find(model => model.active);
+                  setVoiceModelOptions(models);
+                  setSelectedVoiceModelVersion(activeModel?.id || '');
+                })
+                .catch(() => {
+                  // Changing the character later retries the model list request.
+                });
+              if (contactUserId) {
+                localStorage.setItem(
+                  contactCharacterSelectionKey(currentUser?.id, contactUserId),
+                  trainedCharacter.id,
+                );
+                if (currentUser && !activeContact.startsWith('mock:')) {
+                  void saveCharacterBinding(contactUserId, trainedCharacter.id).catch(() => {
+                    notify(t('chat.characterSaveFailed'), 'warning');
+                  });
+                }
+              }
+            }
+          } catch {
+            // The character list will be refreshed again when the conversation changes.
+          }
+          voiceModelNoticeRef.current = noticeKey;
+          notify(t('chat.modelTrainingReady', { model: job.model_id }), 'success');
+        }
+        if (job.status === 'failed' && voiceModelNoticeRef.current !== noticeKey) {
+          voiceModelNoticeRef.current = noticeKey;
+          notify(job.error || t('chat.modelTrainingFailed'), 'error');
+        }
+        if (!['ready', 'failed'].includes(job.status)) {
+          timer = window.setTimeout(loadStatus, 3000);
+        }
+      } catch {
+        if (!cancelled) timer = window.setTimeout(loadStatus, 5000);
+      }
+    };
+    void loadStatus();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [activeContact, activeVoiceTrainingJobId, currentUser, t]);
 
   function toggleCreateGroupMember(userId: string) {
     setCreateMemberIds(current => {
@@ -1572,9 +2835,12 @@ function Chat() {
     } else if (historyLoadingMore) {
       // Keep the viewport stable while older messages are being prepended.
     } else if (shouldJumpToBottom) {
-      if (messageList) messageList.scrollTop = messageList.scrollHeight;
-    } else {
-      msgEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      if (messageList) {
+        messageList.scrollTop = messageList.scrollHeight;
+        messageListNearBottomRef.current = true;
+      }
+    } else if (messageList && messageListNearBottomRef.current) {
+      messageList.scrollTop = messageList.scrollHeight;
     }
 
     lastScrolledConversationRef.current = activeConversationId;
@@ -1593,6 +2859,8 @@ function Chat() {
     return () => {
       imagePreviewUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
       imagePreviewUrlsRef.current.clear();
+      void voiceAudioContextRef.current?.close();
+      voiceAudioContextRef.current = null;
     };
   }, []);
 
@@ -1608,7 +2876,7 @@ function Chat() {
     temporaryId: string,
     request: SendMessageInput,
     userId: string,
-  ) {
+  ): Promise<boolean> {
     try {
       const persisted = await sendMessage(request);
       const persistedMessage = toChatMessage(persisted, userId);
@@ -1618,12 +2886,14 @@ function Chat() {
         temporaryId,
         message: { ...persistedMessage, id: persisted.id, status: 'sent' },
       }));
+      return true;
     } catch {
       dispatch(patchConversationMessage({
         conversationId,
         messageId: temporaryId,
         changes: { status: 'failed' },
       }));
+      return false;
     }
   }
 
@@ -1659,9 +2929,24 @@ function Chat() {
   async function handleSend() {
     const content = inputText.trim();
     if (!content || !activeConversationId || !activeContactInfo) return;
+    if (isSelectedSystemUser && voiceReplyInFlightRef.current) return;
     if (!currentUser) {
       notify(t('chat.signInToSend'), 'warning');
       return;
+    }
+    if (isSelectedSystemUser) {
+      const AudioContextConstructor = window.AudioContext
+        || (window as typeof window & {
+          webkitAudioContext?: typeof AudioContext;
+        }).webkitAudioContext;
+      if (AudioContextConstructor) {
+        const audioContext = voiceAudioContextRef.current
+          || new AudioContextConstructor();
+        voiceAudioContextRef.current = audioContext;
+        if (audioContext.state === 'suspended') {
+          void audioContext.resume();
+        }
+      }
     }
 
     const temporaryId = `local:${Date.now()}:${Math.random().toString(36).slice(2)}`;
@@ -1684,7 +2969,21 @@ function Chat() {
     dispatch(appendConversationMessage({ conversationId, message: newMsg }));
     setInputText('');
 
-    await persistMessage(conversationId, temporaryId, request, currentUser.id);
+    const userMessagePersistence = persistMessage(
+      conversationId,
+      temporaryId,
+      request,
+      currentUser.id,
+    );
+    if (isSelectedSystemUser) {
+      void createAutomaticReply(
+        conversationId,
+        content,
+        activeMessages,
+        userMessagePersistence,
+      );
+    }
+    await userMessagePersistence;
   }
 
   async function retryMessage(message: Message) {
@@ -2069,7 +3368,11 @@ function Chat() {
                 )}
               </div>
               {visibleContacts.filter(c => c.type === 'group').map(c => (
-                <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => selectContact(c.id)}>
+                <div
+                  key={c.id}
+                  className={`contact-item${activeContact === c.id ? ' active' : ''}${c.role === 'system' ? ' is-system-character' : ''}`}
+                  onClick={() => selectContact(c.id)}
+                >
                   <div className="contact-avatar">
                     <img src={c.avatar} alt="" className="avatar-img" />
                   </div>
@@ -2083,7 +3386,11 @@ function Chat() {
               <div className="contact-divider" />
               <div className="contact-group-label">{t('chat.contacts')}</div>
               {visibleContacts.filter(c => c.type === 'user').map(c => (
-                <div key={c.id} className={`contact-item${activeContact === c.id ? ' active' : ''}`} onClick={() => selectContact(c.id)}>
+                <div
+                  key={c.id}
+                  className={`contact-item${activeContact === c.id ? ' active' : ''}${c.role === 'system' ? ' is-system-character' : ''}`}
+                  onClick={() => selectContact(c.id)}
+                >
                   <div className={`contact-avatar${c.isPro ? ' has-pro-frame' : ''}`}>
                     <img src={c.avatar} alt="" className="avatar-img" />
                     {c.isPro && (
@@ -2160,15 +3467,77 @@ function Chat() {
                     </div>
                     <div className="messages-header-actions">
                       {isSelectedSystemUser && (
-                        <button
-                          type="button"
-                          className="model-training-trigger"
-                          aria-label={t('chat.configureModelTraining')}
-                          onClick={() => setIsModelTrainingOpen(true)}
-                        >
-                          <BrainCircuit size={16} strokeWidth={2.1} aria-hidden="true" />
-                          <span>{t('chat.modelButton')}</span>
-                        </button>
+                        <>
+                          <div className="character-selector-wrap model-version-selector-wrap">
+                            <select
+                              className={`character-selector${selectedVoiceModelVersion ? '' : ' is-empty'}`}
+                              value={selectedVoiceModelVersion}
+                              aria-label={t('chat.selectVoiceModelVersion')}
+                              title={t('chat.selectVoiceModelVersion')}
+                              disabled={
+                                !selectedCharacterId
+                                || !canSwitchVoiceModel
+                                || voiceModelSwitching
+                                || voiceModelOptions.length === 0
+                              }
+                              onChange={event => void handleVoiceModelChange(event.target.value)}
+                            >
+                              <option value="">{t('chat.selectVoiceModelVersion')}</option>
+                              {voiceModelOptions.map(model => (
+                                <option
+                                  key={model.id}
+                                  value={model.id}
+                                  disabled={model.status !== 'ready'}
+                                >
+                                  {model.id} {model.name === model.id ? '' : `(${model.name})`}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="character-selector-icon" size={14} strokeWidth={2.2} aria-hidden="true" />
+                          </div>
+                          <div className="character-selector-wrap">
+                            <select
+                              className={`character-selector${selectedCharacterId ? '' : ' is-empty'}`}
+                              value={selectedCharacterId}
+                              aria-label={t('chat.selectCharacter')}
+                              title={t('chat.selectCharacter')}
+                              disabled={characterBindingSaving}
+                              onChange={event => void handleCharacterChange(event.target.value)}
+                            >
+                              <option value="">{t('chat.noCharacterSelected')}</option>
+                              {characters.map(character => (
+                                <option
+                                  key={character.id}
+                                  value={character.id}
+                                  disabled={character.train_status !== 'ready'}
+                                >
+                                  {character.name}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="character-selector-icon" size={14} strokeWidth={2.2} aria-hidden="true" />
+                          </div>
+                          <button
+                            type="button"
+                            className={`model-training-trigger voice-model-trigger${voiceModelButtonState}`}
+                            aria-label={t('chat.configureModelTraining')}
+                            title={voiceModelButtonTitle}
+                            onClick={() => setIsModelTrainingOpen(true)}
+                          >
+                            <AudioLines size={16} strokeWidth={2.1} aria-hidden="true" />
+                            <span>{t('chat.modelButton')}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className={`model-training-trigger llm-config-trigger${llmConfig.connected ? ' is-connected' : ''}`}
+                            aria-label={t('chat.configureLlm')}
+                            title={t('chat.configureLlm')}
+                            onClick={() => setIsLlmConfigOpen(true)}
+                          >
+                            <Settings2 size={16} strokeWidth={2.1} aria-hidden="true" />
+                            <span>{t('chat.llmButton')}</span>
+                          </button>
+                        </>
                       )}
                       {activeContactInfo.type === 'group' && (
                         <div className="group-members-toolbar">
@@ -2221,15 +3590,76 @@ function Chat() {
                     )}
                     <div className="messages-header-actions">
                       {isSelectedSystemUser && (
-                        <button
-                          type="button"
-                          className="model-training-trigger"
-                          aria-label={t('chat.configureModelTraining')}
-                          onClick={() => setIsModelTrainingOpen(true)}
-                        >
-                          <BrainCircuit size={16} strokeWidth={2.1} aria-hidden="true" />
-                          <span>{t('chat.modelButton')}</span>
-                        </button>
+                        <>
+                          <div className="character-selector-wrap model-version-selector-wrap">
+                            <select
+                              className={`character-selector${selectedVoiceModelVersion ? '' : ' is-empty'}`}
+                              value={selectedVoiceModelVersion}
+                              aria-label={t('chat.selectVoiceModelVersion')}
+                              title={t('chat.selectVoiceModelVersion')}
+                              disabled={
+                                !selectedCharacterId
+                                || voiceModelSwitching
+                                || voiceModelOptions.length === 0
+                              }
+                              onChange={event => void handleVoiceModelChange(event.target.value)}
+                            >
+                              <option value="">{t('chat.selectVoiceModelVersion')}</option>
+                              {voiceModelOptions.map(model => (
+                                <option
+                                  key={model.id}
+                                  value={model.id}
+                                  disabled={model.status !== 'ready'}
+                                >
+                                  {model.id} {model.name}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="character-selector-icon" size={14} strokeWidth={2.2} aria-hidden="true" />
+                          </div>
+                          <div className="character-selector-wrap">
+                            <select
+                              className={`character-selector${selectedCharacterId ? '' : ' is-empty'}`}
+                              value={selectedCharacterId}
+                              aria-label={t('chat.selectCharacter')}
+                              title={t('chat.selectCharacter')}
+                              disabled={characterBindingSaving}
+                              onChange={event => void handleCharacterChange(event.target.value)}
+                            >
+                              <option value="">{t('chat.noCharacterSelected')}</option>
+                              {characters.map(character => (
+                                <option
+                                  key={character.id}
+                                  value={character.id}
+                                  disabled={character.train_status !== 'ready'}
+                                >
+                                  {character.name}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="character-selector-icon" size={14} strokeWidth={2.2} aria-hidden="true" />
+                          </div>
+                          <button
+                            type="button"
+                            className={`model-training-trigger voice-model-trigger${voiceModelButtonState}`}
+                            aria-label={t('chat.configureModelTraining')}
+                            title={voiceModelButtonTitle}
+                            onClick={() => setIsModelTrainingOpen(true)}
+                          >
+                            <AudioLines size={16} strokeWidth={2.1} aria-hidden="true" />
+                            <span>{t('chat.modelButton')}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className={`model-training-trigger llm-config-trigger${llmConfig.connected ? ' is-connected' : ''}`}
+                            aria-label={t('chat.configureLlm')}
+                            title={t('chat.configureLlm')}
+                            onClick={() => setIsLlmConfigOpen(true)}
+                          >
+                            <Settings2 size={16} strokeWidth={2.1} aria-hidden="true" />
+                            <span>{t('chat.llmButton')}</span>
+                          </button>
+                        </>
                       )}
                     </div>
                   </>
@@ -2250,6 +3680,7 @@ function Chat() {
                 ) : (
                   activeMessages.map((msg, msgIndex, contactMessages) => {
                     const previousMessage = contactMessages[msgIndex - 1];
+                    const messageRenderKey = msg.clientMessageId || msg.id;
                     const showDateDivider = Boolean(
                       msg.createdAt
                       && (!previousMessage?.createdAt
@@ -2257,7 +3688,7 @@ function Chat() {
                     );
 
                     return (
-                    <Fragment key={msg.id}>
+                    <Fragment key={messageRenderKey}>
                       {showDateDivider && msg.createdAt && (
                         <div className="message-date-divider" role="separator">
                           <span>{historyDateLabel(msg.createdAt, t)}</span>
@@ -2299,7 +3730,7 @@ function Chat() {
                             {msgIndex === contactMessages.length - 1 ? (
                               Array.from(msg.text).map((char, charIndex) => (
                                 <span
-                                  key={`${msg.id}-${charIndex}`}
+                                  key={`${messageRenderKey}-${charIndex}`}
                                   className="msg-char"
                                   style={{ '--char-delay': `${charIndex * 0.032}s` } as React.CSSProperties}
                                 >
@@ -2308,6 +3739,45 @@ function Chat() {
                               ))
                             ) : msg.text}
                           </div>
+                          )}
+                          {(msg.audioStatus || msg.audioStreamUrl || msg.audioSegments?.length || msg.audioUrl) && (
+                            <VoiceMessagePlayer
+                              audioStreamUrl={msg.audioStreamUrl}
+                              audioSegments={
+                                msg.audioSegments?.length
+                                  ? msg.audioSegments
+                                  : [msg.audioUrl].filter((url): url is string => Boolean(url))
+                              }
+                              status={msg.audioStatus}
+                              autoPlay={msg.audioAutoPlay}
+                              onStreamError={() => {
+                                dispatch(patchConversationMessage({
+                                  conversationId: activeConversationId,
+                                  messageId: msg.id,
+                                  changes: { audioStatus: 'failed' },
+                                }));
+                              }}
+                              onAutoPlayStarted={() => {
+                                dispatch(patchConversationMessage({
+                                  conversationId: activeConversationId,
+                                  messageId: msg.id,
+                                  changes: { audioAutoPlay: false },
+                                }));
+                              }}
+                              onAutoPlayBlocked={() => {
+                                dispatch(patchConversationMessage({
+                                  conversationId: activeConversationId,
+                                  messageId: msg.id,
+                                  changes: { audioAutoPlay: false },
+                                }));
+                                notify(t('chat.characterVoiceAutoPlayBlocked'), 'warning');
+                              }}
+                              label={t('chat.characterVoice')}
+                              generatingLabel={t('chat.characterVoiceGenerating')}
+                              bufferingLabel={t('chat.characterVoiceBuffering')}
+                              readyLabel={t('chat.characterVoiceReady')}
+                              failedLabel={t('chat.characterVoiceFailed')}
+                            />
                           )}
                         </div>
                         <div className="msg-time">
@@ -2440,7 +3910,12 @@ function Chat() {
                     onCompositionStart={() => { isChatComposingRef.current = true; }}
                     onCompositionEnd={() => { isChatComposingRef.current = false; }}
                     onKeyDown={handleKeyDown} />
-                  <button className="msg-send-btn" disabled={!inputText.trim()} onClick={handleSend} aria-label={t('chat.sendMessage')}>
+                  <button
+                    className="msg-send-btn"
+                    disabled={!inputText.trim() || (isSelectedSystemUser && voiceReplyLoading)}
+                    onClick={handleSend}
+                    aria-label={t('chat.sendMessage')}
+                  >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
                     </svg>
@@ -3359,6 +4834,187 @@ function Chat() {
           </div>
         </div>
       )}
+      {isLlmConfigOpen && isSelectedSystemUser && (
+        <div className="group-share-overlay llm-config-overlay" role="presentation">
+          <button
+            type="button"
+            className="group-share-backdrop"
+            aria-label={t('chat.closeLlmDialog')}
+            onClick={() => {
+              if (!llmConnecting) setIsLlmConfigOpen(false);
+            }}
+          />
+          <div
+            className="group-share-dialog llm-config-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="llm-config-title"
+          >
+            <button
+              type="button"
+              className="group-share-close"
+              aria-label={t('chat.closeLlmDialog')}
+              disabled={llmConnecting}
+              onClick={() => setIsLlmConfigOpen(false)}
+            >
+              <X size={17} aria-hidden="true" />
+            </button>
+
+            <div className="group-share-heading">
+              <span className="group-share-icon llm-config-icon" aria-hidden="true">
+                <Settings2 size={23} strokeWidth={1.8} />
+              </span>
+              <div className="group-share-heading-copy">
+                <h2 id="llm-config-title">{t('chat.llmConfigTitle')}</h2>
+                <p className="group-share-description">{t('chat.llmConfigDescription')}</p>
+              </div>
+            </div>
+
+            <div className="llm-config-form">
+              <label className="create-group-field create-group-name-field model-training-name-field llm-config-field llm-preset-field">
+                <span>{t('chat.llmPreset')}</span>
+                <select
+                  value={selectedLlmPreset}
+                  onChange={event => {
+                    const preset = LLM_PRESETS.find(item => item.id === event.target.value);
+                    setSelectedLlmPreset(event.target.value);
+                    if (!preset || preset.id === 'custom') {
+                      setLlmConfig(current => ({
+                        ...current,
+                        model_name: '',
+                        api_token: '',
+                        api_request_url: '',
+                        effort: '',
+                        connected: false,
+                      }));
+                    } else {
+                      setLlmConfig(current => ({
+                        ...current,
+                        model_name: preset.model_name,
+                        api_request_url: preset.api_request_url,
+                        effort: preset.effort,
+                        connected: false,
+                      }));
+                    }
+                    setLlmConnectionStatus('');
+                    setLlmConfigError('');
+                  }}
+                >
+                  <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
+                  <option value="custom">{t('chat.llmCustomPreset')}</option>
+                </select>
+              </label>
+              <label className="create-group-field create-group-name-field model-training-name-field llm-config-field">
+                <span>{t('chat.llmModelName')}<b className="required-mark" aria-hidden="true">*</b></span>
+                <input
+                  type="text"
+                  value={llmConfig.model_name}
+                  required
+                  aria-required="true"
+                  placeholder="deepseek-v4-flash"
+                  onChange={event => {
+                    setLlmConfig(current => ({
+                      ...current,
+                      model_name: event.target.value,
+                      effort: current.effort.trim() || (
+                        event.target.value.trim().toLowerCase() === 'deepseek-v4-flash'
+                          ? 'low'
+                          : ''
+                      ),
+                      connected: false,
+                    }));
+                    setLlmConnectionStatus('');
+                  }}
+                />
+              </label>
+              <label className="create-group-field create-group-name-field model-training-name-field llm-config-field">
+                <span>{t('chat.llmApiToken')}<b className="required-mark" aria-hidden="true">*</b></span>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={llmConfig.api_token}
+                  required
+                  aria-required="true"
+                  placeholder="sk-..."
+                  onChange={event => {
+                    setLlmConfig(current => ({
+                      ...current,
+                      api_token: event.target.value,
+                      connected: false,
+                    }));
+                    setLlmConnectionStatus('');
+                  }}
+                />
+              </label>
+              <label className="create-group-field create-group-name-field model-training-name-field llm-config-field">
+                <span>{t('chat.llmRequestUrl')}<b className="required-mark" aria-hidden="true">*</b></span>
+                <input
+                  type="url"
+                  value={llmConfig.api_request_url}
+                  required
+                  aria-required="true"
+                  placeholder="https://api.deepseek.com"
+                  onChange={event => {
+                    setLlmConfig(current => ({
+                      ...current,
+                      api_request_url: event.target.value,
+                      connected: false,
+                    }));
+                    setLlmConnectionStatus('');
+                  }}
+                />
+              </label>
+              <label className="create-group-field create-group-name-field model-training-name-field llm-config-field">
+                <span>{t('chat.llmReasoningEffort')}<b className="required-mark" aria-hidden="true">*</b></span>
+                <input
+                  type="text"
+                  value={llmConfig.effort}
+                  required
+                  aria-required="true"
+                  placeholder="low"
+                  onChange={event => {
+                    setLlmConfig(current => ({
+                      ...current,
+                      effort: event.target.value,
+                      connected: false,
+                    }));
+                    setLlmConnectionStatus('');
+                  }}
+                />
+              </label>
+              {llmConfigError && (
+                <p className="create-group-error" role="alert">{llmConfigError}</p>
+              )}
+              <div className="llm-config-actions">
+                <span
+                  className={`llm-connection-status is-${llmConnectionStatus}`}
+                  role={llmConnectionStatus === 'failed' ? 'alert' : undefined}
+                >
+                  {llmConnectionStatus === 'success'
+                    ? t('chat.llmConnectionSuccessStatus')
+                    : llmConnectionStatus === 'failed'
+                      ? t('chat.llmConnectionFailedStatus')
+                      : ''}
+                </span>
+                <button
+                  type="button"
+                  className="group-dialog-primary llm-connect-submit"
+                  disabled={
+                    llmConnecting
+                    || !llmConfig.model_name.trim()
+                    || !llmConfig.api_token.trim()
+                    || !llmConfig.api_request_url.trim()
+                    || !llmConfig.effort.trim()
+                  }
+                  onClick={() => void handleConnectLlm()}
+                >
+                  {llmConnecting ? t('chat.llmConnecting') : t('chat.connectLlm')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {isModelTrainingOpen && isSelectedSystemUser && (
         <div className="group-share-overlay model-training-overlay" role="presentation">
           <button
@@ -3398,13 +5054,39 @@ function Chat() {
 
             <div className="model-training-form">
               <label className="create-group-field create-group-name-field model-training-name-field">
-                <span>{t('chat.modelNickname')}</span>
+                <span>{t('chat.modelNickname')}<b className="required-mark" aria-hidden="true">*</b></span>
                 <input
                   type="text"
                   value={modelNickname}
+                  maxLength={50}
+                  required
+                  aria-required="true"
                   placeholder={t('chat.modelNicknamePlaceholder')}
                   onChange={event => setModelNickname(event.target.value)}
                 />
+              </label>
+
+              <label className="create-group-field create-group-name-field model-training-name-field">
+                <span>{t('chat.modelVersionName')}<b className="required-mark" aria-hidden="true">*</b></span>
+                <input
+                  type="text"
+                  value={modelVersionName}
+                  maxLength={80}
+                  required
+                  aria-required="true"
+                  list="voice-model-version-names"
+                  placeholder={t('chat.modelVersionNamePlaceholder')}
+                  onChange={event => {
+                    const value = event.target.value;
+                    if (voiceModelOptions.some(model => model.name === value)) return;
+                    setModelVersionName(value);
+                  }}
+                />
+                <datalist id="voice-model-version-names">
+                  {voiceModelOptions.map(model => (
+                    <option key={model.id} value={model.name} disabled />
+                  ))}
+                </datalist>
               </label>
 
               <div className="model-training-upload-grid">
@@ -3414,7 +5096,7 @@ function Chat() {
                       <FileAudio size={19} strokeWidth={1.8} />
                     </span>
                     <div>
-                      <strong>{t('chat.warAudioFiles')}</strong>
+                      <strong>{t('chat.warAudioFiles')}<b className="required-mark" aria-hidden="true">*</b></strong>
                       <small>{t('chat.warAudioDescription')}</small>
                     </div>
                   </div>
@@ -3429,11 +5111,37 @@ function Chat() {
                   <input
                     ref={warFilesInputRef}
                     type="file"
-                    accept=".war,audio/*"
+                    accept=".wav,.mp3,.flac,.ogg,.m4a,audio/*"
                     multiple
                     hidden
+                    required
+                    aria-required="true"
                     onChange={handleWarFilesChange}
                   />
+                  {warFiles.length > 0 && (
+                    <div
+                      className="model-training-upload-progress"
+                      role="progressbar"
+                      aria-label={t('chat.modelTrainingUploadProgress')}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={voiceUploadProgress.percent}
+                    >
+                      <div className="model-training-upload-progress-heading">
+                        <span>{t('chat.modelTrainingUploadProgress')}</span>
+                        <strong>{voiceUploadProgress.percent}%</strong>
+                      </div>
+                      <div className="model-training-upload-track">
+                        <span style={{ width: `${voiceUploadProgress.percent}%` }} />
+                      </div>
+                      <small>
+                        {t('chat.modelTrainingUploadCount', {
+                          uploaded: voiceUploadProgress.successful,
+                          total: warFiles.length,
+                        })}
+                      </small>
+                    </div>
+                  )}
                   <div className={`model-training-file-status${warFiles.length ? ' has-files' : ''}`}>
                     {warFiles.length
                       ? t('chat.warFilesSelected', { count: warFiles.length })
@@ -3447,7 +5155,7 @@ function Chat() {
                       <FileText size={19} strokeWidth={1.8} />
                     </span>
                     <div>
-                      <strong>{t('chat.listTextFile')}</strong>
+                      <strong>{t('chat.listTextFile')}<b className="required-mark" aria-hidden="true">*</b></strong>
                       <small>{t('chat.listTextDescription')}</small>
                     </div>
                   </div>
@@ -3464,10 +5172,20 @@ function Chat() {
                     type="file"
                     accept=".txt,.list"
                     hidden
+                    required
+                    aria-required="true"
                     onChange={handleListTextFileChange}
                   />
                   <div className={`model-training-file-status${listTextFile ? ' has-files' : ''}`}>
-                    {listTextFile?.name || t('chat.noListTextFile')}
+                    {listTextFile && (
+                      <CheckCircle2
+                        className="model-training-file-success"
+                        size={15}
+                        strokeWidth={2.5}
+                        aria-label={t('chat.listTextFileReady')}
+                      />
+                    )}
+                    <span>{listTextFile?.name || t('chat.noListTextFile')}</span>
                   </div>
                 </div>
               </div>
@@ -3477,15 +5195,66 @@ function Chat() {
                 <span>{t('chat.modelTrainingSummary')}</span>
               </div>
 
+              {trainingProgressVisible && (
+                <div
+                  className={`model-training-job-progress${
+                    voiceModelStatus === 'ready' ? ' is-complete' : ''
+                  }${
+                    voiceModelStatus === 'failed' ? ' is-failed' : ''
+                  }`}
+                  role="progressbar"
+                  aria-label={t('chat.modelTrainingProgress')}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={trainingProgressPercent}
+                >
+                  <div className="model-training-upload-progress-heading">
+                    <span>{t('chat.modelTrainingProgress')}</span>
+                    <strong>{trainingProgressPercent}%</strong>
+                  </div>
+                  <div className="model-training-upload-track">
+                    <span style={{ width: `${trainingProgressPercent}%` }} />
+                  </div>
+                  <p className="model-training-job-status">
+                    {voiceModelStatus === 'ready'
+                      ? t('chat.modelTrainingCompleted')
+                      : voiceModelStatus === 'training'
+                        ? voiceModelStage
+                          ? t('chat.modelTrainingRunningStage', { stage: voiceModelStage })
+                          : t('chat.modelTrainingRunning')
+                        : voiceModelStatus === 'queued'
+                          ? t('chat.modelTrainingQueuedStatus')
+                          : voiceModelStatus === 'failed'
+                            ? formatVoiceTrainingError(voiceModelErrorDetail, t)
+                            : modelTraining
+                              ? t('chat.modelTrainingStarting')
+                              : t('chat.modelTrainingAwaitingCommand')}
+                  </p>
+                </div>
+              )}
+
               <button
                 type="button"
                 className="group-dialog-primary model-training-submit"
-                onClick={() => notify(t('chat.modelTrainingPreviewOnly'), 'warning')}
+                disabled={
+                  modelTraining
+                  || ['queued', 'training'].includes(voiceModelStatus)
+                  || !modelNickname.trim()
+                  || !modelVersionName.trim()
+                  || warFiles.length === 0
+                  || warFiles.some(file => file.size === 0)
+                  || !listTextFile
+                  || listTextFile.size === 0
+                }
+                onClick={() => void handleStartModelTraining()}
               >
                 <Sparkles size={16} strokeWidth={2} aria-hidden="true" />
-                {t('chat.publishModel')}
+                {modelTraining ? t('chat.modelTrainingStarting') : t('chat.publishModel')}
                 <ArrowRight size={16} strokeWidth={2} aria-hidden="true" />
               </button>
+              {modelTrainingError && (
+                <p className="create-group-error" role="alert">{modelTrainingError}</p>
+              )}
             </div>
           </div>
         </div>
