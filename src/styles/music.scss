@@ -648,10 +648,10 @@
   overflow: hidden;
   isolation: isolate;
   // border: 1px solid rgba(255, 255, 255, 0.54);
-  border-radius: 3rem;
+  border-radius: 2rem;
   background-position: center;
   background-size: cover;
-  box-shadow: 0 20px 45px rgba(44, 51, 69, 0.13);
+  // box-shadow: 0 20px 45px rgba(44, 51, 69, 0.13);
   cursor: pointer;
   animation: music-card-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   animation-delay: var(--card-delay);
