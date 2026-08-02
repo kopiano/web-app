@@ -319,7 +319,6 @@ function lazyImageProps() {
   return {
     loading: 'lazy' as const,
     decoding: 'async' as const,
-    fetchPriority: 'low' as const,
   };
 }
 
