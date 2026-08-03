@@ -317,10 +317,16 @@ export default function HlsVideo({
         enableWorker: true,
         lowLatencyMode: false,
         startFragPrefetch: false,
-        maxBufferLength: 12,
-        maxMaxBufferLength: 12,
+        // Start with the smallest rendition so the first frame arrives quickly,
+        // then let ABR move up once the initial buffer is stable.
+        startLevel: 0,
+        capLevelToPlayerSize: true,
+        abrBandWidthFactor: 0.8,
+        abrBandWidthUpFactor: 0.7,
+        maxBufferLength: 24,
+        maxMaxBufferLength: 36,
         maxBufferSize: 128 * 1024 * 1024,
-        backBufferLength: 6,
+        backBufferLength: 10,
       });
       hls.loadSource(src);
       hls.attachMedia(video);
