@@ -315,18 +315,17 @@ export default function HlsVideo({
       hls = new Hls({
         autoStartLoad: true,
         enableWorker: true,
-        lowLatencyMode: true, // 短视频
+        // These are VOD streams. Keep a larger buffer to absorb network jitter.
+        lowLatencyMode: false,
         startFragPrefetch: false,
         startLevel: -1,   // 自动选择
         capLevelToPlayerSize: true,
-        // ABR 降速
-        abrBandWidthFactor: 0.9,
-        abrBandWidthUpFactor: 0.8,
-        // short video
-        maxBufferLength: 4,
-        maxMaxBufferLength: 10,
-        maxBufferSize: 30 * 1024 * 1024,
-        backBufferLength: 5,
+        abrBandWidthFactor: 0.8,
+        abrBandWidthUpFactor: 0.7,
+        maxBufferLength: 20,
+        maxMaxBufferLength: 60,
+        maxBufferSize: 60 * 1024 * 1024,
+        backBufferLength: 30,
       });
       hls.loadSource(src);
       hls.attachMedia(video);
