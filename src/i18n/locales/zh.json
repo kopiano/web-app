@@ -491,7 +491,6 @@
     },
     "queue": {
       "label": "播放列表",
-      "next": "接下来播放",
       "count_one": "{{count}} 个视频",
       "count_other": "{{count}} 个视频",
       "playing": "正在播放"

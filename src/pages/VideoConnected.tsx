@@ -1663,7 +1663,7 @@ function VideoWatch({
         </div>
         <aside className="video-watch-queue" style={playerHeight ? { height: playerHeight } : undefined}>
           <header>
-            <div><span>{t('video.queue.label')}</span><h2>{t('video.queue.next')}</h2></div>
+            <div><span>{t('video.queue.label')}</span></div>
             <strong>{t('video.queue.count', { count: playlist.length })}</strong>
           </header>
           <div className="video-watch-queue-list">
@@ -1816,7 +1816,7 @@ export default function VideoConnected() {
     initialPageParam: null as Cursor,
     queryFn: ({ pageParam }) => pageQuery(pageParam, { limit: 20, scope: 'public' }),
     getNextPageParam: nextCursor,
-    enabled: activeView === 'home',
+    enabled: activeView === 'home' || (activeView === 'watch' && !watchFromPlaylist),
     refetchOnMount: 'always',
   });
   const playlistQuery = useInfiniteQuery({

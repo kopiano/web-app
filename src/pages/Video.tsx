@@ -999,7 +999,6 @@ function VideoWatchPage({
           <header>
             <div>
               <span>播放列表</span>
-              <h2>接下来播放</h2>
             </div>
             <strong>{playlist.length} 个视频</strong>
           </header>

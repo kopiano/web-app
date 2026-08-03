@@ -491,7 +491,6 @@
     },
     "queue": {
       "label": "PLAYLIST",
-      "next": "Up next",
       "count_one": "{{count}} video",
       "count_other": "{{count}} videos",
       "playing": "Playing"
