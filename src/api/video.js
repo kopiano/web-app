@@ -170,7 +170,7 @@ function normalizeUploadSession(session) {
   return {
     uploadId: String(session.upload_id),
     video: normalizeVideo(session.video),
-    chunkSize: Number(session.chunk_size) || 4 * 1024 * 1024,
+    chunkSize: Number(session.chunk_size) || 1024 * 1024,
     uploadedBytes: Number(session.uploaded_bytes) || 0,
     totalBytes: Number(session.total_bytes) || 0,
     complete: Boolean(session.complete),
@@ -270,15 +270,22 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
         if (isAbortError(error, signal)) throw error
         if (retries >= 2) throw error
         retries += 1
-        const response = await request.get(
-          `/video/uploads/${encodeURIComponent(session.uploadId)}`,
-          uploadRequestConfig(signal, { params: uploadStatusParams() }),
-        )
-        session = normalizeUploadSession(response.data)
-        if (session.totalBytes !== file.size || session.complete) break
-        uploadedBytes = session.uploadedBytes
-        writeUploadResume(file, session)
-        onUploadProgress?.(Math.min(100, Math.round((uploadedBytes / file.size) * 100)))
+        await new Promise((resolve) => window.setTimeout(resolve, 500 * retries))
+        try {
+          const response = await request.get(
+            `/video/uploads/${encodeURIComponent(session.uploadId)}`,
+            uploadRequestConfig(signal, { params: uploadStatusParams() }),
+          )
+          session = normalizeUploadSession(response.data)
+          if (session.totalBytes !== file.size || session.complete) break
+          uploadedBytes = session.uploadedBytes
+          writeUploadResume(file, session)
+          onUploadProgress?.(Math.min(100, Math.round((uploadedBytes / file.size) * 100)))
+        } catch (statusError) {
+          if (isAbortError(statusError, signal)) throw statusError
+          // Retry the chunk when the status probe also hits a transient
+          // production network error. The server accepts duplicate offsets.
+        }
       }
     }
   }
