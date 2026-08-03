@@ -1098,6 +1098,7 @@ function VideoWatch({
   const [deleteError, setDeleteError] = useState('');
   const controlsTimerRef = useRef<number | undefined>(undefined);
   const volumeControlTimerRef = useRef<number | undefined>(undefined);
+  const preloadedPlaylistVideoIdsRef = useRef(new Set<string>());
 
   const revealControls = useCallback(() => {
     setControlsVisible(true);
@@ -1209,6 +1210,45 @@ function VideoWatch({
       media.removeEventListener('volumechange', sync);
     };
   }, [media, video.raw.duration]);
+
+  useEffect(() => {
+    if (!media || playlist.length < 2 || video.status !== 'ready') return;
+
+    const currentIndex = playlist.findIndex((item) => item.id === video.id);
+    if (currentIndex < 0) return;
+    const nextVideo = playlist
+      .slice(currentIndex + 1)
+      .find((item) => item.status === 'ready');
+    if (!nextVideo || preloadedPlaylistVideoIdsRef.current.has(nextVideo.id)) return;
+
+    let disposed = false;
+    const preloadNextManifest = async () => {
+      const duration = Number.isFinite(media.duration) && media.duration > 0
+        ? media.duration
+        : video.raw.duration;
+      if (!duration || media.currentTime / duration < 0.8) return;
+
+      preloadedPlaylistVideoIdsRef.current.add(nextVideo.id);
+      try {
+        const detail = isMockVideoId(nextVideo.id)
+          ? nextVideo.raw
+          : await getVideo(nextVideo.id);
+        if (disposed || detail.status !== 'ready' || !detail.hlsMasterUrl) return;
+        await fetch(detail.hlsMasterUrl, {
+          credentials: 'include',
+          cache: 'force-cache',
+        });
+      } catch {
+        preloadedPlaylistVideoIdsRef.current.delete(nextVideo.id);
+      }
+    };
+
+    media.addEventListener('timeupdate', preloadNextManifest);
+    return () => {
+      disposed = true;
+      media.removeEventListener('timeupdate', preloadNextManifest);
+    };
+  }, [media, playlist, video.id, video.raw.duration, video.status]);
 
   useEffect(() => {
     if (!media) return;
@@ -2088,7 +2128,13 @@ export default function VideoConnected() {
   useEffect(() => {
     if (watchVideo) setLastWatchVideo(watchVideo);
   }, [watchVideo]);
-  const displayedWatchVideo = watchVideo ?? lastWatchVideo;
+  const requestedPlaylistVideo = useMemo(
+    () => watchPlaylist.find((item) => item.id === requestedVideoId) ?? null,
+    [requestedVideoId, watchPlaylist],
+  );
+  const displayedWatchVideo = watchVideo?.id === requestedVideoId
+    ? watchVideo
+    : requestedPlaylistVideo ?? lastWatchVideo;
   const watchComments = isMockVideoId(requestedVideoId)
     ? mockComments.filter((comment) => comment.videoId === requestedVideoId)
     : commentsQuery.data ?? [];
@@ -2702,7 +2748,7 @@ export default function VideoConnected() {
     setUploadTitle(getFileTitle(file.name));
     const objectUrl = URL.createObjectURL(file);
     const metadataVideo = document.createElement('video');
-    metadataVideo.preload = 'metadata';
+    metadataVideo.preload = 'auto';
     metadataVideo.onloadedmetadata = () => {
       setUploadDuration(formatDuration(metadataVideo.duration));
       URL.revokeObjectURL(objectUrl);

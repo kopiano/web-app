@@ -796,3 +796,24 @@ video播放列表页面
 - `关键帧同步`改为每 2秒，更快开始解码。
 - 播放器首播优先最低`码率`，首帧加载后自动升码率。
 - 增加`缓冲区`，减少播放过程卡顿。
+
+
+修改hls配置：
+```js
+const hls = new Hls({
+  startLevel: -1,
+  maxBufferLength: 4,
+  maxMaxBufferLength: 10,
+  maxBufferSize: 30 * 1024 * 1024,
+  backBufferLength: 5,
+  abrBandWidthFactor:0.9,
+  abrBandWidthUpFactor:0.8,
+});
+```
+HLS 切片时间，短视频：2~4秒：
+index.m3u8
+000.ts 3秒
+001.ts 3秒
+002.ts 3秒
+preload="auto"，而不是preload="none", 否则点击才加载。
+预加载下一个视频：播放A(播放进度达到80%)后台加载B的m3u8

@@ -315,18 +315,18 @@ export default function HlsVideo({
       hls = new Hls({
         autoStartLoad: true,
         enableWorker: true,
-        lowLatencyMode: false,
+        lowLatencyMode: true, // 短视频
         startFragPrefetch: false,
-        // Start with the smallest rendition so the first frame arrives quickly,
-        // then let ABR move up once the initial buffer is stable.
-        startLevel: 0,
+        startLevel: -1,   // 自动选择
         capLevelToPlayerSize: true,
-        abrBandWidthFactor: 0.8,
-        abrBandWidthUpFactor: 0.7,
-        maxBufferLength: 12,
-        maxMaxBufferLength: 24,
-        maxBufferSize: 128 * 1024 * 1024,
-        backBufferLength: 10,
+        // ABR 降速
+        abrBandWidthFactor: 0.9,
+        abrBandWidthUpFactor: 0.8,
+        // short video
+        maxBufferLength: 4,
+        maxMaxBufferLength: 10,
+        maxBufferSize: 30 * 1024 * 1024,
+        backBufferLength: 5,
       });
       hls.loadSource(src);
       hls.attachMedia(video);
@@ -541,7 +541,7 @@ export default function HlsVideo({
         controls={controls}
         playsInline
         muted
-        preload={active ? 'metadata' : 'none'}
+        preload="auto"
         poster={poster}
         className={className}
       />

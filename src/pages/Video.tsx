@@ -1640,7 +1640,7 @@ function Video() {
 
   const updateVideoMetadata = (src: string) => {
     const video = document.createElement('video');
-    video.preload = 'metadata';
+    video.preload = 'auto';
     video.onloadedmetadata = () => {
       setUploadDuration(formatUploadedDuration(video.duration));
       if (video.videoWidth >= 3840) setUploadResolution('4K');
