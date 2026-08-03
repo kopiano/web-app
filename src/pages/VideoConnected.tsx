@@ -1795,6 +1795,7 @@ export default function VideoConnected() {
     queryFn: ({ pageParam }) => pageQuery(pageParam, {
       limit: 8,
       scope: 'mine',
+      sort: 'oldest',
       ...(playlistFilterCategory !== 'all' ? { category: playlistFilterCategory } : {}),
     }),
     getNextPageParam: nextCursor,
@@ -1898,6 +1899,7 @@ export default function VideoConnected() {
     queryFn: ({ pageParam }) => pageQuery(pageParam, {
       limit: 50,
       scope: 'mine',
+      sort: 'oldest',
       ...(playlistFilterCategory !== 'all' ? { category: playlistFilterCategory } : {}),
     }),
     getNextPageParam: nextCursor,
@@ -1973,6 +1975,11 @@ export default function VideoConnected() {
       .map((video) => toCardVideo(video, language, videoOverrides));
     return [...processingCards, ...cards]
       .filter((video, index, all) => all.findIndex((item) => item.id === video.id) === index)
+      .sort((left, right) => {
+        const createdAtOrder = Date.parse(left.createdAt) - Date.parse(right.createdAt);
+        if (createdAtOrder !== 0) return createdAtOrder;
+        return left.id.localeCompare(right.id);
+      })
       .slice(0, 8);
   }, [
     activeCategory,
@@ -2009,7 +2016,13 @@ export default function VideoConnected() {
     const cards = items
       .filter((video) => video.status === 'ready')
       .map((video) => toCardVideo(video, language, videoOverrides));
-    if (cards.length > 0) return cards;
+    if (cards.length > 0) {
+      return cards.sort((left, right) => {
+        const createdAtOrder = Date.parse(left.createdAt) - Date.parse(right.createdAt);
+        if (createdAtOrder !== 0) return createdAtOrder;
+        return left.id.localeCompare(right.id);
+      });
+    }
     return playlistFilterCategory === 'all'
       ? homeVideos
       : homeVideos.filter((video) => video.categorySlug === playlistFilterCategory);
