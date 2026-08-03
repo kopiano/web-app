@@ -323,8 +323,8 @@ export default function HlsVideo({
         capLevelToPlayerSize: true,
         abrBandWidthFactor: 0.8,
         abrBandWidthUpFactor: 0.7,
-        maxBufferLength: 24,
-        maxMaxBufferLength: 36,
+        maxBufferLength: 12,
+        maxMaxBufferLength: 24,
         maxBufferSize: 128 * 1024 * 1024,
         backBufferLength: 10,
       });
