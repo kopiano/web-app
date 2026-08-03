@@ -1707,7 +1707,9 @@
 
 .video-watch-player {
   position: relative;
-  aspect-ratio: 822 / 462;
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 3px solid rgba(255, 255, 255, 0.992);
   border-radius: 3rem;
@@ -1723,12 +1725,17 @@
 }
 
 .video-watch-player .hls-video {
+  position: absolute;
+  inset: 0;
   aspect-ratio: auto !important;
   background: transparent;
 }
 
 .video-watch-player .hls-video video {
+  box-sizing: border-box;
   display: block;
+  min-width: 0;
+  min-height: 0;
   object-fit: cover;
 }
 
@@ -2151,7 +2158,7 @@
   max-width: 80rem;
   margin: 17px 10px 33px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 400;
   line-height: 1.5;
 }
