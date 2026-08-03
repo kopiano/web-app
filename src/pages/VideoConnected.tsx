@@ -244,7 +244,9 @@ function withoutCategoryMarkers(value: string) {
 }
 
 function versionedVideoPoster(video: VideoApiItem) {
-  if (!video.coverUrl || video.status === 'ready') return video.coverUrl;
+  // The API reserves poster.webp before processing starts, but the file does
+  // not exist until the backend has generated the cover.
+  if (!video.coverUrl || video.status !== 'ready') return '';
   const separator = video.coverUrl.includes('?') ? '&' : '?';
   const revision = video.updatedAt || `${video.status}-${video.processingProgress}`;
   return `${video.coverUrl}${separator}preview=${encodeURIComponent(revision)}`;
@@ -407,7 +409,7 @@ const VideoCard = memo(function VideoCard({
       onPointerLeave={() => setIsPreviewActive(false)}
     >
       <button type="button" className="video-tile-hit" onClick={() => onPlay(video)}>
-        <img src={video.poster} alt="" {...lazyImageProps()} />
+        {video.poster && <img src={video.poster} alt="" {...lazyImageProps()} />}
         {isPreviewActive && (
           <span className="video-tile-preview" aria-hidden="true">
             <HlsVideo
@@ -1852,7 +1854,8 @@ export default function VideoConnected() {
   const generatedUploadCoverUrl = useMemo(() => {
     if (
       uploadCoverUrl
-      || !uploadStatusQuery.data?.coverUrl
+      || uploadStatusQuery.data?.status !== 'ready'
+      || !uploadStatusQuery.data.coverUrl
     ) return '';
     const coverUrl = uploadStatusQuery.data.coverUrl;
     const separator = coverUrl.includes('?') ? '&' : '?';
