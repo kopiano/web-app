@@ -446,7 +446,6 @@ function VideoCard({
       <button type="button" className="video-tile-hit" onClick={() => onPlay(video)}>
         <img src={video.poster} alt="" />
         <span className="video-quality">{video.resolution}</span>
-        <span className="video-category-tag">{video.category}</span>
         {variant !== 'playlist' && (
           <span className="video-duration">
             <Clock3 size={12} aria-hidden="true" />

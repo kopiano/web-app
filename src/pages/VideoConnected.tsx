@@ -413,7 +413,6 @@ const VideoCard = memo(function VideoCard({
           />
         )}
         <span className="video-quality">{video.resolution}</span>
-        <span className="video-category-tag">{video.category}</span>
         {variant !== 'playlist' && (
           <span className="video-duration">
             <Clock3 size={12} aria-hidden="true" />
