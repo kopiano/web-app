@@ -283,14 +283,42 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
     }
   }
 
-  const response = await request.post(
-    `/video/uploads/${encodeURIComponent(session.uploadId)}/complete`,
-    undefined,
-    uploadRequestConfig(signal, { timeout: 0 }),
-  )
-  clearUploadResume(file)
-  onUploadProgress?.(100)
-  return normalizeVideo(response.data)
+  let completeError = null
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (signal?.aborted) throw new DOMException('Upload aborted', 'AbortError')
+    try {
+      const response = await request.post(
+        `/video/uploads/${encodeURIComponent(session.uploadId)}/complete`,
+        undefined,
+        uploadRequestConfig(signal, { timeout: 0 }),
+      )
+      clearUploadResume(file)
+      onUploadProgress?.(100)
+      return normalizeVideo(response.data)
+    } catch (error) {
+      if (isAbortError(error, signal)) throw error
+      completeError = error
+      if (attempt === 2) break
+      await new Promise((resolve) => window.setTimeout(resolve, 700 * (attempt + 1)))
+      try {
+        const statusResponse = await request.get(
+          `/video/uploads/${encodeURIComponent(session.uploadId)}`,
+          uploadRequestConfig(signal, { params: uploadStatusParams() }),
+        )
+        const latestSession = normalizeUploadSession(statusResponse.data)
+        if (latestSession.totalBytes !== file.size) break
+        session = latestSession
+        if (session.complete) {
+          clearUploadResume(file)
+          onUploadProgress?.(100)
+          return normalizeVideo(session.video)
+        }
+      } catch (statusError) {
+        if (isAbortError(statusError, signal)) throw statusError
+      }
+    }
+  }
+  throw completeError || new Error('Unable to complete video upload.')
 }
 
 export function updateVideo(id, input) {
