@@ -1739,6 +1739,7 @@ export default function VideoConnected() {
   const draftTitleSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const uploadPublishRequestedRef = useRef(false);
   const uploadFinalizingRef = useRef(false);
+  const publishedUploadIdsRef = useRef(new Set<string>());
   const publishedVideoPollingRef = useRef<number | null>(null);
   const featuredVideoIdRef = useRef<string | null>(null);
   const featuredPreloadedPostersRef = useRef(new Set<string>());
@@ -1860,18 +1861,22 @@ export default function VideoConnected() {
   }, [uploadCoverUrl, uploadStatusQuery.data]);
   const publishedProcessingQuery = useQuery({
     queryKey: ['video', 'published-processing', publishedProcessingVideos.map((video) => video.id)],
-    queryFn: () => getVideos({ limit: 50, scope: 'accessible' }),
+    queryFn: () => getVideos({
+      limit: 50,
+      scope: 'accessible',
+      _video_refresh: Date.now(),
+    }),
     enabled: publishedProcessingVideos.length > 0,
     refetchOnMount: 'always',
     refetchInterval: (query) => {
       if (publishedProcessingVideos.length === 0) return false;
       const items = query.state.data?.items;
-      if (!items) return 1200;
+      if (!items) return 800;
       return publishedProcessingVideos.some((pending) => {
         const current = items.find((video) => video.id === pending.id);
         return !current || current.status === 'uploading' || current.status === 'processing';
       })
-        ? 1200
+        ? 800
         : false;
     },
   });
@@ -2806,7 +2811,13 @@ export default function VideoConnected() {
 
   const closeUpload = () => {
     const uploadId = uploadVideoId;
-    const wasPublished = uploadPublishRequestedRef.current;
+    const wasPublished = Boolean(
+      uploadId
+      && (
+        uploadPublishRequestedRef.current
+        || publishedUploadIdsRef.current.has(uploadId)
+      )
+    );
     const shouldDeleteDraft = Boolean(uploadId) && !wasPublished;
     uploadSessionRef.current += 1;
     draftTitleSaveVersionRef.current += 1;
@@ -2871,6 +2882,7 @@ export default function VideoConnected() {
         publish: true,
       });
       if (session !== uploadSessionRef.current) return;
+      publishedUploadIdsRef.current.add(videoId);
       uploadPublishRequestedRef.current = true;
       setUploadPublishRequested(true);
       queryClient.setQueryData(['video', 'detail', videoId], updated);
@@ -2921,6 +2933,7 @@ export default function VideoConnected() {
             const updated = await updateVideo(uploadVideoId, { cover: uploadCoverFile });
             queryClient.setQueryData(['video', 'detail', uploadVideoId], updated);
           }
+          publishedUploadIdsRef.current.add(uploadVideoId);
           await invalidateVideoData(uploadVideoId);
           closeUpload();
           notify(t('video.upload.published'), 'success');
