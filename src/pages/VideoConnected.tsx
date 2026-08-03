@@ -388,44 +388,29 @@ const VideoCard = memo(function VideoCard({
   video,
   onPlay,
   onFavorite,
-  onViewQualified,
+  priority = false,
   variant = 'playlist',
 }: {
   video: CardVideo;
   onPlay: (video: CardVideo) => void;
   onFavorite: (video: CardVideo) => void;
-  onViewQualified?: (videoId: string) => Promise<boolean>;
+  priority?: boolean;
   variant?: 'playlist' | 'default';
 }) {
   const isProcessing = video.status === 'uploading' || video.status === 'processing';
-  const [isPreviewActive, setIsPreviewActive] = useState(false);
-  const canPreview = video.status === 'ready' && Boolean(video.src);
   return (
     <article
-      className={`video-tile is-${variant}${isProcessing ? ' is-processing' : ''}${video.status === 'failed' ? ' is-failed' : ''}${isPreviewActive ? ' is-previewing' : ''}`}
-      onPointerEnter={() => {
-        if (canPreview) setIsPreviewActive(true);
-      }}
-      onPointerLeave={() => setIsPreviewActive(false)}
+      className={`video-tile is-${variant}${isProcessing ? ' is-processing' : ''}${video.status === 'failed' ? ' is-failed' : ''}`}
     >
       <button type="button" className="video-tile-hit" onClick={() => onPlay(video)}>
-        {video.poster && <img src={video.poster} alt="" {...lazyImageProps()} />}
-        {isPreviewActive && (
-          <span className="video-tile-preview" aria-hidden="true">
-            <HlsVideo
-              className="video-tile-preview-media"
-              src={video.src}
-              poster={video.poster}
-              active
-              autoPlay
-              controls={false}
-              onViewQualified={onViewQualified
-                ? () => {
-                  void onViewQualified(video.id);
-                }
-                : undefined}
-            />
-          </span>
+        {video.poster && (
+          <img
+            src={video.poster}
+            alt=""
+            loading={priority ? 'eager' : 'lazy'}
+            decoding="async"
+            fetchPriority={priority ? 'high' : 'low'}
+          />
         )}
         <span className="video-quality">{video.resolution}</span>
         <span className="video-category-tag">{video.category}</span>
@@ -1707,8 +1692,6 @@ export default function VideoConnected() {
   );
   const [featuredVideoId, setFeaturedVideoId] = useState<string | null>(null);
   const [previousFeaturedVideoId, setPreviousFeaturedVideoId] = useState<string | null>(null);
-  const [isFeaturedPreviewActive, setIsFeaturedPreviewActive] = useState(false);
-  const [isFeaturedPlayVisible, setIsFeaturedPlayVisible] = useState(false);
   const playlistFilterCategory = watchFromPlaylist
     ? searchParams.get('category') || activeCategory
     : activeCategory;
@@ -1717,7 +1700,6 @@ export default function VideoConnected() {
   const collectionLoadMoreRef = useRef<HTMLDivElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
-  const featuredPlayTimerRef = useRef<number | undefined>(undefined);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadStep, setUploadStep] = useState<UploadStep>('upload');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -1758,6 +1740,7 @@ export default function VideoConnected() {
   const draftTitleSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const uploadPublishRequestedRef = useRef(false);
   const uploadFinalizingRef = useRef(false);
+  const publishedVideoPollingRef = useRef<number | null>(null);
   const featuredVideoIdRef = useRef<string | null>(null);
   const featuredPreloadedPostersRef = useRef(new Set<string>());
   const featuredTransitionInFlightRef = useRef(false);
@@ -1769,6 +1752,9 @@ export default function VideoConnected() {
 
   useEffect(() => () => {
     uploadAbortControllerRef.current?.abort();
+    if (publishedVideoPollingRef.current !== null) {
+      window.clearInterval(publishedVideoPollingRef.current);
+    }
     if (uploadCoverObjectUrlRef.current) URL.revokeObjectURL(uploadCoverObjectUrlRef.current);
   }, []);
 
@@ -1790,6 +1776,8 @@ export default function VideoConnected() {
     initialPageParam: null as Cursor,
     queryFn: ({ pageParam }) => pageQuery(pageParam, { limit: 20, scope: 'public' }),
     getNextPageParam: nextCursor,
+    enabled: activeView === 'home',
+    refetchOnMount: 'always',
   });
   const playlistQuery = useInfiniteQuery({
     queryKey: ['video', 'playlist', playlistFilterCategory, currentUser?.id ?? 'public'],
@@ -1831,7 +1819,12 @@ export default function VideoConnected() {
     enabled: activeView === 'watch'
       && Boolean(requestedVideoId)
       && !isMockVideoId(requestedVideoId),
-    refetchInterval: (query) => query.state.data?.status === 'processing' ? 1500 : false,
+    refetchOnMount: 'always',
+    refetchInterval: (query) => (
+      query.state.data?.status === 'ready' || query.state.data?.status === 'failed'
+        ? false
+        : 800
+    ),
   });
   const commentsQuery = useQuery({
     queryKey: ['video', 'comments', requestedVideoId],
@@ -2114,8 +2107,6 @@ export default function VideoConnected() {
 
   useEffect(() => {
     if (activeView !== 'home' || featuredVideos.length === 0) return;
-    if (isFeaturedPreviewActive) return;
-
     if (!featuredVideos.some((video) => video.id === featuredVideoIdRef.current)) {
       const initialId = featuredVideos[Math.floor(Math.random() * featuredVideos.length)].id;
       featuredVideoIdRef.current = initialId;
@@ -2152,13 +2143,7 @@ export default function VideoConnected() {
       window.clearInterval(intervalId);
       featuredTransitionInFlightRef.current = false;
     };
-  }, [activeView, featuredVideos, isFeaturedPreviewActive]);
-
-  useEffect(() => () => {
-    if (featuredPlayTimerRef.current !== undefined) {
-      window.clearTimeout(featuredPlayTimerRef.current);
-    }
-  }, []);
+  }, [activeView, featuredVideos]);
 
   useEffect(() => {
     if (!previousFeaturedVideoId) return;
@@ -2794,6 +2779,32 @@ export default function VideoConnected() {
     }
   };
 
+  const startPublishedVideoPolling = useCallback((videoId: string) => {
+    if (publishedVideoPollingRef.current !== null) {
+      window.clearInterval(publishedVideoPollingRef.current);
+    }
+
+    const poll = async () => {
+      try {
+        const updated = await getVideo(videoId);
+        updateCachedVideo(updated);
+        if (updated.status === 'ready' || updated.status === 'failed') {
+          if (publishedVideoPollingRef.current !== null) {
+            window.clearInterval(publishedVideoPollingRef.current);
+            publishedVideoPollingRef.current = null;
+          }
+        }
+      } catch {
+        // Keep polling transient request failures.
+      }
+    };
+
+    void poll();
+    publishedVideoPollingRef.current = window.setInterval(() => {
+      void poll();
+    }, 800);
+  }, [updateCachedVideo]);
+
   const closeUpload = () => {
     const uploadId = uploadVideoId;
     const wasPublished = uploadPublishRequestedRef.current;
@@ -2831,9 +2842,7 @@ export default function VideoConnected() {
           // The server owns cleanup of a partially uploaded record if deletion cannot be completed here.
         });
     }
-    if (wasPublished) {
-      window.location.reload();
-    }
+    if (wasPublished && uploadId) startPublishedVideoPolling(uploadId);
   };
 
   const publishUpload = async () => {
@@ -3199,29 +3208,8 @@ export default function VideoConnected() {
                   <section className="video-featured" aria-label={t('video.home.featured')}>
                     <button
                       type="button"
-                      className={`video-featured-media${isFeaturedPreviewActive ? ' is-previewing' : ''}`}
+                      className="video-featured-media"
                       onClick={() => openVideo(featured)}
-                      onPointerEnter={() => {
-                        if (featured.status === 'ready' && featured.src) {
-                          setIsFeaturedPreviewActive(true);
-                          setIsFeaturedPlayVisible(true);
-                          if (featuredPlayTimerRef.current !== undefined) {
-                            window.clearTimeout(featuredPlayTimerRef.current);
-                          }
-                          featuredPlayTimerRef.current = window.setTimeout(() => {
-                            setIsFeaturedPlayVisible(false);
-                            featuredPlayTimerRef.current = undefined;
-                          }, 600);
-                        }
-                      }}
-                      onPointerLeave={() => {
-                        setIsFeaturedPreviewActive(false);
-                        setIsFeaturedPlayVisible(false);
-                        if (featuredPlayTimerRef.current !== undefined) {
-                          window.clearTimeout(featuredPlayTimerRef.current);
-                          featuredPlayTimerRef.current = undefined;
-                        }
-                      }}
                     >
                       {featuredVideos.map((video) => (
                         <img
@@ -3234,27 +3222,9 @@ export default function VideoConnected() {
                           fetchPriority={video.id === featured.id ? 'high' : 'low'}
                         />
                       ))}
-                      {isFeaturedPreviewActive && featured.status === 'ready' && featured.src && (
-                        <span
-                          className="video-featured-preview is-active"
-                          aria-hidden="true"
-                        >
-                          <HlsVideo
-                            className="video-featured-preview-media"
-                            src={featured.src}
-                            poster={featured.poster}
-                            active
-                            autoPlay
-                            controls={false}
-                            onViewQualified={() => {
-                              void trackQualifiedVideoView(featured.id);
-                            }}
-                          />
-                        </span>
-                      )}
                       <span className="video-quality">{featured.resolution}</span>
                       <span
-                        className={`video-featured-play${isFeaturedPlayVisible ? ' is-visible' : ''}`}
+                        className="video-featured-play"
                         aria-hidden="true"
                       >
                         <Play size={20} strokeWidth={2} fill="currentColor" />
@@ -3278,13 +3248,13 @@ export default function VideoConnected() {
                   <div className="video-home-recommendation">{t('video.home.today')}</div>
                   {homeVideos.length > 0 ? (
                     <div className="video-home-grid">
-                      {homeVideos.map((video) => (
+                      {homeVideos.map((video, index) => (
                         <VideoCard
                           key={video.id}
                           video={video}
                           onPlay={openVideo}
                           onFavorite={toggleFavorite}
-                          onViewQualified={trackQualifiedVideoView}
+                          priority={index < 12}
                         />
                       ))}
                     </div>
@@ -3378,13 +3348,13 @@ export default function VideoConnected() {
                 {collectionVideos.length > 0 ? (
                   <>
                     <div className="video-playlist-grid">
-                      {collectionVideos.map((video) => (
+                      {collectionVideos.map((video, index) => (
                         <VideoCard
                           key={video.id}
                           video={video}
                           onPlay={openVideo}
                           onFavorite={toggleFavorite}
-                          onViewQualified={trackQualifiedVideoView}
+                          priority={index < 12}
                         />
                       ))}
                     </div>
@@ -3411,13 +3381,13 @@ export default function VideoConnected() {
                   <div className="video-empty">{t('video.authRequired')}</div>
                 ) : playlistVideos.length > 0 ? (
                   <div className="video-playlist-grid">
-                    {playlistVideos.map((video) => (
+                    {playlistVideos.map((video, index) => (
                       <VideoCard
                         key={video.id}
                         video={video}
                         onPlay={openVideo}
                         onFavorite={toggleFavorite}
-                        onViewQualified={trackQualifiedVideoView}
+                        priority={index < 8}
                       />
                     ))}
                   </div>

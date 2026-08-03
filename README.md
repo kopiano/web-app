@@ -762,3 +762,31 @@ ffmpeg智能选帧而不是选2s的，因为有的可能还是黑屏，要过滤
 
 上传视频后：
 使用React Query缓存而不是整页刷新，减少重渲染，单视频轮询
+
+部署后的视频封面花了很久才显示：
+缓存策略
+max-age=31536000, immutable
+导致旧封面被浏览器/CDN 长时间缓存。
+现在已改为：
+public, max-age=5, must-revalidate
+
+视频网站架构：
+进入 video 页面，1秒显示大量视频封面，点击封面才请求视频 url
+如果现在达不到 1 秒，重点优化：
+视频列表接口响应时间
+封面 WebP 大小
+Nginx/CDN 图片缓存
+React 图片懒加载
+分页（不要一次返回几百个视频）
+一般首页视频流一次返回 12~30 个视频卡片 是比较合理的。
+
+video首页
+视频列表接口：只需返回封面等信息，不需要返回视频url
+视频详情接口：点击视频封面才请求url播放视频
+
+video播放列表页面
+
+- 视频首页：GET /api/video?scope=public&limit=20
+- 播放列表：GET /api/video?scope=mine&sort=oldest&limit=8
+- 收藏视频：GET /api/video?scope=collection
+- 视频详情及播放地址：GET /api/video/:id

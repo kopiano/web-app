@@ -100,8 +100,14 @@ export function getVideos(params = {}) {
   })
 }
 
-export function getVideo(id) {
-  return request.get(`/video/${encodeURIComponent(id)}`).then(response => normalizeVideo(response.data))
+export function getVideo(id, options = {}) {
+  return request.get(`/video/${encodeURIComponent(id)}`, {
+    ...options,
+    params: {
+      ...(options.params || {}),
+      _video_refresh: Date.now(),
+    },
+  }).then(response => normalizeVideo(response.data))
 }
 
 export function getVideoCategories(params) {
