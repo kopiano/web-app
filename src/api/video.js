@@ -183,6 +183,22 @@ function isAbortError(error, signal) {
     || error?.code === 'ERR_CANCELED'
 }
 
+function uploadRequestConfig(signal, extra = {}) {
+  return {
+    ...extra,
+    signal,
+    headers: {
+      ...(extra.headers || {}),
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      Pragma: 'no-cache',
+    },
+  }
+}
+
+function uploadStatusParams() {
+  return { _upload_refresh: Date.now() }
+}
+
 export async function uploadVideo(file, onUploadProgress, signal, onUploadCreated) {
   if (file.size <= 0 || file.size > MAX_VIDEO_UPLOAD_BYTES) {
     throw new Error('Video files must be between 1 byte and 6 GB.')
@@ -192,7 +208,10 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
   const saved = readUploadResume(file)
   if (saved) {
     try {
-      const response = await request.get(`/video/uploads/${encodeURIComponent(saved.uploadId)}`, { signal })
+      const response = await request.get(
+        `/video/uploads/${encodeURIComponent(saved.uploadId)}`,
+        uploadRequestConfig(signal, { params: uploadStatusParams() }),
+      )
       const candidate = normalizeUploadSession(response.data)
       if (candidate.totalBytes === file.size && candidate.video.id === saved.videoId) {
         session = candidate
@@ -205,11 +224,15 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
     }
   }
   if (!session) {
-    const response = await request.post('/video/uploads', {
-      file_name: file.name,
-      content_type: file.type || null,
-      total_bytes: file.size,
-    }, { signal })
+    const response = await request.post(
+      '/video/uploads',
+      {
+        file_name: file.name,
+        content_type: file.type || null,
+        total_bytes: file.size,
+      },
+      uploadRequestConfig(signal),
+    )
     session = normalizeUploadSession(response.data)
   }
 
@@ -230,9 +253,9 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
           `/video/uploads/${encodeURIComponent(session.uploadId)}/chunk`,
           chunk,
           {
-            timeout: 0,
-            signal,
+            ...uploadRequestConfig(signal, { timeout: 0 }),
             headers: {
+              ...uploadRequestConfig(signal).headers,
               'Content-Type': 'application/offset+octet-stream',
               'Upload-Offset': String(uploadedBytes),
             },
@@ -249,7 +272,7 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
         retries += 1
         const response = await request.get(
           `/video/uploads/${encodeURIComponent(session.uploadId)}`,
-          { signal },
+          uploadRequestConfig(signal, { params: uploadStatusParams() }),
         )
         session = normalizeUploadSession(response.data)
         if (session.totalBytes !== file.size || session.complete) break
@@ -263,7 +286,7 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
   const response = await request.post(
     `/video/uploads/${encodeURIComponent(session.uploadId)}/complete`,
     undefined,
-    { timeout: 0, signal },
+    uploadRequestConfig(signal, { timeout: 0 }),
   )
   clearUploadResume(file)
   onUploadProgress?.(100)

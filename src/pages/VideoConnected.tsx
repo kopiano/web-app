@@ -1941,6 +1941,19 @@ export default function VideoConnected() {
       .map((video) => toCardVideo(video, language, videoOverrides)),
     [effectiveMockItems, language, realHomeItems, useMockData, videoOverrides],
   );
+  useEffect(() => {
+    if (activeView !== 'home' || homeVideos.length === 0) return;
+    const posters = homeVideos
+      .slice(0, 8)
+      .map((video) => video.poster)
+      .filter(Boolean);
+    posters.forEach((poster) => {
+      const image = new Image();
+      image.decoding = 'async';
+      image.fetchPriority = 'high';
+      image.src = poster;
+    });
+  }, [activeView, homeVideos]);
   const featuredVideos = useMemo(
     () => homeVideos.filter((video) => video.status === 'ready'),
     [homeVideos],
