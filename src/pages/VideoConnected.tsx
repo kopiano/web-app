@@ -300,18 +300,14 @@ function toCardVideo(
   };
 }
 
-function toFeaturedCard(video: VideoBannerItem, language: string): CardVideo {
-  const formatter = new Intl.NumberFormat(language, {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  });
+function toFeaturedCard(video: VideoBannerItem): CardVideo {
   return {
     id: video.id,
     title: video.title,
     description: video.description,
     creator: video.username,
-    avatar: video.avatar || defaultAvatarDataUrl(video.username || 'User'),
-    views: `${formatter.format(video.viewCount)} ${language.startsWith('zh') ? '次播放' : 'views'}`,
+    avatar: video.avatar,
+    views: String(video.viewCount),
     viewCount: video.viewCount,
     likeCount: 0,
     favoriteCount: 0,
@@ -1991,8 +1987,8 @@ export default function VideoConnected() {
     [effectiveMockItems, language, realHomeItems, useMockData, videoOverrides],
   );
   const bannerVideos = useMemo(
-    () => (bannerQuery.data ?? []).map((video) => toFeaturedCard(video, language)),
-    [bannerQuery.data, language, videoOverrides],
+    () => (bannerQuery.data ?? []).map(toFeaturedCard),
+    [bannerQuery.data, videoOverrides],
   );
   const featuredVideos = useMemo(
     () => (bannerVideos.length > 0 ? bannerVideos : homeVideos.filter((video) => video.status === 'ready')),
@@ -3321,7 +3317,9 @@ export default function VideoConnected() {
                           fetchPriority={video.id === featured.id ? 'high' : 'auto'}
                         />
                       ))}
-                      <span className="video-quality">{featured.resolution}</span>
+                      {(featured.raw.width != null || featured.raw.height != null) && (
+                        <span className="video-quality">{featured.resolution}</span>
+                      )}
                       <span
                         className="video-featured-play"
                         aria-hidden="true"
@@ -3336,13 +3334,19 @@ export default function VideoConnected() {
                       {featured.description && (
                         <p>{withoutHashCharacters(featured.description)}</p>
                       )}
-                      <div className="video-featured-author">
-                        <img src={featured.avatar} alt="" {...lazyImageProps()} />
-                        <div>
-                          <strong>{featured.creator}</strong>
-                          <span>{featured.views}<i />{featured.duration}</span>
+                      {(featured.creator || featured.avatar) && (
+                        <div className="video-featured-author">
+                          {featured.avatar && (
+                            <img src={featured.avatar} alt="" {...lazyImageProps()} />
+                          )}
+                          {featured.creator && (
+                            <div>
+                              <strong>{featured.creator}</strong>
+                              <span>{featured.views}<i />{featured.duration}</span>
+                            </div>
+                          )}
                         </div>
-                      </div>
+                      )}
                     </div>
                   </section>
                 )}
