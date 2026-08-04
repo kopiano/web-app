@@ -291,10 +291,10 @@ function withoutHashCharacters(value: string) {
 }
 
 function versionedVideoPoster(video: VideoApiItem) {
-  // The API reserves poster.webp before processing starts, but the file does
-  // not exist until the backend has generated the cover.
-  const hasUploadedCover = video.coverUrl.includes('/cover.webp');
-  if (!video.coverUrl || (video.status !== 'ready' && !hasUploadedCover)) return '';
+  // Both the generated poster.webp and an uploaded cover.webp are returned
+  // before processing finishes. Keep the image visible while the card is
+  // still processing instead of replacing it with an empty placeholder.
+  if (!video.coverUrl) return '';
   const separator = video.coverUrl.includes('?') ? '&' : '?';
   const revision = video.updatedAt || `${video.status}-${video.processingProgress}`;
   return `${video.coverUrl}${separator}preview=${encodeURIComponent(revision)}`;
