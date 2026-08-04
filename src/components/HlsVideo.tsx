@@ -312,6 +312,7 @@ export default function HlsVideo({
         playbackReadyRef.current = true;
       };
       video.addEventListener('loadedmetadata', handleHlsLoadedMetadata);
+      video.addEventListener('canplay', startPlayback);
       hls = new Hls({
         autoStartLoad: true,
         enableWorker: true,
@@ -320,12 +321,14 @@ export default function HlsVideo({
         startFragPrefetch: false,
         startLevel: -1,   // 自动选择
         capLevelToPlayerSize: true,
-        abrBandWidthFactor: 0.8,
-        abrBandWidthUpFactor: 0.7,
-        maxBufferLength: 20,
-        maxMaxBufferLength: 60,
+        abrBandWidthFactor: 0.7,
+        abrBandWidthUpFactor: 0.6,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 90,
         maxBufferSize: 60 * 1024 * 1024,
-        backBufferLength: 30,
+        backBufferLength: 60,
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 2,
       });
       hls.loadSource(src);
       hls.attachMedia(video);
@@ -334,7 +337,6 @@ export default function HlsVideo({
         mediaRetryCount = 0;
         restorePlaybackPosition();
         playbackReadyRef.current = true;
-        startPlayback();
       });
       hls.on(Hls.Events.FRAG_LOADED, () => {
         networkRetryCount = 0;
@@ -376,6 +378,7 @@ export default function HlsVideo({
       if (handleHlsLoadedMetadata) {
         video.removeEventListener('loadedmetadata', handleHlsLoadedMetadata);
       }
+      video.removeEventListener('canplay', startPlayback);
       video.removeEventListener('error', handleNativePlaybackError);
       window.removeEventListener('online', handleOnline);
       hls?.destroy();

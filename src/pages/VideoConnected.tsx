@@ -263,11 +263,13 @@ function toCardVideo(
   video: VideoApiItem,
   language: string,
   videoOverrides: Record<string, Partial<VideoApiItem>> = {},
+  creatorFallback = '',
 ): CardVideo {
   const effectiveVideo = {
     ...video,
     ...videoOverrides[video.id],
   };
+  const creator = effectiveVideo.username || creatorFallback;
   const category = firstCategory(effectiveVideo, language);
   const viewCount = effectiveVideo.viewCount;
   const formatter = new Intl.NumberFormat(language, {
@@ -278,8 +280,8 @@ function toCardVideo(
     id: effectiveVideo.id,
     title: effectiveVideo.title || (language.startsWith('zh') ? '未命名视频' : 'Untitled video'),
     description: effectiveVideo.description,
-    creator: effectiveVideo.username || (language.startsWith('zh') ? '用户' : 'User'),
-    avatar: effectiveVideo.avatar || defaultAvatarDataUrl(effectiveVideo.username || 'User'),
+    creator: creator || (language.startsWith('zh') ? '用户' : 'User'),
+    avatar: effectiveVideo.avatar || defaultAvatarDataUrl(creator || 'User'),
     views: `${formatter.format(viewCount)} ${language.startsWith('zh') ? '次播放' : 'views'}`,
     viewCount,
     likeCount: effectiveVideo.likeCount,
@@ -2023,6 +2025,7 @@ export default function VideoConnected() {
   const mockPlaylistPageCount = Math.max(1, Math.ceil(mockPlaylistItems.length / 8));
   const playlistVideos = useMemo(() => {
     if (!currentUser) return [];
+    const currentUserName = currentUser.name || currentUser.username || '';
     const items = useMockData
       ? mockPlaylistItems.slice((playlistPage - 1) * 8, playlistPage * 8)
       : playlistQuery.data?.pages[playlistPage - 1]?.items ?? [];
@@ -2034,13 +2037,13 @@ export default function VideoConnected() {
           && (video.status === 'uploading' || video.status === 'processing')
         )
       ))
-      .map((video) => toCardVideo(video, language, videoOverrides));
+      .map((video) => toCardVideo(video, language, videoOverrides, currentUserName));
     const processingCards = processingVideos
       .filter((video) => (
         activeCategory === 'all'
         || video.categories.some((category) => category.slug === activeCategory)
       ))
-      .map((video) => toCardVideo(video, language, videoOverrides));
+      .map((video) => toCardVideo(video, language, videoOverrides, currentUserName));
     return [...processingCards, ...cards]
       .filter((video, index, all) => all.findIndex((item) => item.id === video.id) === index)
       .sort((left, right) => {
@@ -2052,6 +2055,8 @@ export default function VideoConnected() {
   }, [
     activeCategory,
     currentUser,
+    currentUser?.name,
+    currentUser?.username,
     language,
     mockPlaylistItems,
     playlistPage,
@@ -2078,12 +2083,13 @@ export default function VideoConnected() {
   const watchPlaylist = useMemo(() => {
     if (!watchFromPlaylist) return homeVideos;
     if (!currentUser) return [];
+    const currentUserName = currentUser.name || currentUser.username || '';
     const items = useMockData
       ? mockPlaylistItems
       : watchPlaylistQuery.data?.pages.flatMap((page) => page.items) ?? [];
     const cards = items
       .filter((video) => video.status === 'ready')
-      .map((video) => toCardVideo(video, language, videoOverrides));
+      .map((video) => toCardVideo(video, language, videoOverrides, currentUserName));
     if (cards.length > 0) {
       return cards.sort((left, right) => {
         const createdAtOrder = Date.parse(left.createdAt) - Date.parse(right.createdAt);
