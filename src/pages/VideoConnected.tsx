@@ -1760,6 +1760,9 @@ export default function VideoConnected() {
   const categoriesQuery = useQuery({
     queryKey: ['video', 'categories'],
     queryFn: () => getVideoCategories(),
+    enabled: activeView === 'playlist'
+      || activeView === 'favorites'
+      || collectionDialogOpen,
   });
   const playlistCategoriesQuery = useQuery({
     queryKey: ['video', 'categories', 'playlist', currentUser?.id ?? 'public'],
@@ -1769,6 +1772,9 @@ export default function VideoConnected() {
   const collectionsQuery = useQuery({
     queryKey: ['video', 'collections'],
     queryFn: () => getVideoCollections(),
+    enabled: activeView === 'library'
+      || activeView === 'favorites'
+      || watchFromFavorites,
   });
   const homeQuery = useInfiniteQuery({
     queryKey: ['video', 'home'],
@@ -1776,7 +1782,6 @@ export default function VideoConnected() {
     queryFn: ({ pageParam }) => pageQuery(pageParam, { limit: 20, scope: 'public' }),
     getNextPageParam: nextCursor,
     enabled: activeView === 'home' || (activeView === 'watch' && !watchFromPlaylist),
-    refetchOnMount: 'always',
   });
   const playlistQuery = useInfiniteQuery({
     queryKey: ['video', 'playlist', playlistFilterCategory, currentUser?.id ?? 'public'],
@@ -1943,7 +1948,7 @@ export default function VideoConnected() {
   useEffect(() => {
     if (activeView !== 'home' || homeVideos.length === 0) return;
     const posters = homeVideos
-      .slice(0, 8)
+      .slice(0, 6)
       .map((video) => video.poster)
       .filter(Boolean);
     posters.forEach((poster) => {
@@ -3247,7 +3252,7 @@ export default function VideoConnected() {
                           className={`video-featured-cover${video.id === featured.id ? ' is-current' : ''}${video.id === previousFeatured?.id ? ' is-previous' : ''}`}
                           src={video.poster}
                           alt=""
-                          loading={video.id === featured.id ? 'eager' : 'lazy'}
+                          loading={video.id === featured.id || video.id === previousFeatured?.id ? 'eager' : 'lazy'}
                           decoding="async"
                           fetchPriority={video.id === featured.id ? 'high' : 'low'}
                         />
@@ -3284,7 +3289,7 @@ export default function VideoConnected() {
                           video={video}
                           onPlay={openVideo}
                           onFavorite={toggleFavorite}
-                          priority={index < 12}
+                          priority={index < 6}
                         />
                       ))}
                     </div>
