@@ -1867,7 +1867,8 @@ export default function VideoConnected() {
     }
   });
   const [mockVideoOverrides, setMockVideoOverrides] = useState<Record<string, MockVideoOverride>>({});
-  const [homeVisibleCardCount, setHomeVisibleCardCount] = useState(0);
+  // Keep the first viewport on the eager image path immediately after data arrives.
+  const [homeVisibleCardCount, setHomeVisibleCardCount] = useState(8);
   const [mockComments, setMockComments] = useState<VideoApiComment[]>(MOCK_VIDEO_COMMENTS);
   const uploadHydratedRef = useRef(false);
   const uploadCoverObjectUrlRef = useRef<string | null>(null);
@@ -2276,6 +2277,19 @@ export default function VideoConnected() {
       image.src = src;
     });
   }, [activeView, playlistVideos, processingPlaylistVideos]);
+  useEffect(() => {
+    if (activeView !== 'home') return;
+    homeVideos
+      .slice(0, 12)
+      .map((video) => video.poster)
+      .filter(Boolean)
+      .forEach((src) => {
+        const image = new Image();
+        image.decoding = 'async';
+        image.fetchPriority = 'high';
+        image.src = src;
+      });
+  }, [activeView, homeVideos]);
   useEffect(() => {
     if (
       !watchFromPlaylist
