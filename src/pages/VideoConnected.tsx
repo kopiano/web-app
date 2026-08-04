@@ -2825,6 +2825,10 @@ export default function VideoConnected() {
         ? [queryClient.invalidateQueries({ queryKey: ['video', 'detail', videoId] })]
         : []),
     ]);
+    await queryClient.refetchQueries({
+      queryKey: ['video', 'playlist'],
+      type: 'active',
+    });
   }, [queryClient]);
 
   const deleteWatchedVideo = useCallback(async (videoId: string) => {
