@@ -484,6 +484,9 @@ const VideoCard = memo(function VideoCard({
 }) {
   const isProcessing = video.status === 'uploading' || video.status === 'processing';
   const [posterLoaded, setPosterLoaded] = useState(false);
+  const posterRef = useCallback((image: HTMLImageElement | null) => {
+    if (image?.complete && image.naturalWidth > 0) setPosterLoaded(true);
+  }, []);
   return (
     <article
       className={`video-tile is-${variant}${isProcessing ? ' is-processing' : ''}${video.status === 'failed' ? ' is-failed' : ''}`}
@@ -491,10 +494,11 @@ const VideoCard = memo(function VideoCard({
       <button type="button" className="video-tile-hit" onClick={() => onPlay(video)}>
         {video.poster && (
           <img
+            ref={posterRef}
             src={video.poster}
             alt=""
             loading={priority ? 'eager' : 'lazy'}
-            decoding="async"
+            decoding={priority ? 'sync' : 'async'}
             fetchPriority={priority ? 'high' : 'low'}
             className={posterLoaded ? 'is-loaded' : undefined}
             onLoad={() => setPosterLoaded(true)}
@@ -2289,19 +2293,6 @@ export default function VideoConnected() {
       image.src = src;
     });
   }, [activeView, playlistVideos, processingPlaylistVideos]);
-  useEffect(() => {
-    if (activeView !== 'home') return;
-    homeVideos
-      .slice(0, 8)
-      .map((video) => video.poster)
-      .filter(Boolean)
-      .forEach((src) => {
-        const image = new Image();
-        image.decoding = 'async';
-        image.fetchPriority = 'high';
-        image.src = src;
-      });
-  }, [activeView, homeVideos]);
   useEffect(() => {
     if (
       !watchFromPlaylist
