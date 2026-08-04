@@ -263,6 +263,8 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
     throw new Error('Video files must be between 1 byte and 6 GB.')
   }
 
+  const reportProgress = createUploadProgressReporter(file, onUploadProgress)
+
   // Match the fast Chat upload path for small and medium videos. The server
   // streams the request directly to disk, while Axios reports byte progress.
   if (file.size <= FAST_VIDEO_UPLOAD_MAX_BYTES) {
@@ -488,4 +490,3 @@ export function updateVideoCollection(id, input) {
 export function deleteVideoCollection(id) {
   return request.delete(`/video/collections/${encodeURIComponent(id)}`).then(() => undefined)
 }
-  const reportProgress = createUploadProgressReporter(file, onUploadProgress)
