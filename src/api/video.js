@@ -2,6 +2,7 @@ import request from './request'
 import { resolveAssetUrl } from '@/lib/avatar'
 
 const MAX_VIDEO_UPLOAD_BYTES = 6 * 1024 * 1024 * 1024
+const DEFAULT_UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
 const VIDEO_UPLOAD_RESUME_KEY = 'lume-video-upload-resume-v1'
 
 function normalizeCategory(category) {
@@ -199,7 +200,7 @@ function normalizeUploadSession(session) {
   return {
     uploadId: String(session.upload_id),
     video: normalizeVideo(session.video),
-    chunkSize: Number(session.chunk_size) || 1024 * 1024,
+    chunkSize: Number(session.chunk_size) || DEFAULT_UPLOAD_CHUNK_SIZE,
     uploadedBytes: Number(session.uploaded_bytes) || 0,
     totalBytes: Number(session.total_bytes) || 0,
     complete: Boolean(session.complete),
