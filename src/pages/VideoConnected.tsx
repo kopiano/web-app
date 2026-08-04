@@ -360,13 +360,15 @@ function lazyImageProps() {
 }
 
 function preloadImage(src: string) {
-  return new Promise<void>((resolve) => {
+  return new Promise<boolean>((resolve) => {
     const image = new Image();
     image.decoding = 'async';
     image.onload = () => {
-      void image.decode().catch(() => undefined).finally(resolve);
+      void image.decode()
+        .catch(() => undefined)
+        .finally(() => resolve(true));
     };
-    image.onerror = () => resolve();
+    image.onerror = () => resolve(false);
     image.src = src;
   });
 }
@@ -2203,7 +2205,11 @@ export default function VideoConnected() {
       featuredTransitionInFlightRef.current = true;
       const transition = async () => {
         if (!featuredPreloadedPostersRef.current.has(nextVideo.poster)) {
-          await preloadImage(nextVideo.poster);
+          const preloaded = await preloadImage(nextVideo.poster);
+          if (!preloaded) {
+            featuredTransitionInFlightRef.current = false;
+            return;
+          }
           featuredPreloadedPostersRef.current.add(nextVideo.poster);
         }
 
@@ -3452,9 +3458,6 @@ export default function VideoConnected() {
                           loading={video.id === featured.id || video.id === previousFeatured?.id ? 'eager' : 'lazy'}
                           decoding="async"
                           fetchPriority={video.id === featured.id ? 'high' : 'auto'}
-                          onLoad={(event) => {
-                            event.currentTarget.classList.add('is-loaded');
-                          }}
                         />
                       ))}
                       {(featured.raw.width != null || featured.raw.height != null) && (
