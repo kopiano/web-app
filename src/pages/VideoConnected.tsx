@@ -483,6 +483,7 @@ const VideoCard = memo(function VideoCard({
   variant?: 'playlist' | 'default';
 }) {
   const isProcessing = video.status === 'uploading' || video.status === 'processing';
+  const [posterLoaded, setPosterLoaded] = useState(false);
   return (
     <article
       className={`video-tile is-${variant}${isProcessing ? ' is-processing' : ''}${video.status === 'failed' ? ' is-failed' : ''}`}
@@ -495,6 +496,8 @@ const VideoCard = memo(function VideoCard({
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"
             fetchPriority={priority ? 'high' : 'low'}
+            className={posterLoaded ? 'is-loaded' : undefined}
+            onLoad={() => setPosterLoaded(true)}
           />
         )}
         <span className="video-quality">{video.resolution}</span>

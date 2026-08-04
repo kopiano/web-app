@@ -838,6 +838,11 @@
   display: block;
   object-fit: cover;
   transform: scale(1.1);
+  visibility: hidden;
+}
+
+.video-tile-hit > img.is-loaded {
+  visibility: visible;
 }
 
 .video-tile-preview {
