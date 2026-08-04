@@ -245,6 +245,10 @@ function withoutCategoryMarkers(value: string) {
     .trim();
 }
 
+function withoutHashCharacters(value: string) {
+  return value.replace(/#/g, '').trim();
+}
+
 function versionedVideoPoster(video: VideoApiItem) {
   // The API reserves poster.webp before processing starts, but the file does
   // not exist until the backend has generated the cover.
@@ -303,8 +307,8 @@ function toFeaturedCard(video: VideoBannerItem, language: string): CardVideo {
   });
   return {
     id: video.id,
-    title: language.startsWith('zh') ? '精选视频' : 'Featured video',
-    description: '',
+    title: video.title,
+    description: video.description,
     creator: video.username || (language.startsWith('zh') ? '用户' : 'User'),
     avatar: video.avatar || defaultAvatarDataUrl(video.username || 'User'),
     views: `${formatter.format(video.viewCount)} ${language.startsWith('zh') ? '次播放' : 'views'}`,
@@ -3328,7 +3332,7 @@ export default function VideoConnected() {
                     <div className="video-featured-copy">
                       <span className="video-featured-label">{t('video.home.featured')}</span>
                       <h2>{withoutCategoryMarkers(featured.title)}</h2>
-                      <p>{withoutCategoryMarkers(featured.description)}</p>
+                      <p>{withoutHashCharacters(featured.description)}</p>
                       <div className="video-featured-author">
                         <img src={featured.avatar} alt="" {...lazyImageProps()} />
                         <div>

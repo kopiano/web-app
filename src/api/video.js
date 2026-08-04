@@ -20,6 +20,8 @@ function normalizeFeaturedVideo(video) {
     width: video.width == null ? null : Number(video.width),
     height: video.height == null ? null : Number(video.height),
     id: String(video.id),
+    title: String(video.title || ''),
+    description: String(video.description || ''),
     viewCount: Number(video.view_count) || 0,
     username: String(video.username || ''),
     avatar: resolveAssetUrl(video.avatar),

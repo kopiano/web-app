@@ -45,6 +45,8 @@ export interface VideoBannerItem {
   width: number | null;
   height: number | null;
   id: string;
+  title: string;
+  description: string;
   viewCount: number;
   username: string;
   avatar: string;
