@@ -3861,7 +3861,7 @@ export default function VideoConnected() {
                   </div>
                 ) : (
                   <div className="video-empty">
-                    {playlistQuery.isLoading
+                    {!playlistQuery.isFetched || playlistQuery.isLoading || playlistQuery.isFetching
                       ? <VideoLoadingSpinner label={t('video.loading')} />
                       : t('video.empty')}
                   </div>
