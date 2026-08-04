@@ -1896,11 +1896,13 @@ export default function VideoConnected() {
     enabled: activeView === 'playlist'
       || activeView === 'favorites'
       || collectionDialogOpen,
+    staleTime: 60_000,
   });
   const playlistCategoriesQuery = useQuery({
     queryKey: ['video', 'categories', 'playlist', currentUser?.id ?? 'public'],
     queryFn: () => getVideoCategories({ scope: 'mine' }),
     enabled: Boolean(currentUser) && (activeView === 'playlist' || collectionDialogOpen),
+    staleTime: 60_000,
   });
   const collectionsQuery = useQuery({
     queryKey: ['video', 'collections'],
@@ -1932,6 +1934,8 @@ export default function VideoConnected() {
       ...(playlistFilterCategory !== 'all' ? { category: playlistFilterCategory } : {}),
     }),
     getNextPageParam: nextCursor,
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
     refetchInterval: (query) => (
       query.state.data?.pages
         .flatMap((page) => page.items)
@@ -3861,7 +3865,7 @@ export default function VideoConnected() {
                   </div>
                 ) : (
                   <div className="video-empty">
-                    {!playlistQuery.isFetched || playlistQuery.isLoading || playlistQuery.isFetching
+                    {!playlistQuery.isFetched || playlistQuery.isLoading
                       ? <VideoLoadingSpinner label={t('video.loading')} />
                       : t('video.empty')}
                   </div>
