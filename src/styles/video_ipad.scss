@@ -1,0 +1,91 @@
+@media (min-width: 768px) and (max-width: 1100px) {
+  .video-page {
+    padding: 7.8rem 1.5rem 10rem;
+  }
+
+  .video-page-shell {
+    padding-inline: 0;
+  }
+
+  .video-page-header,
+  .video-playlist-category-row,
+  .video-section,
+  .video-featured {
+    width: min(100%, 960px);
+  }
+
+  .video-page-header {
+    gap: 1.5rem;
+  }
+
+  .video-page-header h1 {
+    font-size: clamp(2.6rem, 5vw, 3.6rem);
+  }
+
+  .video-page-header-subtitle {
+    font-size: 1.08rem;
+  }
+
+  .video-featured {
+    grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
+    border-radius: 2rem;
+  }
+
+  .video-featured-media {
+    min-height: 0;
+    aspect-ratio: 16 / 10;
+  }
+
+  .video-featured-copy {
+    min-height: 0;
+    padding: 2rem 1.8rem;
+  }
+
+  .video-featured-copy h2 {
+    font-size: clamp(1.7rem, 3.2vw, 2.4rem);
+  }
+
+  .video-featured-copy > p {
+    right: 1.8rem;
+    bottom: 1.5rem;
+    max-width: calc(100% - 3.6rem);
+    font-size: 1rem;
+  }
+
+  .video-home-grid,
+  .video-playlist-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.1rem;
+  }
+
+  .video-playlist-section .video-playlist-grid,
+  .video-home-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .video-library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.1rem;
+  }
+
+  .video-watch-layout {
+    grid-template-columns: minmax(0, 1fr) 18rem;
+    gap: 1.2rem;
+  }
+
+  .video-watch-queue-list {
+    grid-auto-rows: minmax(5.6rem, auto);
+  }
+
+  .video-watch-queue-list > button {
+    min-height: 5.6rem;
+  }
+
+  .video-watch-queue-list > button img {
+    width: 6.4rem;
+  }
+
+  .video-dock {
+    bottom: 1.2rem;
+  }
+}

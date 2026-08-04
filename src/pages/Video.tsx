@@ -38,6 +38,7 @@ import { deleteVideo } from '@/api/video';
 import { defaultAvatarDataUrl, resolveAvatarUrl } from '@/lib/avatar';
 import type { RootState } from '@/store/store';
 import '@/styles/video.scss';
+import '@/styles/video_ipad.scss';
 
 type VideoView = 'home' | 'library' | 'favorites' | 'playlist' | 'watch';
 type VideoUploadStep = 'upload' | 'publish';

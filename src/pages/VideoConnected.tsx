@@ -96,6 +96,7 @@ import { rememberVideoReturnTo } from '@/lib/videoNavigation';
 import { setVideoDetails, setVideoViewCount } from '@/store/videoViewSlice';
 import type { AppDispatch, RootState } from '@/store/store';
 import '@/styles/video.scss';
+import '@/styles/video_ipad.scss';
 
 type VideoView = 'home' | 'library' | 'favorites' | 'playlist' | 'watch';
 type UploadStep = 'upload' | 'publish';
