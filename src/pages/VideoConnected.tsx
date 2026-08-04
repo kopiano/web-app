@@ -309,7 +309,7 @@ function toFeaturedCard(video: VideoBannerItem, language: string): CardVideo {
     id: video.id,
     title: video.title,
     description: video.description,
-    creator: video.username || (language.startsWith('zh') ? '用户' : 'User'),
+    creator: video.username,
     avatar: video.avatar || defaultAvatarDataUrl(video.username || 'User'),
     views: `${formatter.format(video.viewCount)} ${language.startsWith('zh') ? '次播放' : 'views'}`,
     viewCount: video.viewCount,
@@ -3330,9 +3330,12 @@ export default function VideoConnected() {
                       </span>
                     </button>
                     <div className="video-featured-copy">
-                      <span className="video-featured-label">{t('video.home.featured')}</span>
-                      <h2>{withoutCategoryMarkers(featured.title)}</h2>
-                      <p>{withoutHashCharacters(featured.description)}</p>
+                      {featured.title && (
+                        <h2>{withoutCategoryMarkers(featured.title)}</h2>
+                      )}
+                      {featured.description && (
+                        <p>{withoutHashCharacters(featured.description)}</p>
+                      )}
                       <div className="video-featured-author">
                         <img src={featured.avatar} alt="" {...lazyImageProps()} />
                         <div>
