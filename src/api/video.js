@@ -2,6 +2,7 @@ import request from './request'
 import { resolveAssetUrl } from '@/lib/avatar'
 
 const MAX_VIDEO_UPLOAD_BYTES = 6 * 1024 * 1024 * 1024
+const FAST_VIDEO_UPLOAD_MAX_BYTES = 256 * 1024 * 1024
 const DEFAULT_UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
 const VIDEO_UPLOAD_RESUME_KEY = 'lume-video-upload-resume-v1'
 
@@ -232,6 +233,29 @@ function uploadStatusParams() {
 export async function uploadVideo(file, onUploadProgress, signal, onUploadCreated) {
   if (file.size <= 0 || file.size > MAX_VIDEO_UPLOAD_BYTES) {
     throw new Error('Video files must be between 1 byte and 6 GB.')
+  }
+
+  // Match the fast Chat upload path for small and medium videos. The server
+  // streams the request directly to disk, while Axios reports byte progress.
+  if (file.size <= FAST_VIDEO_UPLOAD_MAX_BYTES) {
+    const formData = new FormData()
+    formData.append('video', file, file.name)
+    const response = await request.post(
+      '/video/upload',
+      formData,
+      {
+        ...uploadRequestConfig(signal, { timeout: 0 }),
+        onUploadProgress: progressEvent => {
+          const total = progressEvent.total || file.size
+          const loaded = Math.min(progressEvent.loaded, file.size)
+          onUploadProgress?.(Math.min(99, Math.round((loaded / total) * 100)))
+        },
+      },
+    )
+    const video = normalizeVideo(response.data)
+    onUploadCreated?.(video)
+    onUploadProgress?.(100)
+    return video
   }
 
   let session = null
