@@ -386,7 +386,15 @@
   height: 329px;
   overflow: hidden;
   color: #fff;
-  background: #cfd4d1;
+  background:
+    linear-gradient(
+      110deg,
+      rgba(226, 232, 228, 0.94),
+      rgba(195, 207, 201, 0.86),
+      rgba(226, 232, 228, 0.94)
+    );
+  background-size: 220% 100%;
+  animation: video-featured-skeleton 1.35s ease-in-out infinite;
 }
 
 .video-featured-media::after {
@@ -406,17 +414,36 @@
   object-fit: cover;
   opacity: 0;
   transition:
-    opacity 2s ease-in-out,
+    opacity 0.42s ease-out,
     filter 0.7s ease;
 }
 
 .video-featured-media > img.is-current {
   z-index: 1;
+}
+
+.video-featured-media > img.is-current.is-loaded,
+.video-featured-media > img.is-previous.is-loaded {
   opacity: 1;
 }
 
 .video-featured-media > img.is-previous {
   z-index: 0;
+}
+
+.video-featured-media:has(> img.is-current.is-loaded) {
+  animation: none;
+  background: #cfd4d1;
+}
+
+@keyframes video-featured-skeleton {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 .video-featured-preview {

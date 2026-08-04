@@ -70,6 +70,7 @@ import {
   updateVideoFavorite,
   updateVideoLike,
   uploadVideo,
+  videoStatusWebSocketUrl,
   viewVideo,
 } from '@/api/video';
 import type {
@@ -2555,12 +2556,27 @@ export default function VideoConnected() {
   const updateCachedVideo = useCallback((updated: VideoApiItem) => {
     const updatePages = (data: InfiniteData<VideoPage, Cursor> | undefined) => {
       if (!data) return data;
+      let found = false;
+      const pages = data.pages.map((page) => ({
+        ...page,
+        items: page.items.map((item) => {
+          if (item.id !== updated.id) return item;
+          found = true;
+          return updated;
+        }),
+      }));
+      if (!found && (updated.status === 'uploading' || updated.status === 'processing')) {
+        const firstPage = pages[0];
+        if (firstPage) {
+          pages[0] = {
+            ...firstPage,
+            items: [updated, ...firstPage.items].slice(0, 8),
+          };
+        }
+      }
       return {
         ...data,
-        pages: data.pages.map((page) => ({
-          ...page,
-          items: page.items.map((item) => (item.id === updated.id ? updated : item)),
-        })),
+        pages,
       };
     };
 
@@ -2582,6 +2598,126 @@ export default function VideoConnected() {
       updatePages,
     );
   }, [queryClient]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | undefined;
+    let connectTimer: number | undefined;
+    let disposed = false;
+    let reconnectDelay = 1000;
+
+    const connect = () => {
+      if (disposed) return;
+      const currentSocket = new WebSocket(videoStatusWebSocketUrl());
+      socket = currentSocket;
+      currentSocket.onopen = () => {
+        reconnectDelay = 1000;
+      };
+      currentSocket.onmessage = event => {
+        let payload: unknown;
+        try {
+          payload = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        if (
+          !payload
+          || typeof payload !== 'object'
+          || (payload as { type?: unknown }).type !== 'video_progress'
+        ) return;
+        const message = payload as {
+          video_id?: unknown;
+          status?: unknown;
+          progress?: unknown;
+        };
+        const videoId = String(message.video_id || '');
+        if (!videoId) return;
+        const progress = Math.max(0, Math.min(100, Number(message.progress) || 0));
+        const status = message.status === 'uploading'
+          || message.status === 'processing'
+          || message.status === 'ready'
+          || message.status === 'failed'
+          ? message.status
+          : null;
+        if (!status) return;
+
+        queryClient.setQueryData<VideoApiItem>(
+          ['video', 'detail', videoId],
+          item => item
+            ? { ...item, status, processingProgress: progress }
+            : item,
+        );
+        queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+          { queryKey: ['video', 'home'] },
+          data => data && {
+            ...data,
+            pages: data.pages.map(page => ({
+              ...page,
+              items: page.items.map(item => (
+                item.id === videoId
+                  ? { ...item, status, processingProgress: progress }
+                  : item
+              )),
+            })),
+          },
+        );
+        queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+          { queryKey: ['video', 'playlist'] },
+          data => data && {
+            ...data,
+            pages: data.pages.map(page => ({
+              ...page,
+              items: page.items.map(item => (
+                item.id === videoId
+                  ? { ...item, status, processingProgress: progress }
+                  : item
+              )),
+            })),
+          },
+        );
+        queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+          { queryKey: ['video', 'watch-playlist'] },
+          data => data && {
+            ...data,
+            pages: data.pages.map(page => ({
+              ...page,
+              items: page.items.map(item => (
+                item.id === videoId
+                  ? { ...item, status, processingProgress: progress }
+                  : item
+              )),
+            })),
+          },
+        );
+      };
+      currentSocket.onclose = () => {
+        if (disposed) return;
+        reconnectTimer = window.setTimeout(connect, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 10000);
+      };
+      currentSocket.onerror = () => {};
+    };
+
+    connectTimer = window.setTimeout(connect, 0);
+    return () => {
+      disposed = true;
+      if (connectTimer !== undefined) window.clearTimeout(connectTimer);
+      if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
+      const currentSocket = socket;
+      socket = null;
+      if (!currentSocket) return;
+      currentSocket.onmessage = null;
+      currentSocket.onclose = null;
+      currentSocket.onerror = null;
+      if (currentSocket.readyState === WebSocket.CONNECTING) {
+        currentSocket.onopen = () => currentSocket.close(1000, 'Video status closed');
+      } else if (currentSocket.readyState === WebSocket.OPEN) {
+        currentSocket.close(1000, 'Video status closed');
+      }
+    };
+  }, [currentUser?.id, queryClient]);
 
   const trackQualifiedVideoView = useCallback(async (videoId: string) => {
     if (isMockVideoId(videoId)) {
@@ -2617,6 +2753,7 @@ export default function VideoConnected() {
   const invalidateVideoData = useCallback(async (videoId?: string) => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['video', 'home'] }),
+      queryClient.invalidateQueries({ queryKey: ['video', 'banner'] }),
       queryClient.invalidateQueries({ queryKey: ['video', 'playlist'] }),
       queryClient.invalidateQueries({ queryKey: ['video', 'collection'] }),
       ...(videoId
@@ -2805,7 +2942,7 @@ export default function VideoConnected() {
         void deleteVideo(uploaded.id);
         return;
       }
-      const latest = await queryClient.fetchQuery({
+    const latest = await queryClient.fetchQuery({
         queryKey: ['video', 'detail', uploaded.id],
         queryFn: () => getVideo(uploaded.id),
         staleTime: 0,
@@ -2819,7 +2956,7 @@ export default function VideoConnected() {
       } catch {
         // The current session still suppresses mock content when storage is unavailable.
       }
-      updateCachedVideo(latest);
+    updateCachedVideo(latest);
       void invalidateVideoData(latest.id);
     } catch {
       if (controller.signal.aborted || session !== uploadSessionRef.current) return;
@@ -3315,6 +3452,9 @@ export default function VideoConnected() {
                           loading={video.id === featured.id || video.id === previousFeatured?.id ? 'eager' : 'lazy'}
                           decoding="async"
                           fetchPriority={video.id === featured.id ? 'high' : 'auto'}
+                          onLoad={(event) => {
+                            event.currentTarget.classList.add('is-loaded');
+                          }}
                         />
                       ))}
                       {(featured.raw.width != null || featured.raw.height != null) && (

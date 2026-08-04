@@ -821,3 +821,34 @@ preload="auto"，而不是preload="none", 否则点击才加载。
 
 封面分优先级加载: home大卡片封面使用fetchpriority="high"，其它小卡片封面使用loading="lazy"
 大卡片使用单独的接口GET /video/banner
+
+### playlist
+上传视频发布后们不要刷新整个playlist页面，而是设计人物状态同步机制，如使用websocket实时更新进度变化。
+更新进度方式：
+- Websocket（最佳）
+- 轮询（简单，推荐初期）
+
+流程：
+上传视频
+ |
+ |
+POST /video/upload
+ |
+返回 video_id
+ |
+playlist 添加临时卡片
+ |
+ |
+Redis记录任务状态
+ |
+ |
+FFmpeg处理
+ |
+ |
+WebSocket推送
+ |
+ |
+React更新VideoCard
+
+图片从上到下渐进显示：
+使用骨架屏站为淡入显示，高清图加载完成后停止骨架动画

@@ -121,6 +121,14 @@ export function getVideoBanner() {
   })
 }
 
+export function videoStatusWebSocketUrl() {
+  const apiUrl = new URL(import.meta.env.VITE_API_URL || 'http://localhost:8100/api')
+  apiUrl.protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+  apiUrl.pathname = `${apiUrl.pathname.replace(/\/$/, '')}/video/status`
+  apiUrl.search = ''
+  return apiUrl.toString()
+}
+
 export function getVideo(id, options = {}) {
   return request.get(`/video/${encodeURIComponent(id)}`, {
     ...options,
