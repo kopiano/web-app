@@ -2205,6 +2205,26 @@ export default function VideoConnected() {
   ]);
   useEffect(() => {
     if (
+      activeView !== 'playlist'
+      || useMockData
+      || playlistPage <= 1
+      || playlistQuery.isFetchingNextPage
+      || !playlistQuery.hasNextPage
+      || playlistQuery.data?.pages.length === undefined
+      || playlistQuery.data.pages.length >= playlistPage
+    ) return;
+    void playlistQuery.fetchNextPage();
+  }, [
+    activeView,
+    playlistPage,
+    playlistQuery.data?.pages.length,
+    playlistQuery.fetchNextPage,
+    playlistQuery.hasNextPage,
+    playlistQuery.isFetchingNextPage,
+    useMockData,
+  ]);
+  useEffect(() => {
+    if (
       !watchFromPlaylist
       || useMockData
       || !watchPlaylistQuery.hasNextPage
@@ -2762,13 +2782,20 @@ export default function VideoConnected() {
   }, [queryClient]);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (
+      !currentUser
+      || (
+        publishedProcessingVideos.length === 0
+        && !(uploadVideoId && uploadPublishRequested)
+      )
+    ) return;
 
     let socket: WebSocket | null = null;
     let reconnectTimer: number | undefined;
     let connectTimer: number | undefined;
     let disposed = false;
     let reconnectDelay = 1000;
+    let connectionFailures = 0;
 
     const connect = () => {
       if (disposed) return;
@@ -2776,6 +2803,7 @@ export default function VideoConnected() {
       socket = currentSocket;
       currentSocket.onopen = () => {
         reconnectDelay = 1000;
+        connectionFailures = 0;
       };
       currentSocket.onmessage = event => {
         let payload: unknown;
@@ -2856,6 +2884,10 @@ export default function VideoConnected() {
       };
       currentSocket.onclose = () => {
         if (disposed) return;
+        connectionFailures += 1;
+        // HTTP polling remains the source of truth when the optional
+        // realtime endpoint is unavailable.
+        if (connectionFailures >= 3) return;
         reconnectTimer = window.setTimeout(connect, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, 10000);
       };
@@ -2879,7 +2911,13 @@ export default function VideoConnected() {
         currentSocket.close(1000, 'Video status closed');
       }
     };
-  }, [currentUser?.id, queryClient]);
+  }, [
+    currentUser?.id,
+    publishedProcessingVideos.length,
+    queryClient,
+    uploadPublishRequested,
+    uploadVideoId,
+  ]);
 
   const trackQualifiedVideoView = useCallback(async (videoId: string) => {
     if (isMockVideoId(videoId)) {
@@ -3042,7 +3080,13 @@ export default function VideoConnected() {
     if (useMockData && nextPage > mockPlaylistPageCount) return;
     if (!useMockData && nextPage > (playlistQuery.data?.pages.length ?? 0)) {
       if (!playlistQuery.hasNextPage) return;
-      await playlistQuery.fetchNextPage();
+      let loadedPages = playlistQuery.data?.pages.length ?? 0;
+      while (loadedPages < nextPage && playlistQuery.hasNextPage) {
+        const result = await playlistQuery.fetchNextPage();
+        loadedPages = result.data?.pages.length ?? loadedPages;
+        if (!result.hasNextPage) break;
+      }
+      if (loadedPages < nextPage) return;
     }
     const next = new URLSearchParams(searchParams);
     if (nextPage === 1) next.delete('page');
