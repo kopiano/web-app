@@ -1473,6 +1473,25 @@
   backdrop-filter: blur(18px);
 }
 
+.video-retry-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid rgba(29, 36, 32, 0.2);
+  border-radius: 999px;
+  color: #1d2420;
+  background: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  cursor: pointer;
+}
+
+.video-retry-button:hover {
+  background: #fff;
+}
+
 .video-list-loading-spinner {
   width: 3.2rem;
   aspect-ratio: 1;

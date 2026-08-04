@@ -1938,10 +1938,13 @@ export default function VideoConnected() {
   const homeQuery = useInfiniteQuery({
     queryKey: ['video', 'home'],
     initialPageParam: null as Cursor,
-    queryFn: ({ pageParam }) => pageQuery(pageParam, { limit: 20, scope: 'public' }),
+    queryFn: ({ pageParam }) => pageQuery(pageParam, { limit: 8, scope: 'public' }),
     getNextPageParam: nextCursor,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(800 * (attempt + 1), 2_000),
     enabled: activeView === 'home' || (activeView === 'watch' && !watchFromPlaylist),
   });
   const bannerQuery = useQuery({
@@ -2107,8 +2110,7 @@ export default function VideoConnected() {
     [homeQuery.data],
   );
   const realHomeItems = useMemo(
-    () => homeSourceItems
-      .filter((video) => video.status === 'ready'),
+    () => homeSourceItems,
     [homeSourceItems],
   );
   const useMockData = homeQuery.isSuccess
@@ -2210,9 +2212,9 @@ export default function VideoConnected() {
     const items = useMockData
       ? mockPlaylistItems.slice((playlistPage - 1) * 8, playlistPage * 8)
       : playlistQuery.data?.pages[playlistPage - 1]?.items ?? [];
-    const cards = items
-      .filter((video) => video.status === 'ready')
-      .map((video) => toCardVideo(video, language, videoOverrides, currentUserName));
+    const cards = items.map((video) => (
+      toCardVideo(video, language, videoOverrides, currentUserName)
+    ));
     return cards
       .filter((video, index, all) => all.findIndex((item) => item.id === video.id) === index)
       .sort((left, right) => {
@@ -3786,12 +3788,12 @@ export default function VideoConnected() {
                       {featured.description && (
                         <p>{withoutHashCharacters(featured.description)}</p>
                       )}
-                      {(featured.creator || featured.avatar) && (
+                      {(featured.raw.username || featured.raw.avatar) && (
                         <div className="video-featured-author">
-                          {featured.avatar && (
+                          {featured.raw.avatar && (
                             <img src={featured.avatar} alt="" {...lazyImageProps()} />
                           )}
-                          {featured.creator && (
+                          {featured.raw.username && (
                             <div>
                               <strong>{featured.creator}</strong>
                               <span>{featured.views}<i />{featured.duration}</span>
@@ -3819,7 +3821,16 @@ export default function VideoConnected() {
                   ) : (
                     <div className="video-empty">
                       {homeQuery.isError
-                        ? t('video.loadFailed')
+                        ? (
+                          <button
+                            type="button"
+                            className="video-retry-button"
+                            onClick={() => void homeQuery.refetch()}
+                          >
+                            <RefreshCw size={16} aria-hidden="true" />
+                            <span>{t('video.loadFailed')}</span>
+                          </button>
+                        )
                         : homeQuery.isLoading
                           ? <VideoLoadingSpinner label={t('video.loading')} />
                           : t('video.empty')}
