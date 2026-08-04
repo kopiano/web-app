@@ -2,7 +2,9 @@ import request from './request'
 import { resolveAssetUrl } from '@/lib/avatar'
 
 const MAX_VIDEO_UPLOAD_BYTES = 6 * 1024 * 1024 * 1024
-const FAST_VIDEO_UPLOAD_MAX_BYTES = 256 * 1024 * 1024
+// Keep the single-request path short enough to avoid Cloudflare's proxy
+// timeout. Larger files use resumable 8 MB chunks.
+const FAST_VIDEO_UPLOAD_MAX_BYTES = 32 * 1024 * 1024
 const DEFAULT_UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
 const VIDEO_UPLOAD_RESUME_KEY = 'lume-video-upload-resume-v1'
 
