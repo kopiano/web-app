@@ -39,6 +39,17 @@ export interface VideoApiItem {
   updatedAt: string;
 }
 
+export interface VideoBannerItem {
+  coverUrl: string;
+  duration: number;
+  width: number | null;
+  height: number | null;
+  id: string;
+  viewCount: number;
+  username: string;
+  avatar: string;
+}
+
 export interface VideoPage {
   items: VideoApiItem[];
   hasMore: boolean;
@@ -80,7 +91,7 @@ export interface VideoApiCollection {
 }
 
 export function getVideos(params?: Record<string, unknown>): Promise<VideoPage>;
-export function getVideoBanner(): Promise<VideoApiItem[]>;
+export function getVideoBanner(): Promise<VideoBannerItem[]>;
 export function getVideo(id: string): Promise<VideoApiItem>;
 export function getVideoCategories(input?: { scope?: 'public' | 'accessible' | 'mine' }): Promise<VideoCategory[]>;
 export function getVideoCollections(input?: { mine?: boolean }): Promise<VideoApiCollection[]>;

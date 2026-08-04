@@ -554,7 +554,7 @@
   align-self: center;
   width: 498px;
   height: 329px;
-  padding: 3.2rem 3.8rem;
+  padding: 3.2rem 3.8rem 8.8rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -595,7 +595,11 @@
 }
 
 .video-featured-author {
-  margin-top: 2.6rem;
+  position: absolute;
+  right: 3.8rem;
+  bottom: 2.4rem;
+  left: 3.8rem;
+  margin-top: 0;
   display: flex;
   align-items: center;
   gap: 1.1rem;
@@ -4556,6 +4560,7 @@
   .video-featured-copy {
     width: auto;
     height: auto;
+    min-height: 22rem;
   }
 
   .video-watch-layout {
@@ -4717,6 +4722,11 @@
     width: auto;
     height: auto;
     padding: 3.2rem;
+  }
+
+  .video-featured-author {
+    position: static;
+    margin-top: 2.6rem;
   }
 
   .video-home-grid,

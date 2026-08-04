@@ -76,6 +76,7 @@ import type {
   VideoApiCollection,
   VideoApiComment,
   VideoApiItem,
+  VideoBannerItem,
   VideoCategory,
   VideoPage,
   VideoVisibility,
@@ -229,7 +230,7 @@ function resolutionFor(video: VideoApiItem): CardVideo['resolution'] {
 }
 
 function firstCategory(video: VideoApiItem, language: string) {
-  const category = video.categories[0];
+  const category = video.categories?.[0];
   if (!category) return { name: language.startsWith('zh') ? '其它' : 'Other', slug: 'other' };
   return {
     name: language.startsWith('zh') ? category.nameZh : category.nameEn,
@@ -292,6 +293,38 @@ function toCardVideo(
     favorited: effectiveVideo.favorited,
     createdAt: effectiveVideo.createdAt,
     raw: effectiveVideo,
+  };
+}
+
+function toFeaturedCard(video: VideoBannerItem, language: string): CardVideo {
+  const formatter = new Intl.NumberFormat(language, {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  });
+  return {
+    id: video.id,
+    title: language.startsWith('zh') ? '精选视频' : 'Featured video',
+    description: '',
+    creator: video.username || (language.startsWith('zh') ? '用户' : 'User'),
+    avatar: video.avatar || defaultAvatarDataUrl(video.username || 'User'),
+    views: `${formatter.format(video.viewCount)} ${language.startsWith('zh') ? '次播放' : 'views'}`,
+    viewCount: video.viewCount,
+    likeCount: 0,
+    favoriteCount: 0,
+    commentCount: 0,
+    duration: formatDuration(video.duration),
+    resolution: resolutionFor(video as VideoApiItem),
+    category: '',
+    categorySlug: '',
+    poster: video.coverUrl,
+    src: '',
+    status: 'ready',
+    processingProgress: 0,
+    processingError: null,
+    liked: false,
+    favorited: false,
+    createdAt: '',
+    raw: video as unknown as VideoApiItem,
   };
 }
 
@@ -1954,9 +1987,7 @@ export default function VideoConnected() {
     [effectiveMockItems, language, realHomeItems, useMockData, videoOverrides],
   );
   const bannerVideos = useMemo(
-    () => (bannerQuery.data ?? [])
-      .filter((video) => video.status === 'ready')
-      .map((video) => toCardVideo(video, language, videoOverrides)),
+    () => (bannerQuery.data ?? []).map((video) => toFeaturedCard(video, language)),
     [bannerQuery.data, language, videoOverrides],
   );
   const featuredVideos = useMemo(

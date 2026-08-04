@@ -13,6 +13,18 @@ function normalizeCategory(category) {
   }
 }
 
+function normalizeFeaturedVideo(video) {
+  return {
+    coverUrl: resolveAssetUrl(video.cover_url),
+    duration: Number(video.duration) || 0,
+    width: video.width == null ? null : Number(video.width),
+    height: video.height == null ? null : Number(video.height),
+    id: String(video.id),
+    viewCount: Number(video.view_count) || 0,
+    username: String(video.username || ''),
+    avatar: resolveAssetUrl(video.avatar),
+  }
+}
 function normalizeVideo(video) {
   return {
     id: String(video.id),
@@ -103,7 +115,7 @@ export function getVideos(params = {}) {
 export function getVideoBanner() {
   return request.get('/video/banner').then(response => {
     if (!Array.isArray(response.data)) throw new Error('Invalid video banner response')
-    return response.data.map(normalizeVideo)
+    return response.data.map(normalizeFeaturedVideo)
   })
 }
 
