@@ -256,6 +256,7 @@ export default function HlsVideo({
     let networkRetryCount = 0;
     let mediaRetryCount = 0;
     let handleHlsLoadedMetadata: (() => void) | null = null;
+    let recoverStalledBuffer: (() => void) | null = null;
     const clearRetryTimer = () => {
       if (retryTimer !== undefined) {
         window.clearTimeout(retryTimer);
@@ -323,12 +324,20 @@ export default function HlsVideo({
         capLevelToPlayerSize: true,
         abrBandWidthFactor: 0.7,
         abrBandWidthUpFactor: 0.6,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 90,
-        maxBufferSize: 60 * 1024 * 1024,
-        backBufferLength: 60,
+        // Production traffic goes through Cloudflare and may have brief
+        // throughput dips. Buffer more VOD data before playback catches up.
+        maxBufferLength: 60,
+        maxMaxBufferLength: 180,
+        maxBufferSize: 120 * 1024 * 1024,
+        backBufferLength: 30,
         maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 2,
+        fragLoadingMaxRetry: 6,
+        fragLoadingRetryDelay: 500,
+        fragLoadingMaxRetryTimeout: 8000,
+        manifestLoadingMaxRetry: 4,
+        manifestLoadingRetryDelay: 500,
+        manifestLoadingMaxRetryTimeout: 8000,
       });
       hls.loadSource(src);
       hls.attachMedia(video);
@@ -342,6 +351,15 @@ export default function HlsVideo({
         networkRetryCount = 0;
         mediaRetryCount = 0;
       });
+      recoverStalledBuffer = () => {
+        if (disposed || !hls || video.ended) return;
+        hls.startLoad(Math.max(0, video.currentTime));
+        if (video.paused && autoPlayRef.current) {
+          void video.play().catch(() => undefined);
+        }
+      };
+      video.addEventListener('waiting', recoverStalledBuffer);
+      video.addEventListener('stalled', recoverStalledBuffer);
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal || !hls) return;
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
@@ -380,6 +398,10 @@ export default function HlsVideo({
       }
       video.removeEventListener('canplay', startPlayback);
       video.removeEventListener('error', handleNativePlaybackError);
+      if (recoverStalledBuffer) {
+        video.removeEventListener('waiting', recoverStalledBuffer);
+        video.removeEventListener('stalled', recoverStalledBuffer);
+      }
       window.removeEventListener('online', handleOnline);
       hls?.destroy();
       video.pause();
