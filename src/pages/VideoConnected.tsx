@@ -1873,6 +1873,8 @@ export default function VideoConnected() {
   const uploadHydratedRef = useRef(false);
   const uploadCoverObjectUrlRef = useRef<string | null>(null);
   const uploadAbortControllerRef = useRef<AbortController | null>(null);
+  const activeUploadFileRef = useRef<string | null>(null);
+  const uploadProgressLoadedRef = useRef(0);
   const uploadSessionRef = useRef(0);
   const draftTitleSaveVersionRef = useRef(0);
   const draftTitleSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -3176,8 +3178,18 @@ export default function VideoConnected() {
       setUploadError(t('video.upload.invalidVideo'));
       return;
     }
+    const fileKey = `${file.name}:${file.size}:${file.lastModified}`;
+    if (
+      activeUploadFileRef.current === fileKey
+      && uploadAbortControllerRef.current
+      && !uploadAbortControllerRef.current.signal.aborted
+    ) {
+      return;
+    }
     const session = uploadSessionRef.current + 1;
     uploadSessionRef.current = session;
+    activeUploadFileRef.current = fileKey;
+    uploadProgressLoadedRef.current = 0;
     draftTitleSaveVersionRef.current += 1;
     uploadAbortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -3214,8 +3226,13 @@ export default function VideoConnected() {
       const uploaded = await uploadVideo(
         file,
         progress => {
-          setUploadProgress(progress.percent);
-          setUploadDetails(progress);
+          if (session !== uploadSessionRef.current) return;
+          if (progress.loaded < uploadProgressLoadedRef.current) return;
+          uploadProgressLoadedRef.current = progress.loaded;
+          setUploadProgress((current) => Math.max(current, progress.percent));
+          setUploadDetails((current) => (
+            progress.loaded >= current.loaded ? progress : current
+          ));
         },
         controller.signal,
         (draftVideo) => {
@@ -3259,6 +3276,7 @@ export default function VideoConnected() {
     } finally {
       if (uploadAbortControllerRef.current === controller) {
         uploadAbortControllerRef.current = null;
+        activeUploadFileRef.current = null;
       }
     }
   };
@@ -3338,6 +3356,8 @@ export default function VideoConnected() {
     draftTitleSaveVersionRef.current += 1;
     uploadAbortControllerRef.current?.abort();
     uploadAbortControllerRef.current = null;
+    activeUploadFileRef.current = null;
+    uploadProgressLoadedRef.current = 0;
     uploadFinalizingRef.current = false;
     setUploadOpen(false);
     setUploadStep('upload');
