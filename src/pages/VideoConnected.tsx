@@ -1937,6 +1937,8 @@ export default function VideoConnected() {
     initialPageParam: null as Cursor,
     queryFn: ({ pageParam }) => pageQuery(pageParam, { limit: 20, scope: 'public' }),
     getNextPageParam: nextCursor,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     enabled: activeView === 'home' || (activeView === 'watch' && !watchFromPlaylist),
   });
   const bannerQuery = useQuery({
@@ -1944,6 +1946,7 @@ export default function VideoConnected() {
     queryFn: getVideoBanner,
     enabled: activeView === 'home',
     staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
   const playlistQuery = useInfiniteQuery({
     queryKey: ['video', 'playlist', playlistFilterCategory, currentUser?.id ?? 'public'],
@@ -1976,6 +1979,8 @@ export default function VideoConnected() {
       ...(activeCategory !== 'all' ? { category: activeCategory } : {}),
     }),
     getNextPageParam: nextCursor,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     enabled: activeView === 'favorites'
       && Boolean(selectedCollectionId)
       && !isMockCollectionId(selectedCollectionId),
@@ -2186,8 +2191,7 @@ export default function VideoConnected() {
       setHomeVisibleCardCount(0);
       return;
     }
-    const timer = window.setTimeout(() => setHomeVisibleCardCount(4), 100);
-    return () => window.clearTimeout(timer);
+    setHomeVisibleCardCount(8);
   }, [activeView, homeVideos.length]);
   const mockPlaylistItems = useMemo(
     () => effectiveMockItems.filter((video) => (
@@ -2283,7 +2287,7 @@ export default function VideoConnected() {
   useEffect(() => {
     if (activeView !== 'home') return;
     homeVideos
-      .slice(0, 12)
+      .slice(0, 8)
       .map((video) => video.poster)
       .filter(Boolean)
       .forEach((src) => {
