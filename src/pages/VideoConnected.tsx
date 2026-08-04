@@ -295,13 +295,9 @@ function versionedVideoPoster(video: VideoApiItem) {
   // before processing finishes. Keep the image visible while the card is
   // still processing instead of replacing it with an empty placeholder.
   if (!video.coverUrl) return '';
-  const separator = video.coverUrl.includes('?') ? '&' : '?';
-  const revision = [
-    video.updatedAt,
-    video.status,
-    video.processingProgress,
-  ].filter(Boolean).join('-');
-  return `${video.coverUrl}${separator}preview=${encodeURIComponent(revision)}`;
+  // Do not include processing progress in the URL. Progress updates happen
+  // frequently and would make the browser download the same cover repeatedly.
+  return video.coverUrl;
 }
 
 function toCardVideo(
@@ -2267,6 +2263,19 @@ export default function VideoConnected() {
     playlistQuery.isFetchingNextPage,
     useMockData,
   ]);
+  useEffect(() => {
+    if (activeView !== 'playlist') return;
+    const posters = [...processingPlaylistVideos, ...playlistVideos]
+      .slice(0, 12)
+      .map((video) => video.poster)
+      .filter(Boolean);
+    posters.forEach((src) => {
+      const image = new Image();
+      image.decoding = 'async';
+      image.fetchPriority = 'high';
+      image.src = src;
+    });
+  }, [activeView, playlistVideos, processingPlaylistVideos]);
   useEffect(() => {
     if (
       !watchFromPlaylist
