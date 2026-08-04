@@ -272,22 +272,34 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
   if (file.size <= FAST_VIDEO_UPLOAD_MAX_BYTES) {
     const formData = new FormData()
     formData.append('video', file, file.name)
-    const response = await request.post(
-      '/video/upload',
-      formData,
-      {
-        ...uploadRequestConfig(signal, { timeout: 0 }),
-        onUploadProgress: progressEvent => {
-          const total = progressEvent.total || file.size
-          const loaded = Math.min(progressEvent.loaded, file.size)
-          reportProgress(loaded, total)
-        },
-      },
-    )
-    const video = normalizeVideo(response.data)
-    onUploadCreated?.(video)
-    reportProgress(file.size)
-    return video
+    let lastError = null
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (signal?.aborted) throw new DOMException('Upload aborted', 'AbortError')
+      try {
+        const response = await request.post(
+          '/video/upload',
+          formData,
+          {
+            ...uploadRequestConfig(signal, { timeout: 0 }),
+            onUploadProgress: progressEvent => {
+              const total = progressEvent.total || file.size
+              const loaded = Math.min(progressEvent.loaded, file.size)
+              reportProgress(loaded, total)
+            },
+          },
+        )
+        const video = normalizeVideo(response.data)
+        onUploadCreated?.(video)
+        reportProgress(file.size)
+        return video
+      } catch (error) {
+        if (isAbortError(error, signal)) throw error
+        lastError = error
+        if (attempt === 2) break
+        await new Promise(resolve => window.setTimeout(resolve, 700 * (attempt + 1)))
+      }
+    }
+    throw lastError || new Error('Unable to upload video.')
   }
 
   let session = null
