@@ -255,12 +255,20 @@ export default function HlsVideo({
     let retryTimer: number | undefined;
     let networkRetryCount = 0;
     let mediaRetryCount = 0;
+    let stalledRecoveryTimer: number | undefined;
+    let lastStalledRecoveryAt = 0;
     let handleHlsLoadedMetadata: (() => void) | null = null;
     let recoverStalledBuffer: (() => void) | null = null;
     const clearRetryTimer = () => {
       if (retryTimer !== undefined) {
         window.clearTimeout(retryTimer);
         retryTimer = undefined;
+      }
+    };
+    const clearStalledRecoveryTimer = () => {
+      if (stalledRecoveryTimer !== undefined) {
+        window.clearTimeout(stalledRecoveryTimer);
+        stalledRecoveryTimer = undefined;
       }
     };
     const attachNativeHls = () => {
@@ -317,19 +325,18 @@ export default function HlsVideo({
       hls = new Hls({
         autoStartLoad: true,
         enableWorker: true,
-        // These are VOD streams. Keep a larger buffer to absorb network jitter.
+        // Keep enough VOD data to absorb normal jitter without allowing one
+        // player to consume the connection and memory needed by other views.
         lowLatencyMode: false,
         startFragPrefetch: false,
-        startLevel: -1,   // 自动选择
+        startLevel: 0,
         capLevelToPlayerSize: true,
         abrBandWidthFactor: 0.7,
         abrBandWidthUpFactor: 0.6,
-        // Production traffic goes through Cloudflare and may have brief
-        // throughput dips. Buffer more VOD data before playback catches up.
-        maxBufferLength: 60,
-        maxMaxBufferLength: 180,
-        maxBufferSize: 120 * 1024 * 1024,
-        backBufferLength: 30,
+        maxBufferLength: 12,
+        maxMaxBufferLength: 24,
+        maxBufferSize: 48 * 1024 * 1024,
+        backBufferLength: 8,
         maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 2,
         fragLoadingMaxRetry: 6,
@@ -353,10 +360,18 @@ export default function HlsVideo({
       });
       recoverStalledBuffer = () => {
         if (disposed || !hls || video.ended) return;
-        hls.startLoad(Math.max(0, video.currentTime));
-        if (video.paused && autoPlayRef.current) {
-          void video.play().catch(() => undefined);
-        }
+        const now = performance.now();
+        if (now - lastStalledRecoveryAt < 1_500) return;
+        lastStalledRecoveryAt = now;
+        clearStalledRecoveryTimer();
+        stalledRecoveryTimer = window.setTimeout(() => {
+          stalledRecoveryTimer = undefined;
+          if (disposed || !hls || video.ended) return;
+          hls.startLoad(Math.max(0, video.currentTime));
+          if (video.paused && autoPlayRef.current) {
+            void video.play().catch(() => undefined);
+          }
+        }, 250);
       };
       video.addEventListener('waiting', recoverStalledBuffer);
       video.addEventListener('stalled', recoverStalledBuffer);
@@ -389,6 +404,7 @@ export default function HlsVideo({
       disposed = true;
       persistPlaybackPositionRef.current(true);
       clearRetryTimer();
+      clearStalledRecoveryTimer();
       if (nativeHlsAttached) {
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         video.removeEventListener('canplay', startPlayback);
@@ -565,7 +581,7 @@ export default function HlsVideo({
         controls={controls}
         playsInline
         muted
-        preload="auto"
+        preload="metadata"
         poster={poster}
         className={className}
       />
