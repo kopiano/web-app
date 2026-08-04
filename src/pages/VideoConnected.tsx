@@ -2583,6 +2583,18 @@ export default function VideoConnected() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const refreshPlaylistAfterPublish = useCallback(async () => {
+    setSearchParams(new URLSearchParams({ view: 'playlist' }));
+    setActiveCategory('all');
+    setSearch('');
+    await queryClient.invalidateQueries({ queryKey: ['video', 'playlist'] });
+    await queryClient.refetchQueries({
+      queryKey: ['video', 'playlist'],
+      type: 'active',
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [queryClient, setSearchParams]);
+
   const openVideo = useCallback((video: CardVideo) => {
     const nextParams: Record<string, string> = { view: 'watch', video: video.id };
     if (activeView === 'playlist' || watchFromPlaylist) {
@@ -3282,6 +3294,7 @@ export default function VideoConnected() {
       }
       notify(t('video.upload.published'), 'success');
       closeUpload();
+      await refreshPlaylistAfterPublish();
     } catch (error) {
       if (session !== uploadSessionRef.current) return;
       uploadPublishRequestedRef.current = false;
@@ -3321,6 +3334,7 @@ export default function VideoConnected() {
           publishedUploadIdsRef.current.add(uploadVideoId);
           await invalidateVideoData(uploadVideoId);
           closeUpload();
+          await refreshPlaylistAfterPublish();
           notify(t('video.upload.published'), 'success');
         } catch (error) {
           const status = (error as ApiRequestError).response?.status;
@@ -3345,6 +3359,7 @@ export default function VideoConnected() {
   }, [
     invalidateVideoData,
     queryClient,
+    refreshPlaylistAfterPublish,
     updateCachedVideo,
     uploadPublishRequested,
     uploadCoverFile,
