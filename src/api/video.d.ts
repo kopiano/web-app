@@ -100,7 +100,13 @@ export function getVideoCategories(input?: { scope?: 'public' | 'accessible' | '
 export function getVideoCollections(input?: { mine?: boolean }): Promise<VideoApiCollection[]>;
 export function uploadVideo(
   file: File,
-  onUploadProgress?: (percent: number) => void,
+  onUploadProgress?: (progress: {
+    percent: number;
+    loaded: number;
+    total: number;
+    bytesPerSecond: number;
+    remainingSeconds: number;
+  }) => void,
   signal?: AbortSignal,
   onUploadCreated?: (video: VideoApiItem) => void,
 ): Promise<VideoApiItem>;

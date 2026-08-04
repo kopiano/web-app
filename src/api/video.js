@@ -6,6 +6,34 @@ const FAST_VIDEO_UPLOAD_MAX_BYTES = 256 * 1024 * 1024
 const DEFAULT_UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
 const VIDEO_UPLOAD_RESUME_KEY = 'lume-video-upload-resume-v1'
 
+function createUploadProgressReporter(file, onUploadProgress) {
+  let previousLoaded = 0
+  let previousTimestamp = performance.now()
+  let smoothedRate = 0
+  return (loaded, total = file.size) => {
+    const now = performance.now()
+    const elapsed = Math.max((now - previousTimestamp) / 1000, 0.001)
+    const measuredRate = Math.max(0, loaded - previousLoaded) / elapsed
+    if (measuredRate > 0) {
+      smoothedRate = smoothedRate > 0
+        ? smoothedRate * 0.72 + measuredRate * 0.28
+        : measuredRate
+    }
+    previousLoaded = loaded
+    previousTimestamp = now
+    const percent = Math.min(100, Math.round((loaded / total) * 100))
+    onUploadProgress?.({
+      percent,
+      loaded,
+      total,
+      bytesPerSecond: smoothedRate,
+      remainingSeconds: smoothedRate > 0
+        ? Math.ceil(Math.max(0, total - loaded) / smoothedRate)
+        : 0,
+    })
+  }
+}
+
 function normalizeCategory(category) {
   return {
     id: String(category.id),
@@ -248,13 +276,13 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
         onUploadProgress: progressEvent => {
           const total = progressEvent.total || file.size
           const loaded = Math.min(progressEvent.loaded, file.size)
-          onUploadProgress?.(Math.min(99, Math.round((loaded / total) * 100)))
+          reportProgress(loaded, total)
         },
       },
     )
     const video = normalizeVideo(response.data)
     onUploadCreated?.(video)
-    onUploadProgress?.(100)
+    reportProgress(file.size)
     return video
   }
 
@@ -293,7 +321,7 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
   writeUploadResume(file, session)
   onUploadCreated?.(session.video)
   let uploadedBytes = session.uploadedBytes
-  onUploadProgress?.(Math.min(100, Math.round((uploadedBytes / file.size) * 100)))
+  reportProgress(uploadedBytes)
 
   while (uploadedBytes < file.size) {
     if (signal?.aborted) throw new DOMException('Upload aborted', 'AbortError')
@@ -314,10 +342,7 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
                 99,
                 Math.round(((uploadedBytes + loaded) / file.size) * 100),
               )
-              onUploadProgress?.(Math.max(
-                Math.round((uploadedBytes / file.size) * 100),
-                percent,
-              ))
+              reportProgress(uploadedBytes + loaded)
             },
             headers: {
               ...uploadRequestConfig(signal).headers,
@@ -329,7 +354,7 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
         session = normalizeUploadSession(response.data)
         uploadedBytes = session.uploadedBytes
         writeUploadResume(file, session)
-        onUploadProgress?.(Math.min(100, Math.round((uploadedBytes / file.size) * 100)))
+        reportProgress(uploadedBytes)
         break
       } catch (error) {
         if (isAbortError(error, signal)) throw error
@@ -345,7 +370,7 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
           if (session.totalBytes !== file.size || session.complete) break
           uploadedBytes = session.uploadedBytes
           writeUploadResume(file, session)
-          onUploadProgress?.(Math.min(100, Math.round((uploadedBytes / file.size) * 100)))
+          reportProgress(uploadedBytes)
         } catch (statusError) {
           if (isAbortError(statusError, signal)) throw statusError
           // Retry the chunk when the status probe also hits a transient
@@ -365,7 +390,7 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
         uploadRequestConfig(signal, { timeout: 0 }),
       )
       clearUploadResume(file)
-      onUploadProgress?.(100)
+      reportProgress(file.size)
       return normalizeVideo(response.data)
     } catch (error) {
       if (isAbortError(error, signal)) throw error
@@ -382,7 +407,7 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
         session = latestSession
         if (session.complete) {
           clearUploadResume(file)
-          onUploadProgress?.(100)
+          reportProgress(file.size)
           return normalizeVideo(session.video)
         }
       } catch (statusError) {
@@ -463,3 +488,4 @@ export function updateVideoCollection(id, input) {
 export function deleteVideoCollection(id) {
   return request.delete(`/video/collections/${encodeURIComponent(id)}`).then(() => undefined)
 }
+  const reportProgress = createUploadProgressReporter(file, onUploadProgress)

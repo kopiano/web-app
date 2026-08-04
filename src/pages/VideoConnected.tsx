@@ -100,6 +100,13 @@ import '@/styles/video.scss';
 type VideoView = 'home' | 'library' | 'favorites' | 'playlist' | 'watch';
 type UploadStep = 'upload' | 'publish';
 type Cursor = { createdAt: string; id: string } | null;
+type VideoUploadProgress = {
+  percent: number;
+  loaded: number;
+  total: number;
+  bytesPerSecond: number;
+  remainingSeconds: number;
+};
 
 type CardVideo = {
   id: string;
@@ -228,6 +235,30 @@ function resolutionFor(video: VideoApiItem): CardVideo['resolution'] {
   if ((video.width ?? 0) >= 3840 || (video.height ?? 0) >= 2160) return '4K';
   if ((video.width ?? 0) >= 2048 || (video.height ?? 0) >= 1440) return '2K';
   return '1080p';
+}
+
+function formatUploadBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
+  const megabytes = bytes / (1024 * 1024);
+  if (megabytes >= 100) return `${Math.round(megabytes)} MB`;
+  if (megabytes >= 10) return `${megabytes.toFixed(1)} MB`;
+  return `${megabytes.toFixed(2)} MB`;
+}
+
+function formatUploadSpeed(bytesPerSecond: number) {
+  if (!Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) return 'Calculating speed';
+  if (bytesPerSecond >= 1024 * 1024) return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`;
+  return `${Math.max(1, Math.round(bytesPerSecond / 1024))} KB/s`;
+}
+
+function formatRemainingTime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return 'Calculating remaining time';
+  if (seconds < 60) return `${Math.max(1, Math.ceil(seconds))}s remaining`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.ceil(seconds % 60);
+  return remainingSeconds > 0
+    ? `${minutes}m ${remainingSeconds}s remaining`
+    : `${minutes}m remaining`;
 }
 
 function firstCategory(video: VideoApiItem, language: string) {
@@ -522,6 +553,7 @@ const VideoCard = memo(function VideoCard({
 function UploadDialog({
   step,
   progress,
+  uploadDetails,
   processingProgress,
   videoName,
   coverUrl,
@@ -546,6 +578,7 @@ function UploadDialog({
 }: {
   step: UploadStep;
   progress: number;
+  uploadDetails: VideoUploadProgress;
   processingProgress: number;
   videoName: string;
   coverUrl: string;
@@ -627,6 +660,15 @@ function UploadDialog({
             <span className="video-upload-progress-track" aria-hidden="true">
               <i style={{ width: `${progress < 100 ? progress : processingProgress}%` }} />
             </span>
+            {progress < 100 && (
+              <div className="video-upload-progress-meta">
+                <span>{formatUploadBytes(uploadDetails.loaded)} / {formatUploadBytes(uploadDetails.total)}</span>
+                <span>{formatUploadSpeed(uploadDetails.bytesPerSecond)}</span>
+                <span>{uploadDetails.bytesPerSecond > 0
+                  ? formatRemainingTime(uploadDetails.remainingSeconds)
+                  : 'Calculating remaining time'}</span>
+              </div>
+            )}
             {progress === 100 && processingProgress >= 100 && (
               <p className="video-upload-processing-complete">
                 {t('video.upload.processingComplete')}
@@ -1744,6 +1786,13 @@ export default function VideoConnected() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadStep, setUploadStep] = useState<UploadStep>('upload');
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadDetails, setUploadDetails] = useState<VideoUploadProgress>({
+    percent: 0,
+    loaded: 0,
+    total: 0,
+    bytesPerSecond: 0,
+    remainingSeconds: 0,
+  });
   const [uploadVideoId, setUploadVideoId] = useState<string | null>(null);
   const [uploadVideoName, setUploadVideoName] = useState('');
   const [uploadTitle, setUploadTitle] = useState('');
@@ -2920,6 +2969,13 @@ export default function VideoConnected() {
     setUploadBusy(false);
     setUploadStep('publish');
     setUploadProgress(0);
+    setUploadDetails({
+      percent: 0,
+      loaded: 0,
+      total: file.size,
+      bytesPerSecond: 0,
+      remainingSeconds: 0,
+    });
     setUploadVideoId(null);
     setUploadVideoName(file.name);
     setUploadTitle(getFileTitle(file.name));
@@ -2937,7 +2993,10 @@ export default function VideoConnected() {
     try {
       const uploaded = await uploadVideo(
         file,
-        setUploadProgress,
+        progress => {
+          setUploadProgress(progress.percent);
+          setUploadDetails(progress);
+        },
         controller.signal,
         (draftVideo) => {
           if (session !== uploadSessionRef.current) {
@@ -3705,6 +3764,7 @@ export default function VideoConnected() {
             <UploadDialog
               step={uploadStep}
               progress={uploadProgress}
+              uploadDetails={uploadDetails}
               processingProgress={uploadStatusQuery.data?.processingProgress ?? 0}
               videoName={uploadVideoName}
               coverUrl={uploadCoverUrl || generatedUploadCoverUrl}

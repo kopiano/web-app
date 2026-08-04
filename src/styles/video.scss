@@ -3933,6 +3933,17 @@
   animation: video-upload-progress-sheen 1.35s linear infinite;
 }
 
+.video-upload-progress-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.4rem 0.9rem;
+  margin-top: 0.62rem;
+  color: #667085;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .video-upload-processing-complete {
   margin: 0.55rem 0 0;
   color: #198754;
