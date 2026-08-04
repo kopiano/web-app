@@ -107,6 +107,10 @@ type VideoUploadProgress = {
   bytesPerSecond: number;
   remainingSeconds: number;
 };
+type VideoProcessingProgress = {
+  percentPerSecond: number;
+  remainingSeconds: number;
+};
 
 type CardVideo = {
   id: string;
@@ -261,6 +265,11 @@ function formatRemainingTime(seconds: number) {
     : `${minutes}m remaining`;
 }
 
+function formatProcessingSpeed(percentPerSecond: number, calculatingLabel = 'Calculating speed') {
+  if (!Number.isFinite(percentPerSecond) || percentPerSecond <= 0) return calculatingLabel;
+  return `${percentPerSecond.toFixed(1)}%/s`;
+}
+
 function firstCategory(video: VideoApiItem, language: string) {
   const category = video.categories?.[0];
   if (!category) return { name: language.startsWith('zh') ? '其它' : 'Other', slug: 'other' };
@@ -284,7 +293,8 @@ function withoutHashCharacters(value: string) {
 function versionedVideoPoster(video: VideoApiItem) {
   // The API reserves poster.webp before processing starts, but the file does
   // not exist until the backend has generated the cover.
-  if (!video.coverUrl || video.status !== 'ready') return '';
+  const hasUploadedCover = video.coverUrl.includes('/cover.webp');
+  if (!video.coverUrl || (video.status !== 'ready' && !hasUploadedCover)) return '';
   const separator = video.coverUrl.includes('?') ? '&' : '?';
   const revision = video.updatedAt || `${video.status}-${video.processingProgress}`;
   return `${video.coverUrl}${separator}preview=${encodeURIComponent(revision)}`;
@@ -555,6 +565,7 @@ function UploadDialog({
   progress,
   uploadDetails,
   processingProgress,
+  processingDetails,
   videoName,
   coverUrl,
   hasCustomCover,
@@ -580,6 +591,7 @@ function UploadDialog({
   progress: number;
   uploadDetails: VideoUploadProgress;
   processingProgress: number;
+  processingDetails: VideoProcessingProgress;
   videoName: string;
   coverUrl: string;
   hasCustomCover: boolean;
@@ -667,6 +679,19 @@ function UploadDialog({
                 <span>{uploadDetails.bytesPerSecond > 0
                   ? formatRemainingTime(uploadDetails.remainingSeconds)
                   : 'Calculating remaining time'}</span>
+              </div>
+            )}
+            {progress >= 100 && processingProgress < 100 && !processingFailed && (
+              <div className="video-upload-progress-meta">
+                <span>{t('video.upload.processingSpeed', {
+                  speed: formatProcessingSpeed(
+                    processingDetails.percentPerSecond,
+                    t('video.upload.calculatingSpeed'),
+                  ),
+                })}</span>
+                <span>{processingDetails.percentPerSecond > 0
+                  ? formatRemainingTime(processingDetails.remainingSeconds)
+                  : t('video.upload.calculatingRemainingTime')}</span>
               </div>
             )}
             {progress === 100 && processingProgress >= 100 && (
@@ -1793,6 +1818,10 @@ export default function VideoConnected() {
     bytesPerSecond: 0,
     remainingSeconds: 0,
   });
+  const [processingDetails, setProcessingDetails] = useState<VideoProcessingProgress>({
+    percentPerSecond: 0,
+    remainingSeconds: 0,
+  });
   const [uploadVideoId, setUploadVideoId] = useState<string | null>(null);
   const [uploadVideoName, setUploadVideoName] = useState('');
   const [uploadTitle, setUploadTitle] = useState('');
@@ -1832,6 +1861,17 @@ export default function VideoConnected() {
   const uploadPublishRequestedRef = useRef(false);
   const uploadFinalizingRef = useRef(false);
   const publishedUploadIdsRef = useRef(new Set<string>());
+  const processingMeasurementRef = useRef<{
+    videoId: string | null;
+    progress: number;
+    timestamp: number;
+    rate: number;
+  }>({
+    videoId: null,
+    progress: 0,
+    timestamp: 0,
+    rate: 0,
+  });
   const publishedVideoPollingRef = useRef<number | null>(null);
   const featuredVideoIdRef = useRef<string | null>(null);
   const featuredPreloadedPostersRef = useRef(new Set<string>());
@@ -1947,18 +1987,63 @@ export default function VideoConnected() {
         : 1200
     ),
   });
+  useEffect(() => {
+    const videoId = uploadVideoId;
+    const progress = Math.max(0, Math.min(100, uploadStatusQuery.data?.processingProgress ?? 0));
+    const now = Date.now();
+    const previous = processingMeasurementRef.current;
+
+    if (!videoId || !uploadPublishRequested || videoId !== previous.videoId || progress < previous.progress) {
+      processingMeasurementRef.current = {
+        videoId,
+        progress,
+        timestamp: now,
+        rate: 0,
+      };
+      setProcessingDetails({ percentPerSecond: 0, remainingSeconds: 0 });
+      return;
+    }
+
+    const elapsedSeconds = (now - previous.timestamp) / 1000;
+    if (elapsedSeconds <= 0) return;
+
+    if (progress > previous.progress) {
+      const instantRate = (progress - previous.progress) / elapsedSeconds;
+      const rate = previous.rate > 0
+        ? previous.rate * 0.65 + instantRate * 0.35
+        : instantRate;
+      processingMeasurementRef.current = {
+        videoId,
+        progress,
+        timestamp: now,
+        rate,
+      };
+      setProcessingDetails({
+        percentPerSecond: rate,
+        remainingSeconds: rate > 0 ? (100 - progress) / rate : 0,
+      });
+    } else if (now - previous.timestamp > 5000) {
+      setProcessingDetails({ percentPerSecond: 0, remainingSeconds: 0 });
+    }
+  }, [
+    uploadStatusQuery.data?.processingProgress,
+    uploadVideoId,
+    uploadPublishRequested,
+  ]);
   const generatedUploadCoverUrl = useMemo(() => {
+    const uploadedVideo = uploadStatusQuery.data;
     if (
       uploadCoverUrl
-      || uploadStatusQuery.data?.status !== 'ready'
-      || !uploadStatusQuery.data.coverUrl
+      || !uploadedVideo
+      || !['processing', 'ready'].includes(uploadedVideo.status)
+      || !uploadedVideo.coverUrl
     ) return '';
-    const coverUrl = uploadStatusQuery.data.coverUrl;
+    const coverUrl = uploadedVideo.coverUrl;
     const separator = coverUrl.includes('?') ? '&' : '?';
     const revision = [
-      uploadStatusQuery.data.updatedAt,
-      uploadStatusQuery.data.status,
-      uploadStatusQuery.data.processingProgress,
+      uploadedVideo.updatedAt,
+      uploadedVideo.status,
+      uploadedVideo.processingProgress,
     ].filter(Boolean).join('-');
     return `${coverUrl}${separator}preview=${encodeURIComponent(revision)}`;
   }, [uploadCoverUrl, uploadStatusQuery.data]);
@@ -3185,6 +3270,7 @@ export default function VideoConnected() {
       uploadPublishRequestedRef.current = true;
       setUploadPublishRequested(true);
       queryClient.setQueryData(['video', 'detail', videoId], updated);
+      updateCachedVideo(updated);
       if (updated.status !== 'ready') {
         setPublishedProcessingVideos((current) => [
           updated,
@@ -3259,6 +3345,7 @@ export default function VideoConnected() {
   }, [
     invalidateVideoData,
     queryClient,
+    updateCachedVideo,
     uploadPublishRequested,
     uploadCoverFile,
     uploadStatusQuery.data,
@@ -3770,6 +3857,7 @@ export default function VideoConnected() {
               progress={uploadProgress}
               uploadDetails={uploadDetails}
               processingProgress={uploadStatusQuery.data?.processingProgress ?? 0}
+              processingDetails={processingDetails}
               videoName={uploadVideoName}
               coverUrl={uploadCoverUrl || generatedUploadCoverUrl}
               hasCustomCover={Boolean(uploadCoverUrl)}
