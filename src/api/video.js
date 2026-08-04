@@ -284,6 +284,17 @@ export async function uploadVideo(file, onUploadProgress, signal, onUploadCreate
           chunk,
           {
             ...uploadRequestConfig(signal, { timeout: 0 }),
+            onUploadProgress: progressEvent => {
+              const loaded = Math.min(chunk.size, Number(progressEvent.loaded) || 0)
+              const percent = Math.min(
+                99,
+                Math.round(((uploadedBytes + loaded) / file.size) * 100),
+              )
+              onUploadProgress?.(Math.max(
+                Math.round((uploadedBytes / file.size) * 100),
+                percent,
+              ))
+            },
             headers: {
               ...uploadRequestConfig(signal).headers,
               'Content-Type': 'application/offset+octet-stream',

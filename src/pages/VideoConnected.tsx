@@ -304,13 +304,17 @@ function toCardVideo(
 }
 
 function toFeaturedCard(video: VideoBannerItem): CardVideo {
+  const formatter = new Intl.NumberFormat('en', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  });
   return {
     id: video.id,
     title: video.title,
     description: video.description,
     creator: video.username,
     avatar: video.avatar,
-    views: String(video.viewCount),
+    views: `${formatter.format(video.viewCount)} views`,
     viewCount: video.viewCount,
     likeCount: 0,
     favoriteCount: 0,
