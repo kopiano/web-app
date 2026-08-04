@@ -296,7 +296,11 @@ function versionedVideoPoster(video: VideoApiItem) {
   // still processing instead of replacing it with an empty placeholder.
   if (!video.coverUrl) return '';
   const separator = video.coverUrl.includes('?') ? '&' : '?';
-  const revision = video.updatedAt || `${video.status}-${video.processingProgress}`;
+  const revision = [
+    video.updatedAt,
+    video.status,
+    video.processingProgress,
+  ].filter(Boolean).join('-');
   return `${video.coverUrl}${separator}preview=${encodeURIComponent(revision)}`;
 }
 
@@ -557,6 +561,23 @@ const VideoCard = memo(function VideoCard({
         </button>
       )}
     </article>
+  );
+});
+
+const ProcessingVideoCard = memo(function ProcessingVideoCard({
+  video,
+  onPlay,
+}: {
+  video: CardVideo;
+  onPlay: (video: CardVideo) => void;
+}) {
+  return (
+    <VideoCard
+      video={video}
+      onPlay={onPlay}
+      onFavorite={() => undefined}
+      priority
+    />
   );
 });
 
@@ -2122,10 +2143,21 @@ export default function VideoConnected() {
       : collectionsQuery.data ?? [];
   const processingVideos = useMemo(
     () => publishedProcessingVideos
-      .map((pending) => (
-        publishedProcessingQuery.data?.items.find((video) => video.id === pending.id) ?? pending
-      ))
-      .filter((video) => video.status === 'uploading' || video.status === 'processing'),
+      .map((pending) => {
+        const current = publishedProcessingQuery.data?.items.find((video) => video.id === pending.id);
+        if (!current) return pending;
+        return {
+          ...pending,
+          ...current,
+          // Keep the cover already returned by the publish response when a
+          // transient polling response is missing cover_url.
+          coverUrl: current.coverUrl || pending.coverUrl,
+          title: current.title || pending.title,
+          username: current.username || pending.username,
+          avatar: current.avatar || pending.avatar,
+        };
+      })
+      .filter((video) => video.status !== 'failed'),
     [publishedProcessingQuery.data, publishedProcessingVideos],
   );
   const homeVideos = useMemo(
@@ -2172,21 +2204,9 @@ export default function VideoConnected() {
       ? mockPlaylistItems.slice((playlistPage - 1) * 8, playlistPage * 8)
       : playlistQuery.data?.pages[playlistPage - 1]?.items ?? [];
     const cards = items
-      .filter((video) => (
-        video.status === 'ready'
-        || (
-          video.owned
-          && (video.status === 'uploading' || video.status === 'processing')
-        )
-      ))
+      .filter((video) => video.status === 'ready')
       .map((video) => toCardVideo(video, language, videoOverrides, currentUserName));
-    const processingCards = processingVideos
-      .filter((video) => (
-        activeCategory === 'all'
-        || video.categories.some((category) => category.slug === activeCategory)
-      ))
-      .map((video) => toCardVideo(video, language, videoOverrides, currentUserName));
-    return [...processingCards, ...cards]
+    return cards
       .filter((video, index, all) => all.findIndex((item) => item.id === video.id) === index)
       .sort((left, right) => {
         const createdAtOrder = Date.parse(left.createdAt) - Date.parse(right.createdAt);
@@ -2194,6 +2214,26 @@ export default function VideoConnected() {
         return left.id.localeCompare(right.id);
       })
       .slice(0, 8);
+  }, [
+    currentUser,
+    currentUser?.name,
+    currentUser?.username,
+    language,
+    mockPlaylistItems,
+    playlistPage,
+    playlistQuery.data,
+    useMockData,
+    videoOverrides,
+  ]);
+  const processingPlaylistVideos = useMemo(() => {
+    if (!currentUser) return [];
+    const currentUserName = currentUser.name || currentUser.username || '';
+    return processingVideos
+      .filter((video) => (
+        activeCategory === 'all'
+        || video.categories.some((category) => category.slug === activeCategory)
+      ))
+      .map((video) => toCardVideo(video, language, videoOverrides, currentUserName));
   }, [
     activeCategory,
     currentUser,
@@ -2611,13 +2651,8 @@ export default function VideoConnected() {
     setSearchParams(new URLSearchParams({ view: 'playlist' }));
     setActiveCategory('all');
     setSearch('');
-    await queryClient.invalidateQueries({ queryKey: ['video', 'playlist'] });
-    await queryClient.refetchQueries({
-      queryKey: ['video', 'playlist'],
-      type: 'active',
-    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [queryClient, setSearchParams]);
+  }, [setSearchParams]);
 
   const openVideo = useCallback((video: CardVideo) => {
     const nextParams: Record<string, string> = { view: 'watch', video: video.id };
@@ -2748,7 +2783,11 @@ export default function VideoConnected() {
         items: page.items.map((item) => {
           if (item.id !== updated.id) return item;
           found = true;
-          return updated;
+          return {
+            ...item,
+            ...updated,
+            coverUrl: updated.coverUrl || item.coverUrl,
+          };
         }),
       }));
       if (!found && (updated.status === 'uploading' || updated.status === 'processing')) {
@@ -2766,7 +2805,16 @@ export default function VideoConnected() {
       };
     };
 
-    queryClient.setQueryData<VideoApiItem>(['video', 'detail', updated.id], updated);
+    queryClient.setQueryData<VideoApiItem>(
+      ['video', 'detail', updated.id],
+      current => current
+        ? {
+          ...current,
+          ...updated,
+          coverUrl: updated.coverUrl || current.coverUrl,
+        }
+        : updated,
+    );
     queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
       { queryKey: ['video', 'home'] },
       updatePages,
@@ -3331,15 +3379,10 @@ export default function VideoConnected() {
       setUploadPublishRequested(true);
       queryClient.setQueryData(['video', 'detail', videoId], updated);
       updateCachedVideo(updated);
-      if (updated.status !== 'ready') {
-        setPublishedProcessingVideos((current) => [
-          updated,
-          ...current.filter((video) => video.id !== updated.id),
-        ]);
-        void invalidateVideoData(videoId);
-      } else {
-        await invalidateVideoData(videoId);
-      }
+      setPublishedProcessingVideos((current) => [
+        updated,
+        ...current.filter((video) => video.id !== updated.id),
+      ]);
       notify(t('video.upload.published'), 'success');
       closeUpload();
       await refreshPlaylistAfterPublish();
@@ -3375,12 +3418,16 @@ export default function VideoConnected() {
       setUploadBusy(true);
       void (async () => {
         try {
+          let finalVideo = uploaded;
           if (uploadCoverFile) {
-            const updated = await updateVideo(uploadVideoId, { cover: uploadCoverFile });
-            queryClient.setQueryData(['video', 'detail', uploadVideoId], updated);
+            finalVideo = await updateVideo(uploadVideoId, { cover: uploadCoverFile });
+            queryClient.setQueryData(['video', 'detail', uploadVideoId], finalVideo);
           }
           publishedUploadIdsRef.current.add(uploadVideoId);
-          await invalidateVideoData(uploadVideoId);
+          setPublishedProcessingVideos((current) => [
+            finalVideo,
+            ...current.filter((video) => video.id !== finalVideo.id),
+          ]);
           closeUpload();
           await refreshPlaylistAfterPublish();
           notify(t('video.upload.published'), 'success');
@@ -3405,7 +3452,6 @@ export default function VideoConnected() {
       setUploadError(uploaded.processingError || t('video.upload.processingFailed'));
     }
   }, [
-    invalidateVideoData,
     queryClient,
     refreshPlaylistAfterPublish,
     updateCachedVideo,
@@ -3421,18 +3467,7 @@ export default function VideoConnected() {
       .filter((video) => publishedProcessingVideos.some((pending) => pending.id === video.id))
       .forEach((video) => updateCachedVideo(video));
 
-    const completedIds = publishedProcessingQuery.data?.items
-      .filter((video) => (
-        publishedProcessingVideos.some((pending) => pending.id === video.id)
-        && video.status === 'ready'
-      ))
-      .map((video) => video.id)
-      ?? [];
-    if (completedIds.length === 0) return;
-    setPublishedProcessingVideos((current) => current.filter((video) => !completedIds.includes(video.id)));
-    void Promise.all(completedIds.map((videoId) => invalidateVideoData(videoId)));
   }, [
-    invalidateVideoData,
     publishedProcessingQuery.data,
     publishedProcessingVideos,
     updateCachedVideo,
@@ -3851,18 +3886,27 @@ export default function VideoConnected() {
               <section className="video-section video-playlist-section">
                 {!currentUser ? (
                   <div className="video-empty">{t('video.authRequired')}</div>
-                ) : playlistVideos.length > 0 ? (
-                  <div className="video-playlist-grid">
-                    {playlistVideos.map((video, index) => (
-                      <VideoCard
-                        key={video.id}
-                        video={video}
-                        onPlay={openVideo}
-                        onFavorite={toggleFavorite}
-                        priority={index < 8}
-                      />
-                    ))}
-                  </div>
+                ) : playlistVideos.length > 0 || processingPlaylistVideos.length > 0 ? (
+                  <>
+                    {processingPlaylistVideos.length > 0 && (
+                      <div className="video-playlist-grid">
+                        {processingPlaylistVideos.map((video) => (
+                          <ProcessingVideoCard key={video.id} video={video} onPlay={openVideo} />
+                        ))}
+                      </div>
+                    )}
+                    <div className="video-playlist-grid">
+                      {playlistVideos.map((video, index) => (
+                        <VideoCard
+                          key={video.id}
+                          video={video}
+                          onPlay={openVideo}
+                          onFavorite={toggleFavorite}
+                          priority={index < 8}
+                        />
+                      ))}
+                    </div>
+                  </>
                 ) : (
                   <div className="video-empty">
                     {!playlistQuery.isFetched || playlistQuery.isLoading
