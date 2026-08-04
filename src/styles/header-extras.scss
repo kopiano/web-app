@@ -249,6 +249,7 @@
 
 .user-avatar-shell.has-pro-frame {
   filter: drop-shadow(0 10px 20px rgba(50, 50, 50, 0.877));
+  -webkit-filter: drop-shadow(0 10px 20px rgba(50, 50, 50, 0.877));
 }
 
 .user-avatar-box {
