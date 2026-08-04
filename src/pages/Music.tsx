@@ -1997,10 +1997,14 @@ function Music({ isActive = true }: MusicProps) {
         ) : pageTracks.length ? (
           <article
             className="music-feature-card"
-            style={{
-              backgroundImage: `url(${previousFeaturedCover || featuredTrack.cover || bg0})`,
-            }}
           >
+            <img
+              className="music-feature-image"
+              src={previousFeaturedCover || featuredTrack.cover || bg0}
+              alt=""
+              fetchPriority="high"
+              decoding="async"
+            />
             {previousFeaturedCover && (
               <div className="music-feature-cover-clip" aria-hidden="true">
                 <div

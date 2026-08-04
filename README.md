@@ -817,3 +817,7 @@ index.m3u8
 002.ts 3秒
 preload="auto"，而不是preload="none", 否则点击才加载。
 预加载下一个视频：播放A(播放进度达到80%)后台加载B的m3u8
+
+
+封面分优先级加载: home大卡片封面使用fetchpriority="high"，其它小卡片封面使用loading="lazy"
+大卡片使用单独的接口GET /video/banner

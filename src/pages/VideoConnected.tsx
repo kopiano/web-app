@@ -60,6 +60,7 @@ import {
   createVideoCollection,
   deleteVideo,
   getVideo,
+  getVideoBanner,
   getVideoCategories,
   getVideoCollections,
   getVideoComments,
@@ -1729,6 +1730,7 @@ export default function VideoConnected() {
     }
   });
   const [mockVideoOverrides, setMockVideoOverrides] = useState<Record<string, MockVideoOverride>>({});
+  const [homeVisibleCardCount, setHomeVisibleCardCount] = useState(0);
   const [mockComments, setMockComments] = useState<VideoApiComment[]>(MOCK_VIDEO_COMMENTS);
   const uploadHydratedRef = useRef(false);
   const uploadCoverObjectUrlRef = useRef<string | null>(null);
@@ -1782,6 +1784,12 @@ export default function VideoConnected() {
     queryFn: ({ pageParam }) => pageQuery(pageParam, { limit: 20, scope: 'public' }),
     getNextPageParam: nextCursor,
     enabled: activeView === 'home' || (activeView === 'watch' && !watchFromPlaylist),
+  });
+  const bannerQuery = useQuery({
+    queryKey: ['video', 'banner'],
+    queryFn: getVideoBanner,
+    enabled: activeView === 'home',
+    staleTime: 60_000,
   });
   const playlistQuery = useInfiniteQuery({
     queryKey: ['video', 'playlist', playlistFilterCategory, currentUser?.id ?? 'public'],
@@ -1945,23 +1953,32 @@ export default function VideoConnected() {
       .map((video) => toCardVideo(video, language, videoOverrides)),
     [effectiveMockItems, language, realHomeItems, useMockData, videoOverrides],
   );
-  useEffect(() => {
-    if (activeView !== 'home' || homeVideos.length === 0) return;
-    const posters = homeVideos
-      .slice(0, 6)
-      .map((video) => video.poster)
-      .filter(Boolean);
-    posters.forEach((poster) => {
-      const image = new Image();
-      image.decoding = 'async';
-      image.fetchPriority = 'high';
-      image.src = poster;
-    });
-  }, [activeView, homeVideos]);
-  const featuredVideos = useMemo(
-    () => homeVideos.filter((video) => video.status === 'ready'),
-    [homeVideos],
+  const bannerVideos = useMemo(
+    () => (bannerQuery.data ?? [])
+      .filter((video) => video.status === 'ready')
+      .map((video) => toCardVideo(video, language, videoOverrides)),
+    [bannerQuery.data, language, videoOverrides],
   );
+  const featuredVideos = useMemo(
+    () => (bannerVideos.length > 0 ? bannerVideos : homeVideos.filter((video) => video.status === 'ready')),
+    [bannerVideos, homeVideos],
+  );
+  useEffect(() => {
+    if (activeView !== 'home' || !featuredVideos[0]?.poster) return;
+    const image = new Image();
+    image.decoding = 'async';
+    image.fetchPriority = 'high';
+    image.src = featuredVideos[0].poster;
+  }, [activeView, featuredVideos]);
+
+  useEffect(() => {
+    if (activeView !== 'home') {
+      setHomeVisibleCardCount(0);
+      return;
+    }
+    const timer = window.setTimeout(() => setHomeVisibleCardCount(4), 100);
+    return () => window.clearTimeout(timer);
+  }, [activeView, homeVideos.length]);
   const mockPlaylistItems = useMemo(
     () => effectiveMockItems.filter((video) => (
       playlistFilterCategory === 'all'
@@ -2195,6 +2212,18 @@ export default function VideoConnected() {
     homeQuery.isFetchingNextPage,
     useMockData,
   ]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || activeView !== 'home') return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setHomeVisibleCardCount((count) => Math.min(homeVideos.length, count + 8));
+      }
+    }, { rootMargin: '600px 0px' });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [activeView, homeVideos.length]);
 
   useEffect(() => {
     const target = collectionLoadMoreRef.current;
@@ -3254,7 +3283,7 @@ export default function VideoConnected() {
                           alt=""
                           loading={video.id === featured.id || video.id === previousFeatured?.id ? 'eager' : 'lazy'}
                           decoding="async"
-                          fetchPriority={video.id === featured.id ? 'high' : 'low'}
+                          fetchPriority={video.id === featured.id ? 'high' : 'auto'}
                         />
                       ))}
                       <span className="video-quality">{featured.resolution}</span>
@@ -3289,7 +3318,7 @@ export default function VideoConnected() {
                           video={video}
                           onPlay={openVideo}
                           onFavorite={toggleFavorite}
-                          priority={index < 6}
+                          priority={index < homeVisibleCardCount}
                         />
                       ))}
                     </div>

@@ -100,6 +100,13 @@ export function getVideos(params = {}) {
   })
 }
 
+export function getVideoBanner() {
+  return request.get('/video/banner').then(response => {
+    if (!Array.isArray(response.data)) throw new Error('Invalid video banner response')
+    return response.data.map(normalizeVideo)
+  })
+}
+
 export function getVideo(id, options = {}) {
   return request.get(`/video/${encodeURIComponent(id)}`, {
     ...options,

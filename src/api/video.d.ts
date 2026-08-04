@@ -80,6 +80,7 @@ export interface VideoApiCollection {
 }
 
 export function getVideos(params?: Record<string, unknown>): Promise<VideoPage>;
+export function getVideoBanner(): Promise<VideoApiItem[]>;
 export function getVideo(id: string): Promise<VideoApiItem>;
 export function getVideoCategories(input?: { scope?: 'public' | 'accessible' | 'mine' }): Promise<VideoCategory[]>;
 export function getVideoCollections(input?: { mine?: boolean }): Promise<VideoApiCollection[]>;
