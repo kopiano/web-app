@@ -425,6 +425,43 @@ function lazyImageProps() {
   };
 }
 
+function VideoQueuePoster({ src }: { src: string }) {
+  const [retry, setRetry] = useState(0);
+  const [failed, setFailed] = useState(!src);
+  const imageSource = src
+    ? `${src}${src.includes('?') ? '&' : '?'}queue_retry=${retry}`
+    : '';
+
+  useEffect(() => {
+    setRetry(0);
+    setFailed(!src);
+  }, [src]);
+
+  if (failed) {
+    return (
+      <span className="video-watch-queue-poster-placeholder" aria-hidden="true">
+        <Film size={18} />
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={imageSource}
+      alt=""
+      loading="eager"
+      decoding="async"
+      onError={() => {
+        if (retry < 2) {
+          window.setTimeout(() => setRetry((value) => value + 1), 500);
+        } else {
+          setFailed(true);
+        }
+      }}
+    />
+  );
+}
+
 function preloadImage(src: string) {
   return new Promise<boolean>((resolve) => {
     const image = new Image();
@@ -1842,20 +1879,7 @@ function VideoWatch({
               >
                 <span className="video-watch-queue-index">{index + 1}</span>
                 <span className="video-watch-queue-poster">
-                  {item.poster ? (
-                    <img
-                      src={item.poster}
-                      alt=""
-                      {...lazyImageProps()}
-                      onError={(event) => {
-                        event.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <span className="video-watch-queue-poster-placeholder" aria-hidden="true">
-                      <Film size={18} />
-                    </span>
-                  )}
+                  <VideoQueuePoster src={item.poster} />
                   <small>{item.duration}</small>
                 </span>
                 <span className="video-watch-queue-copy">
