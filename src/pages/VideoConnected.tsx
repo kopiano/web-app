@@ -1529,11 +1529,11 @@ function VideoWatch({
             onPointerDown={revealControls}
             onPointerLeave={hideControls}
           >
-            {video.status === 'ready' && video.src ? (
+            {video.status === 'ready' && (video.raw.originFileUrl || video.src) ? (
               <HlsVideo
                 key={video.id}
-                src={video.src}
-                fallbackSrc={video.raw.originFileUrl}
+                src={video.raw.originFileUrl || video.src}
+                fallbackSrc={video.raw.originFileUrl ? video.src : undefined}
                 poster={video.poster}
                 playbackId={video.id}
                 active

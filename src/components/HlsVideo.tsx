@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store/store';
@@ -12,6 +12,8 @@ import {
 const VIDEO_AUDIO_STORAGE_KEY = 'lume-video-audio-v1';
 const VIDEO_VIEW_QUALIFICATION_MS = 3_000;
 const VIDEO_STARTUP_FALLBACK_MS = 3_000;
+const VIDEO_NETWORK_RETRY_LIMIT = 3;
+const VIDEO_MEDIA_RETRY_LIMIT = 2;
 
 interface NavigatorWithUserAgentData extends Navigator {
   userAgentData?: {
@@ -117,7 +119,7 @@ export default function HlsVideo({
   const lastPlaybackTimeRef = useRef(0);
   const persistPlaybackPositionRef = useRef<(force?: boolean) => void>(() => undefined);
   const [playbackError, setPlaybackError] = useState(false);
-  const [usingFallback, setUsingFallback] = useState(false);
+  const [failedSourceSet, setFailedSourceSet] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isInViewport, setIsInViewport] = useState(false);
@@ -127,8 +129,46 @@ export default function HlsVideo({
   // of waiting for the observer callback, which can delay the first request.
   const shouldAttachMedia = active && (isInViewport || Boolean(onVideoElement));
   const playbackStorageKey = playbackId ? `lume-video-progress:${playbackId}` : null;
+  const sourceSet = `${src}\u0000${fallbackSrc ?? ''}`;
+  const usingFallback = failedSourceSet === sourceSet && Boolean(fallbackSrc);
   autoPlayRef.current = autoPlay;
   onViewQualifiedRef.current = onViewQualified;
+
+  const requestPlayback = useCallback(async (
+    video: HTMLVideoElement,
+    allowMutedFallback: boolean,
+  ) => {
+    try {
+      await video.play();
+      return true;
+    } catch (error) {
+      if (!(error instanceof DOMException) || error.name === 'AbortError') return false;
+
+      if (
+        error.name === 'NotAllowedError'
+        && allowMutedFallback
+        && !video.muted
+        && autoplayFallbackAvailableRef.current
+      ) {
+        autoplayFallbackAvailableRef.current = false;
+        autoplayFallbackMutedRef.current = true;
+        video.muted = true;
+        try {
+          await video.play();
+          return true;
+        } catch (retryError) {
+          if (retryError instanceof DOMException && retryError.name === 'AbortError') {
+            return false;
+          }
+        }
+      }
+
+      // Source-specific media and HLS error events decide whether to retry,
+      // switch sources, or show the terminal playback error.
+      setIsLoading(false);
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -225,6 +265,8 @@ export default function HlsVideo({
 
     configureAutoplayAudio(video);
     applyStoredVideoAudio(video);
+    autoplayFallbackAvailableRef.current = true;
+    autoplayFallbackMutedRef.current = false;
     playbackReadyRef.current = false;
 
     const readSavedPlaybackPosition = () => {
@@ -248,27 +290,7 @@ export default function HlsVideo({
       if (!autoPlayRef.current && !resumeAfterInterruptionRef.current) return;
       if (!video.currentSrc || video.readyState < HTMLMediaElement.HAVE_METADATA) return;
       resumeAfterInterruptionRef.current = false;
-      void video.play().catch((error: DOMException) => {
-        if (error.name === 'AbortError') return;
-        // Fall back to muted autoplay only when the browser blocks audio.
-        if (!video.muted && autoplayFallbackAvailableRef.current) {
-          autoplayFallbackAvailableRef.current = false;
-          autoplayFallbackMutedRef.current = true;
-          video.muted = true;
-          void video.play().catch((retryError: DOMException) => {
-            if (retryError.name === 'AbortError') return;
-            setIsLoading(false);
-            if (retryError.name !== 'NotAllowedError' && video.error) {
-              setPlaybackError(true);
-            }
-          });
-          return;
-        }
-        setIsLoading(false);
-        if (error.name !== 'NotAllowedError' && video.error) {
-          setPlaybackError(true);
-        }
-      });
+      void requestPlayback(video, true);
     };
     const handleLoadedMetadata = () => {
       restorePlaybackPosition();
@@ -284,7 +306,7 @@ export default function HlsVideo({
     if (!source.toLowerCase().split(/[?#]/, 1)[0].endsWith('.m3u8')) {
       const handleDirectPlaybackError = () => {
         if (fallbackSrc && !usingFallback) {
-          setUsingFallback(true);
+          setFailedSourceSet(sourceSet);
           return;
         }
         setIsLoading(false);
@@ -342,7 +364,7 @@ export default function HlsVideo({
       if (disposed || !fallbackSrc || usingFallback) return false;
       clearRetryTimer();
       clearStartupFallbackTimer();
-      setUsingFallback(true);
+      setFailedSourceSet(sourceSet);
       hls?.destroy();
       hls = null;
       return true;
@@ -367,6 +389,13 @@ export default function HlsVideo({
     };
     const retryNativePlayback = (immediate = false) => {
       if (disposed || !nativeHlsAttached) return;
+      if (!immediate && networkRetryCount >= VIDEO_NETWORK_RETRY_LIMIT) {
+        if (!switchToFallback()) {
+          setIsLoading(false);
+          setPlaybackError(true);
+        }
+        return;
+      }
       const currentTime = video.currentTime;
       clearRetryTimer();
       const delay = immediate ? 0 : Math.min(10_000, 500 * (2 ** networkRetryCount));
@@ -480,7 +509,7 @@ export default function HlsVideo({
           if (disposed || !hls || video.ended) return;
           hls.startLoad(Math.max(0, video.currentTime));
           if (video.paused && autoPlayRef.current) {
-            void video.play().catch(() => undefined);
+            void requestPlayback(video, true);
           }
         }, 250);
       };
@@ -493,6 +522,13 @@ export default function HlsVideo({
           const delay = Math.min(3_000, 250 * (2 ** networkRetryCount));
           networkRetryCount += 1;
           if (fallbackSrc && networkRetryCount >= 2 && switchToFallback()) return;
+          if (networkRetryCount > VIDEO_NETWORK_RETRY_LIMIT) {
+            setIsLoading(false);
+            setPlaybackError(true);
+            hls.destroy();
+            hls = null;
+            return;
+          }
           retryTimer = window.setTimeout(() => {
             if (!disposed && hls) hls.startLoad();
           }, delay);
@@ -500,6 +536,13 @@ export default function HlsVideo({
           if (fallbackSrc && mediaRetryCount >= 1 && switchToFallback()) return;
           clearRetryTimer();
           mediaRetryCount += 1;
+          if (mediaRetryCount > VIDEO_MEDIA_RETRY_LIMIT) {
+            setIsLoading(false);
+            setPlaybackError(true);
+            hls.destroy();
+            hls = null;
+            return;
+          }
           retryTimer = window.setTimeout(() => {
             if (disposed || !hls) return;
             if (mediaRetryCount === 2) hls.swapAudioCodec();
@@ -544,7 +587,15 @@ export default function HlsVideo({
       video.removeAttribute('src');
       video.load();
     };
-  }, [fallbackSrc, playbackStorageKey, shouldAttachMedia, src, usingFallback]);
+  }, [
+    fallbackSrc,
+    playbackStorageKey,
+    requestPlayback,
+    shouldAttachMedia,
+    src,
+    sourceSet,
+    usingFallback,
+  ]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -552,30 +603,11 @@ export default function HlsVideo({
 
     if (autoPlay) {
       if (!video.currentSrc || video.readyState < HTMLMediaElement.HAVE_METADATA) return;
-      void video.play().catch((error: DOMException) => {
-        if (error.name === 'AbortError') return;
-        if (!video.muted && autoplayFallbackAvailableRef.current) {
-          autoplayFallbackAvailableRef.current = false;
-          autoplayFallbackMutedRef.current = true;
-          video.muted = true;
-          void video.play().catch((retryError: DOMException) => {
-            if (retryError.name === 'AbortError') return;
-            setIsLoading(false);
-            if (retryError.name !== 'NotAllowedError' && video.error) {
-              setPlaybackError(true);
-            }
-          });
-          return;
-        }
-        setIsLoading(false);
-        if (error.name !== 'NotAllowedError' && video.error) {
-          setPlaybackError(true);
-        }
-      });
+      void requestPlayback(video, true);
     } else {
       video.pause();
     }
-  }, [autoPlay, shouldAttachMedia]);
+  }, [autoPlay, requestPlayback, shouldAttachMedia]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -699,12 +731,7 @@ export default function HlsVideo({
     }
 
     const video = videoRef.current;
-    void video?.play().catch((error: DOMException) => {
-      setIsLoading(false);
-      if (error.name !== 'AbortError' && error.name !== 'NotAllowedError' && video.error) {
-        setPlaybackError(true);
-      }
-    });
+    if (video) void requestPlayback(video, false);
   };
 
   const handleSurfaceClick = () => {
@@ -719,12 +746,7 @@ export default function HlsVideo({
     if (video.paused || video.ended) {
       setPlaybackError(false);
       setIsLoading(true);
-      void video.play().catch((error: DOMException) => {
-        setIsLoading(false);
-        if (error.name !== 'AbortError' && error.name !== 'NotAllowedError' && video.error) {
-          setPlaybackError(true);
-        }
-      });
+      void requestPlayback(video, false);
     } else {
       video.pause();
     }
