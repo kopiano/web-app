@@ -662,8 +662,14 @@ export default function HlsVideo({
       }
       persistPlaybackPosition(true);
     };
-    const handleLoading = () => {
-      if (!video.ended) setIsLoading(true);
+    const handleLoading = (event: Event) => {
+      if (video.ended) return;
+      const isActuallyBuffering = (
+        video.paused
+        || video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA
+        || event.type === 'seeking'
+      );
+      if (isActuallyBuffering) setIsLoading(true);
     };
     const handlePlayable = () => {
       if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
