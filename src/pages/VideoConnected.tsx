@@ -101,6 +101,7 @@ import '@/styles/video_ipad.scss';
 
 type VideoView = 'home' | 'library' | 'favorites' | 'playlist' | 'watch';
 type UploadStep = 'upload' | 'publish';
+const VIDEO_LIST_CACHE_VERSION = 'dimensions-v1';
 type Cursor = { createdAt: string; id: string } | null;
 type VideoUploadProgress = {
   percent: number;
@@ -126,7 +127,7 @@ type CardVideo = {
   favoriteCount: number;
   commentCount: number;
   duration: string;
-  resolution: '4K' | '2K' | '1080p';
+  resolution: string | null;
   category: string;
   categorySlug: string;
   poster: string;
@@ -157,6 +158,13 @@ type UploadDraft = {
   duration: string;
   coverUrl: string;
   publishRequested?: boolean;
+};
+
+const videoStatusRank: Record<VideoApiItem['status'], number> = {
+  uploading: 0,
+  processing: 1,
+  ready: 2,
+  failed: 2,
 };
 
 type MockVideoOverride = Partial<Pick<
@@ -248,9 +256,19 @@ function formatVideoCommentTime(value: string) {
 }
 
 function resolutionFor(video: VideoApiItem): CardVideo['resolution'] {
-  if ((video.width ?? 0) >= 3840 || (video.height ?? 0) >= 2160) return '4K';
-  if ((video.width ?? 0) >= 2048 || (video.height ?? 0) >= 1440) return '2K';
-  return '1080p';
+  const width = Number(video.width);
+  const height = Number(video.height);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return null;
+  }
+
+  const longEdge = Math.max(width, height);
+  const shortEdge = Math.min(width, height);
+  if (longEdge >= 3840) return '4K';
+  if (longEdge >= 2560) return '2K';
+  if (longEdge >= 1920) return '1080p';
+  if (longEdge >= 1280) return '720p';
+  return `${Math.round(shortEdge)}p`;
 }
 
 function formatUploadBytes(bytes: number) {
@@ -315,10 +333,6 @@ function versionedVideoPoster(video: VideoApiItem) {
   return video.coverUrl;
 }
 
-function isUploadedVideoCover(url: string) {
-  return /\/cover\.webp(?:[?#]|$)/i.test(url);
-}
-
 function toCardVideo(
   video: VideoApiItem,
   language: string,
@@ -348,7 +362,9 @@ function toCardVideo(
     favoriteCount: effectiveVideo.favoriteCount,
     commentCount: effectiveVideo.commentCount,
     duration: formatDuration(effectiveVideo.duration),
-    resolution: resolutionFor(effectiveVideo),
+    // Keep quality tied to the API media dimensions. Local reaction/view
+    // overrides must not replace width/height used by the card label.
+    resolution: resolutionFor(video),
     category: category.name,
     categorySlug: category.slug,
     poster: versionedVideoPoster(effectiveVideo),
@@ -611,7 +627,7 @@ const VideoCard = memo(function VideoCard({
             <Film size={24} />
           </span>
         )}
-        <span className="video-quality">{video.resolution}</span>
+        {video.resolution && <span className="video-quality">{video.resolution}</span>}
         {variant !== 'playlist' && (
           <span className="video-duration">
             <Clock3 size={12} aria-hidden="true" />
@@ -1641,7 +1657,9 @@ function VideoWatch({
                     {formatPlaybackTime(currentTime)} <i>/</i> {formatPlaybackTime(duration)}
                   </span>
                   <span className="video-watch-control-spacer" />
-                  <span className="video-watch-quality">{video.resolution}</span>
+                  {video.resolution && (
+                    <span className="video-watch-quality">{video.resolution}</span>
+                  )}
                   <div
                     className={`video-watch-volume${volumeControlOpen ? ' is-open' : ''}`}
                     onPointerLeave={hideVolumeControl}
@@ -2009,7 +2027,6 @@ export default function VideoConnected() {
     timestamp: 0,
     rate: 0,
   });
-  const publishedVideoPollingRef = useRef<number | null>(null);
   const featuredVideoIdRef = useRef<string | null>(null);
   const featuredPreloadedPostersRef = useRef(new Set<string>());
   const featuredTransitionInFlightRef = useRef(false);
@@ -2021,9 +2038,6 @@ export default function VideoConnected() {
 
   useEffect(() => () => {
     uploadAbortControllerRef.current?.abort();
-    if (publishedVideoPollingRef.current !== null) {
-      window.clearInterval(publishedVideoPollingRef.current);
-    }
     if (uploadCoverObjectUrlRef.current) URL.revokeObjectURL(uploadCoverObjectUrlRef.current);
   }, []);
 
@@ -2049,7 +2063,7 @@ export default function VideoConnected() {
       || watchFromFavorites,
   });
   const homeQuery = useInfiniteQuery({
-    queryKey: ['video', 'home'],
+    queryKey: ['video', 'home', VIDEO_LIST_CACHE_VERSION],
     initialPageParam: null as Cursor,
     queryFn: ({ pageParam }) => pageQuery(pageParam, { limit: 8, scope: 'public' }),
     getNextPageParam: nextCursor,
@@ -2068,7 +2082,7 @@ export default function VideoConnected() {
     refetchOnWindowFocus: false,
   });
   const playlistQuery = useInfiniteQuery({
-    queryKey: ['video', 'playlist', playlistFilterCategory, currentUser?.id ?? 'public'],
+    queryKey: ['video', 'playlist', VIDEO_LIST_CACHE_VERSION, playlistFilterCategory, currentUser?.id ?? 'public'],
     initialPageParam: null as Cursor,
     queryFn: ({ pageParam }) => pageQuery(pageParam, {
       limit: 8,
@@ -3078,10 +3092,18 @@ export default function VideoConnected() {
           video_id?: unknown;
           status?: unknown;
           progress?: unknown;
+          width?: unknown;
+          height?: unknown;
         };
         const videoId = String(message.video_id || '');
         if (!videoId) return;
         const progress = Math.max(0, Math.min(100, Number(message.progress) || 0));
+        const messageWidth = Number(message.width);
+        const messageHeight = Number(message.height);
+        const dimensions = {
+          ...(Number.isFinite(messageWidth) && messageWidth > 0 ? { width: messageWidth } : {}),
+          ...(Number.isFinite(messageHeight) && messageHeight > 0 ? { height: messageHeight } : {}),
+        };
         const status: VideoApiItem['status'] | null = message.status === 'uploading'
           || message.status === 'processing'
           || message.status === 'ready'
@@ -3092,9 +3114,13 @@ export default function VideoConnected() {
 
         setPublishedProcessingVideos(current => current.map(item => {
           if (item.id !== videoId) return item;
+          const nextStatus = videoStatusRank[status] >= videoStatusRank[item.status]
+            ? status
+            : item.status;
           return {
             ...item,
-            status,
+            ...dimensions,
+            status: nextStatus,
             processingProgress: Math.max(item.processingProgress, progress),
           };
         }));
@@ -3103,7 +3129,10 @@ export default function VideoConnected() {
           item => item
             ? {
               ...item,
-              status,
+              ...dimensions,
+              status: videoStatusRank[status] >= videoStatusRank[item.status]
+                ? status
+                : item.status,
               processingProgress: Math.max(item.processingProgress, progress),
             }
             : item,
@@ -3118,7 +3147,10 @@ export default function VideoConnected() {
                 item.id === videoId
                   ? {
                     ...item,
-                    status,
+                    ...dimensions,
+                    status: videoStatusRank[status] >= videoStatusRank[item.status]
+                      ? status
+                      : item.status,
                     processingProgress: Math.max(item.processingProgress, progress),
                   }
                   : item
@@ -3136,7 +3168,10 @@ export default function VideoConnected() {
                 item.id === videoId
                   ? {
                     ...item,
-                    status,
+                    ...dimensions,
+                    status: videoStatusRank[status] >= videoStatusRank[item.status]
+                      ? status
+                      : item.status,
                     processingProgress: Math.max(item.processingProgress, progress),
                   }
                   : item
@@ -3154,7 +3189,31 @@ export default function VideoConnected() {
                 item.id === videoId
                   ? {
                     ...item,
-                    status,
+                    ...dimensions,
+                    status: videoStatusRank[status] >= videoStatusRank[item.status]
+                      ? status
+                      : item.status,
+                    processingProgress: Math.max(item.processingProgress, progress),
+                  }
+                  : item
+              )),
+            })),
+          },
+        );
+        queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+          { queryKey: ['video', 'collection'] },
+          data => data && {
+            ...data,
+            pages: data.pages.map(page => ({
+              ...page,
+              items: page.items.map(item => (
+                item.id === videoId
+                  ? {
+                    ...item,
+                    ...dimensions,
+                    status: videoStatusRank[status] >= videoStatusRank[item.status]
+                      ? status
+                      : item.status,
                     processingProgress: Math.max(item.processingProgress, progress),
                   }
                   : item
@@ -3166,9 +3225,6 @@ export default function VideoConnected() {
       currentSocket.onclose = () => {
         if (disposed) return;
         connectionFailures += 1;
-        // HTTP polling remains the source of truth when the optional
-        // realtime endpoint is unavailable.
-        if (connectionFailures >= 3) return;
         reconnectTimer = window.setTimeout(connect, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, 10000);
       };
@@ -3520,44 +3576,6 @@ export default function VideoConnected() {
     }
   };
 
-  const startPublishedVideoPolling = useCallback((videoId: string) => {
-    if (publishedVideoPollingRef.current !== null) {
-      window.clearInterval(publishedVideoPollingRef.current);
-    }
-
-    const poll = async () => {
-      try {
-        const updated = await getVideo(videoId);
-        updateCachedVideo(updated);
-        setPublishedProcessingVideos((current) => current
-          .map((item) => item.id === videoId
-            ? {
-              ...item,
-              ...updated,
-              coverUrl: isUploadedVideoCover(item.coverUrl)
-                ? item.coverUrl
-                : updated.coverUrl || item.coverUrl,
-              processingProgress: Math.max(item.processingProgress, updated.processingProgress),
-            }
-            : item)
-          .filter((item) => item.status === 'uploading' || item.status === 'processing'));
-        if (updated.status === 'ready' || updated.status === 'failed') {
-          if (publishedVideoPollingRef.current !== null) {
-            window.clearInterval(publishedVideoPollingRef.current);
-            publishedVideoPollingRef.current = null;
-          }
-        }
-      } catch {
-        // Keep polling transient request failures.
-      }
-    };
-
-    void poll();
-    publishedVideoPollingRef.current = window.setInterval(() => {
-      void poll();
-    }, 800);
-  }, [updateCachedVideo]);
-
   const closeUpload = () => {
     const uploadId = uploadVideoId;
     const wasPublished = Boolean(
@@ -3604,7 +3622,6 @@ export default function VideoConnected() {
           // The server owns cleanup of a partially uploaded record if deletion cannot be completed here.
         });
     }
-    if (wasPublished && uploadId) startPublishedVideoPolling(uploadId);
   };
 
   const publishUpload = async () => {
@@ -4053,7 +4070,7 @@ export default function VideoConnected() {
                           fetchPriority={video.id === featured.id ? 'high' : 'auto'}
                         />
                       ))}
-                      {(featured.raw.width != null || featured.raw.height != null) && (
+                      {featured.resolution && (
                         <span className="video-quality">{featured.resolution}</span>
                       )}
                       <span
