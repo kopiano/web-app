@@ -2726,7 +2726,12 @@ export default function VideoConnected() {
     setActiveCategory('all');
     setSearch('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [setSearchParams]);
+    await queryClient.invalidateQueries({ queryKey: ['video', 'playlist'] });
+    await queryClient.refetchQueries({
+      queryKey: ['video', 'playlist'],
+      type: 'active',
+    });
+  }, [queryClient, setSearchParams]);
 
   const openVideo = useCallback((video: CardVideo) => {
     if (!isMockVideoId(video.id) && video.raw.hlsMasterUrl) {

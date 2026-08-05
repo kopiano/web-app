@@ -1,12 +1,16 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
-
 // https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(async ({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const previewApiTarget =
+    env.VITE_PREVIEW_API_TARGET || "https://a.kopiano.cc";
+
+  return {
   plugins: [react()],
   resolve: {
     alias: {
@@ -35,27 +39,6 @@ export default defineConfig(async () => ({
     host: "0.0.0.0",
     port: 4173,
     strictPort: true,
-    proxy: {
-      "/api": {
-        target: "https://a.kopiano.cc",
-        changeOrigin: true,
-        secure: true,
-        cookieDomainRewrite: {
-          "*": "",
-        },
-        configure: (proxy) => {
-          proxy.on("proxyRes", (proxyRes) => {
-            const setCookie = proxyRes.headers["set-cookie"];
-            if (!setCookie) return;
-
-            proxyRes.headers["set-cookie"] = setCookie.map((cookie) =>
-              cookie
-                .replace(/;\s*Secure/gi, "")
-                .replace(/;\s*Domain=[^;]*/gi, "")
-            );
-          });
-        },
-      },
-    },
   },
-}));
+  };
+});
