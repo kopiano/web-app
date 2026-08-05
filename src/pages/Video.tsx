@@ -646,7 +646,10 @@ function VideoWatchPage({
   const togglePlayback = () => {
     if (!media) return;
     if (media.paused) {
-      void media.play();
+      void media.play().catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setIsPlaying(false);
+      });
       return;
     }
     media.pause();

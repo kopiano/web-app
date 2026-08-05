@@ -455,9 +455,10 @@ export default function HlsVideo({
         backBufferLength: 8,
         maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 2,
-        fragLoadingMaxRetry: 3,
+        fragLoadingTimeOut: 15_000,
+        fragLoadingMaxRetry: 6,
         fragLoadingRetryDelay: 250,
-        fragLoadingMaxRetryTimeout: 4000,
+        fragLoadingMaxRetryTimeout: 8_000,
         manifestLoadingMaxRetry: 2,
         manifestLoadingRetryDelay: 250,
         manifestLoadingMaxRetryTimeout: 4000,
@@ -516,7 +517,11 @@ export default function HlsVideo({
       video.addEventListener('waiting', recoverStalledBuffer);
       video.addEventListener('stalled', recoverStalledBuffer);
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (!data.fatal || !hls) return;
+        if (!hls) return;
+        if (!data.fatal) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) setIsLoading(true);
+          return;
+        }
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
           clearRetryTimer();
           const delay = Math.min(3_000, 250 * (2 ** networkRetryCount));

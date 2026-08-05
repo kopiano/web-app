@@ -224,6 +224,16 @@ function VideoLoadingSpinner({
   );
 }
 
+function playMedia(
+  media: HTMLMediaElement,
+  onRejected?: (error: unknown) => void,
+) {
+  void media.play().catch((error: unknown) => {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
+    onRejected?.(error);
+  });
+}
+
 function formatVideoCommentTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -1402,7 +1412,7 @@ function VideoWatch({
     const handleEnded = () => {
       if (singleLoop) {
         media.currentTime = 0;
-        void media.play().catch(() => setIsPlaying(false));
+        playMedia(media, () => setIsPlaying(false));
         return;
       }
 
@@ -1418,7 +1428,7 @@ function VideoWatch({
 
       if (nextVideo.id === video.id) {
         media.currentTime = 0;
-        void media.play().catch(() => setIsPlaying(false));
+        playMedia(media, () => setIsPlaying(false));
       } else {
         onSelect(nextVideo);
       }
@@ -1439,7 +1449,7 @@ function VideoWatch({
       revealControls();
       if (!media) return;
       if (media.paused || media.ended) {
-        void media.play();
+        playMedia(media, () => setIsPlaying(false));
       } else {
         media.pause();
       }
@@ -1481,7 +1491,7 @@ function VideoWatch({
 
   const togglePlayback = () => {
     if (!media) return;
-    if (media.paused) void media.play();
+    if (media.paused) playMedia(media, () => setIsPlaying(false));
     else media.pause();
   };
 
