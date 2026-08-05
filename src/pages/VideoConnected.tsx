@@ -2634,7 +2634,9 @@ export default function VideoConnected() {
       const saved = window.localStorage.getItem(UPLOAD_DRAFT_KEY);
       if (saved) {
         const draft = JSON.parse(saved) as UploadDraft;
-        setUploadOpen(Boolean(draft.isOpen));
+        // Draft data may be shared across tabs, but the dialog state must
+        // remain local to the tab that opened it.
+        setUploadOpen(false);
         setUploadStep(draft.step === 'publish' ? 'publish' : 'upload');
         setUploadVideoId(draft.videoId || null);
         setUploadVideoName(draft.videoName || '');
@@ -2661,7 +2663,6 @@ export default function VideoConnected() {
   useEffect(() => {
     if (!uploadHydratedRef.current) return;
     if (!uploadOpen) {
-      window.localStorage.removeItem(UPLOAD_DRAFT_KEY);
       return;
     }
     const draft: UploadDraft = {
@@ -3593,6 +3594,7 @@ export default function VideoConnected() {
     setUploadBusy(false);
     uploadPublishRequestedRef.current = false;
     setUploadPublishRequested(false);
+    window.localStorage.removeItem(UPLOAD_DRAFT_KEY);
     if (videoInputRef.current) videoInputRef.current.value = '';
     if (coverInputRef.current) coverInputRef.current.value = '';
     if (shouldDeleteDraft) {

@@ -449,8 +449,11 @@ export default function HlsVideo({
         maxStarvationDelay: 1,
         maxLoadingDelay: 2,
         capLevelToPlayerSize: false,
-        maxBufferLength: 12,
-        maxMaxBufferLength: 24,
+        // 缓冲控制
+        // maxBufferLength: 12,
+        // maxMaxBufferLength: 24,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
         maxBufferSize: 48 * 1024 * 1024,
         backBufferLength: 8,
         maxBufferHole: 0.5,
