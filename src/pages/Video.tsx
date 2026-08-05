@@ -531,6 +531,7 @@ function VideoWatchPage({
   const [volume, setVolume] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [bufferedTime, setBufferedTime] = useState(0);
   const [playerHeight, setPlayerHeight] = useState<number>();
   const [comments, setComments] = useState<VideoComment[]>(VIDEO_COMMENTS);
   const [commentDraft, setCommentDraft] = useState('');
@@ -619,6 +620,16 @@ function VideoWatchPage({
       setIsPlaying(!media.paused && !media.ended);
       setCurrentTime(media.currentTime);
       setDuration(Number.isFinite(media.duration) ? media.duration : 0);
+      const buffered = media.buffered;
+      let bufferedEnd = 0;
+      for (let index = 0; index < buffered.length; index += 1) {
+        if (media.currentTime >= buffered.start(index) - 0.25
+          && media.currentTime <= buffered.end(index) + 0.25) {
+          bufferedEnd = buffered.end(index);
+          break;
+        }
+      }
+      setBufferedTime(Math.max(bufferedEnd, media.currentTime));
       setIsMuted(media.muted);
       setVolume(media.volume);
     };
@@ -631,6 +642,9 @@ function VideoWatchPage({
     media.addEventListener('pause', syncMediaState);
     media.addEventListener('volumechange', syncMediaState);
     media.addEventListener('ended', syncMediaState);
+    media.addEventListener('progress', syncMediaState);
+    media.addEventListener('canplay', syncMediaState);
+    media.addEventListener('waiting', syncMediaState);
 
     return () => {
       media.removeEventListener('loadedmetadata', syncMediaState);
@@ -640,6 +654,9 @@ function VideoWatchPage({
       media.removeEventListener('pause', syncMediaState);
       media.removeEventListener('volumechange', syncMediaState);
       media.removeEventListener('ended', syncMediaState);
+      media.removeEventListener('progress', syncMediaState);
+      media.removeEventListener('canplay', syncMediaState);
+      media.removeEventListener('waiting', syncMediaState);
     };
   }, [media]);
 
@@ -771,7 +788,10 @@ function VideoWatchPage({
                 value={playbackValue}
                 aria-label="Video progress"
                 onChange={(event) => seek(Number(event.target.value))}
-                style={{ '--video-progress': `${duration ? (playbackValue / duration) * 100 : 0}%` } as React.CSSProperties}
+                style={{
+                  '--video-progress': `${duration ? (playbackValue / duration) * 100 : 0}%`,
+                  '--video-buffered': `${duration ? (bufferedTime / duration) * 100 : 0}%`,
+                } as React.CSSProperties}
               />
               <div className="video-watch-control-row">
                 <button type="button" aria-label={isPlaying ? 'Pause' : 'Play'} onClick={togglePlayback}>

@@ -1342,6 +1342,7 @@ function VideoWatch({
   const [volume, setVolume] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(video.raw.duration);
+  const [bufferedTime, setBufferedTime] = useState(0);
   const [playerHeight, setPlayerHeight] = useState<number>();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -1450,6 +1451,16 @@ function VideoWatch({
         setCurrentTime(media.currentTime);
       }
       setDuration(Number.isFinite(media.duration) ? media.duration : video.raw.duration);
+      const buffered = media.buffered;
+      let bufferedEnd = 0;
+      for (let index = 0; index < buffered.length; index += 1) {
+        if (media.currentTime >= buffered.start(index) - 0.25
+          && media.currentTime <= buffered.end(index) + 0.25) {
+          bufferedEnd = buffered.end(index);
+          break;
+        }
+      }
+      setBufferedTime(Math.max(bufferedEnd, media.currentTime));
       setIsPlaying(!media.paused && !media.ended);
       setIsMuted(media.muted);
       setVolume(media.volume);
@@ -1460,12 +1471,18 @@ function VideoWatch({
     media.addEventListener('play', sync);
     media.addEventListener('pause', sync);
     media.addEventListener('volumechange', sync);
+    media.addEventListener('progress', sync);
+    media.addEventListener('canplay', sync);
+    media.addEventListener('waiting', sync);
     return () => {
       media.removeEventListener('loadedmetadata', sync);
       media.removeEventListener('timeupdate', sync);
       media.removeEventListener('play', sync);
       media.removeEventListener('pause', sync);
       media.removeEventListener('volumechange', sync);
+      media.removeEventListener('progress', sync);
+      media.removeEventListener('canplay', sync);
+      media.removeEventListener('waiting', sync);
     };
   }, [media, video.raw.duration]);
 
@@ -1649,7 +1666,10 @@ function VideoWatch({
                   value={Math.min(currentTime, duration || currentTime)}
                   aria-label={t('video.player.progress')}
                   onChange={(event) => seek(Number(event.target.value))}
-                  style={{ '--video-progress': `${duration ? (currentTime / duration) * 100 : 0}%` } as CSSProperties}
+                  style={{
+                    '--video-progress': `${duration ? (currentTime / duration) * 100 : 0}%`,
+                    '--video-buffered': `${duration ? (bufferedTime / duration) * 100 : 0}%`,
+                  } as CSSProperties}
                 />
                 <div className="video-watch-control-row">
                   <button type="button" aria-label={isPlaying ? t('video.player.pause') : t('video.player.play')} onClick={togglePlayback}>

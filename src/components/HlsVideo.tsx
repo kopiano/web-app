@@ -528,7 +528,12 @@ export default function HlsVideo({
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!hls) return;
         if (!data.fatal) {
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) setIsLoading(true);
+          if (
+            data.type === Hls.ErrorTypes.NETWORK_ERROR
+            && (video.paused || video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA)
+          ) {
+            setIsLoading(true);
+          }
           return;
         }
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
@@ -663,6 +668,9 @@ export default function HlsVideo({
       if (Number.isFinite(video.currentTime) && video.currentTime > 0) {
         lastPlaybackTimeRef.current = video.currentTime;
       }
+      if (!video.paused && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+        setIsLoading(false);
+      }
       persistPlaybackPosition();
     };
     const handleSeeked = () => {
@@ -676,7 +684,12 @@ export default function HlsVideo({
       const isActuallyBuffering = (
         event.type === 'loadstart'
         || event.type === 'seeking'
-        || (!video.paused && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA)
+        || (event.type === 'waiting'
+          && !video.paused
+          && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA)
+        || (event.type === 'stalled'
+          && !video.paused
+          && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA)
       );
       if (isActuallyBuffering) setIsLoading(true);
     };
@@ -713,6 +726,8 @@ export default function HlsVideo({
     video.addEventListener('stalled', handleLoading);
     video.addEventListener('seeking', handleLoading);
     video.addEventListener('canplay', handlePlayable);
+    video.addEventListener('canplaythrough', handlePlayable);
+    video.addEventListener('progress', handlePlayable);
     video.addEventListener('error', handleMediaError);
     video.addEventListener('volumechange', persistAudio);
     window.addEventListener('pagehide', handleStopped);
@@ -730,6 +745,8 @@ export default function HlsVideo({
       video.removeEventListener('stalled', handleLoading);
       video.removeEventListener('seeking', handleLoading);
       video.removeEventListener('canplay', handlePlayable);
+      video.removeEventListener('canplaythrough', handlePlayable);
+      video.removeEventListener('progress', handlePlayable);
       video.removeEventListener('error', handleMediaError);
       video.removeEventListener('volumechange', persistAudio);
       window.removeEventListener('pagehide', handleStopped);

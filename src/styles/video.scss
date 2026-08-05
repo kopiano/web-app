@@ -2000,7 +2000,8 @@
   background: linear-gradient(
     to right,
     rgba(255, 255, 255, 0.94) 0 var(--video-progress),
-    rgba(255, 255, 255, 0.34) var(--video-progress) 100%
+    rgba(255, 255, 255, 0.62) var(--video-progress) var(--video-buffered),
+    rgba(255, 255, 255, 0.34) var(--video-buffered) 100%
   );
 }
 
