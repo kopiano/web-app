@@ -476,6 +476,7 @@
     },
     "player": {
       "error": "视频暂时无法播放。",
+      "loading": "正在加载视频",
       "failed": "视频处理失败。",
       "processing": "视频处理中 {{progress}}%",
       "progress": "视频播放进度",

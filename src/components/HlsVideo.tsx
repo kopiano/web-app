@@ -82,6 +82,7 @@ interface HlsVideoProps {
   onVideoElement?: (video: HTMLVideoElement | null) => void;
   playbackId?: string;
   errorLabel?: string;
+  loadingLabel?: string;
 }
 
 export default function HlsVideo({
@@ -101,6 +102,7 @@ export default function HlsVideo({
   onVideoElement,
   playbackId,
   errorLabel = 'Unable to play this video.',
+  loadingLabel = 'Loading video',
 }: HlsVideoProps) {
   const dispatch = useDispatch<AppDispatch>();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -117,6 +119,7 @@ export default function HlsVideo({
   const [playbackError, setPlaybackError] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [isInViewport, setIsInViewport] = useState(false);
   const hasDimensions = Boolean(width && height && width > 0 && height > 0);
   const aspectRatio = hasDimensions ? `${width} / ${height}` : '16 / 9';
@@ -212,6 +215,7 @@ export default function HlsVideo({
 
     setPlaybackError(false);
     setIsPlaying(false);
+    setIsLoading(shouldAttachMedia);
     if (!shouldAttachMedia) {
       video.pause();
       video.removeAttribute('src');
@@ -252,11 +256,18 @@ export default function HlsVideo({
           autoplayFallbackMutedRef.current = true;
           video.muted = true;
           void video.play().catch((retryError: DOMException) => {
-            if (retryError.name !== 'AbortError') setPlaybackError(true);
+            if (retryError.name === 'AbortError') return;
+            setIsLoading(false);
+            if (retryError.name !== 'NotAllowedError' && video.error) {
+              setPlaybackError(true);
+            }
           });
           return;
         }
-        setPlaybackError(true);
+        setIsLoading(false);
+        if (error.name !== 'NotAllowedError' && video.error) {
+          setPlaybackError(true);
+        }
       });
     };
     const handleLoadedMetadata = () => {
@@ -276,6 +287,7 @@ export default function HlsVideo({
           setUsingFallback(true);
           return;
         }
+        setIsLoading(false);
         setPlaybackError(true);
       };
       video.src = source;
@@ -341,6 +353,7 @@ export default function HlsVideo({
         if (fallbackSrc && !usingFallback) {
           switchToFallback();
         } else {
+          setIsLoading(false);
           setPlaybackError(true);
         }
         return;
@@ -496,6 +509,7 @@ export default function HlsVideo({
           if (fallbackSrc && !usingFallback) {
             switchToFallback();
           } else {
+            setIsLoading(false);
             setPlaybackError(true);
             hls.destroy();
             hls = null;
@@ -545,11 +559,18 @@ export default function HlsVideo({
           autoplayFallbackMutedRef.current = true;
           video.muted = true;
           void video.play().catch((retryError: DOMException) => {
-            if (retryError.name !== 'AbortError') setPlaybackError(true);
+            if (retryError.name === 'AbortError') return;
+            setIsLoading(false);
+            if (retryError.name !== 'NotAllowedError' && video.error) {
+              setPlaybackError(true);
+            }
           });
           return;
         }
-        setPlaybackError(true);
+        setIsLoading(false);
+        if (error.name !== 'NotAllowedError' && video.error) {
+          setPlaybackError(true);
+        }
       });
     } else {
       video.pause();
@@ -583,6 +604,8 @@ export default function HlsVideo({
     persistPlaybackPositionRef.current = persistPlaybackPosition;
     const handlePlaying = () => {
       setIsPlaying(true);
+      setIsLoading(false);
+      setPlaybackError(false);
       if (playbackId) dispatch(activateVideo(playbackId));
     };
     const handleStopped = () => {
@@ -601,6 +624,17 @@ export default function HlsVideo({
         lastPlaybackTimeRef.current = video.currentTime;
       }
       persistPlaybackPosition(true);
+    };
+    const handleLoading = () => {
+      if (!video.ended) setIsLoading(true);
+    };
+    const handlePlayable = () => {
+      if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+        setIsLoading(false);
+      }
+    };
+    const handleMediaError = () => {
+      setIsLoading(false);
     };
     const persistAudio = () => {
       // A browser-imposed autoplay fallback is not a user preference.
@@ -622,6 +656,12 @@ export default function HlsVideo({
     video.addEventListener('ended', handleStopped);
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('seeked', handleSeeked);
+    video.addEventListener('loadstart', handleLoading);
+    video.addEventListener('waiting', handleLoading);
+    video.addEventListener('stalled', handleLoading);
+    video.addEventListener('seeking', handleLoading);
+    video.addEventListener('canplay', handlePlayable);
+    video.addEventListener('error', handleMediaError);
     video.addEventListener('volumechange', persistAudio);
     window.addEventListener('pagehide', handleStopped);
 
@@ -633,6 +673,12 @@ export default function HlsVideo({
       video.removeEventListener('ended', handleStopped);
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('seeked', handleSeeked);
+      video.removeEventListener('loadstart', handleLoading);
+      video.removeEventListener('waiting', handleLoading);
+      video.removeEventListener('stalled', handleLoading);
+      video.removeEventListener('seeking', handleLoading);
+      video.removeEventListener('canplay', handlePlayable);
+      video.removeEventListener('error', handleMediaError);
       video.removeEventListener('volumechange', persistAudio);
       window.removeEventListener('pagehide', handleStopped);
       if (playbackId) dispatch(clearActiveVideo(playbackId));
@@ -646,13 +692,18 @@ export default function HlsVideo({
 
   const handlePlay = () => {
     setPlaybackError(false);
+    setIsLoading(true);
     if (!active) {
       onActivate?.();
       return;
     }
 
-    void videoRef.current?.play().catch(() => {
-      setPlaybackError(true);
+    const video = videoRef.current;
+    void video?.play().catch((error: DOMException) => {
+      setIsLoading(false);
+      if (error.name !== 'AbortError' && error.name !== 'NotAllowedError' && video.error) {
+        setPlaybackError(true);
+      }
     });
   };
 
@@ -666,7 +717,14 @@ export default function HlsVideo({
     const video = videoRef.current;
     if (!video) return;
     if (video.paused || video.ended) {
-      void video.play().catch(() => setPlaybackError(true));
+      setPlaybackError(false);
+      setIsLoading(true);
+      void video.play().catch((error: DOMException) => {
+        setIsLoading(false);
+        if (error.name !== 'AbortError' && error.name !== 'NotAllowedError' && video.error) {
+          setPlaybackError(true);
+        }
+      });
     } else {
       video.pause();
     }
@@ -728,6 +786,11 @@ export default function HlsVideo({
             <path d="M8 5.5v13l10-6.5-10-6.5Z" />
           </svg>
         </button>
+      )}
+      {isLoading && !playbackError && (
+        <div className="hls-video-loading" role="status" aria-label={loadingLabel}>
+          <span className="hls-video-loading-spinner" aria-hidden="true" />
+        </div>
       )}
       {playbackError && (
         <div className="hls-video-error" role="alert">

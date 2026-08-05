@@ -1542,6 +1542,7 @@ function VideoWatch({
                 toggleOnSurfaceClick
                 onVideoElement={setMedia}
                 errorLabel={t('video.player.error')}
+                loadingLabel={t('video.player.loading')}
                 onViewQualified={() => {
                   void onViewQualified(video.id).then((counted) => {
                     if (!counted) return;

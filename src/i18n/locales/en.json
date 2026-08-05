@@ -476,6 +476,7 @@
     },
     "player": {
       "error": "Unable to play this video.",
+      "loading": "Loading video",
       "failed": "Video processing failed.",
       "processing": "Processing video {{progress}}%",
       "progress": "Video progress",

@@ -1791,6 +1791,26 @@
   object-fit: cover;
 }
 
+.video-watch-player .hls-video-loading {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: rgba(8, 11, 10, 0.18);
+}
+
+.video-watch-player .hls-video-loading-spinner {
+  width: 4.2rem;
+  aspect-ratio: 1;
+  border: 0.3rem solid rgba(255, 255, 255, 0.32);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: video-processing-spin 0.78s linear infinite;
+  filter: drop-shadow(0 0.2rem 0.8rem rgba(0, 0, 0, 0.35));
+}
+
 .video-processing-player {
   position: relative;
   display: grid;
