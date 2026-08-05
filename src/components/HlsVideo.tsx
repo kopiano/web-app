@@ -671,9 +671,9 @@ export default function HlsVideo({
     const handleLoading = (event: Event) => {
       if (video.ended) return;
       const isActuallyBuffering = (
-        video.paused
-        || video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA
+        event.type === 'loadstart'
         || event.type === 'seeking'
+        || (!video.paused && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA)
       );
       if (isActuallyBuffering) setIsLoading(true);
     };
