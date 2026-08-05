@@ -296,9 +296,15 @@ function versionedVideoPoster(video: VideoApiItem) {
   // before processing finishes. Keep the image visible while the card is
   // still processing instead of replacing it with an empty placeholder.
   if (!video.coverUrl) return '';
-  // Do not include processing progress in the URL. Progress updates happen
-  // frequently and would make the browser download the same cover repeatedly.
+  if (video.status === 'uploading' || video.status === 'processing') {
+    const separator = video.coverUrl.includes('?') ? '&' : '?';
+    return `${video.coverUrl}${separator}poster_refresh=${video.processingProgress}`;
+  }
   return video.coverUrl;
+}
+
+function isUploadedVideoCover(url: string) {
+  return /\/cover\.webp(?:[?#]|$)/i.test(url);
 }
 
 function toCardVideo(
@@ -486,6 +492,14 @@ const VideoCard = memo(function VideoCard({
 }) {
   const isProcessing = video.status === 'uploading' || video.status === 'processing';
   const [posterLoaded, setPosterLoaded] = useState(false);
+  const [posterRetry, setPosterRetry] = useState(0);
+  const posterSource = video.poster
+    ? `${video.poster}${video.poster.includes('?') ? '&' : '?'}retry=${posterRetry}`
+    : '';
+  useEffect(() => {
+    setPosterLoaded(false);
+    setPosterRetry(0);
+  }, [video.id, video.poster]);
   const posterRef = useCallback((image: HTMLImageElement | null) => {
     if (image?.complete && image.naturalWidth > 0) setPosterLoaded(true);
   }, []);
@@ -504,13 +518,18 @@ const VideoCard = memo(function VideoCard({
         {video.poster && (
           <img
             ref={posterRef}
-            src={video.poster}
+            src={posterSource}
             alt=""
             loading={priority ? 'eager' : 'lazy'}
             decoding={priority ? 'sync' : 'async'}
             fetchPriority={priority ? 'high' : 'low'}
             className={posterLoaded ? 'is-loaded' : undefined}
             onLoad={() => setPosterLoaded(true)}
+            onError={() => {
+              if (!posterLoaded && posterRetry < 2) {
+                window.setTimeout(() => setPosterRetry((value) => value + 1), 1000);
+              }
+            }}
           />
         )}
         <span className="video-quality">{video.resolution}</span>
@@ -2175,15 +2194,17 @@ export default function VideoConnected() {
         return {
           ...pending,
           ...current,
-          // Keep the cover already returned by the publish response when a
-          // transient polling response is missing cover_url.
-          coverUrl: current.coverUrl || pending.coverUrl,
+          // Preserve a user-uploaded cover when polling briefly returns the
+          // generated poster URL.
+          coverUrl: isUploadedVideoCover(pending.coverUrl)
+            ? pending.coverUrl
+            : current.coverUrl || pending.coverUrl,
           title: current.title || pending.title,
           username: current.username || pending.username,
           avatar: current.avatar || pending.avatar,
         };
       })
-      .filter((video) => video.status !== 'failed'),
+      .filter((video) => video.status === 'uploading' || video.status === 'processing'),
     [publishedProcessingQuery.data, publishedProcessingVideos],
   );
   const homeVideos = useMemo(
@@ -2272,6 +2293,14 @@ export default function VideoConnected() {
     useMockData,
     videoOverrides,
   ]);
+  const processingVideoIds = useMemo(
+    () => new Set(processingPlaylistVideos.map((video) => video.id)),
+    [processingPlaylistVideos],
+  );
+  const visiblePlaylistVideos = useMemo(
+    () => playlistVideos.filter((video) => !processingVideoIds.has(video.id)),
+    [playlistVideos, processingVideoIds],
+  );
   useEffect(() => {
     if (
       activeView !== 'playlist'
@@ -3972,7 +4001,7 @@ export default function VideoConnected() {
               <section className="video-section video-playlist-section">
                 {!currentUser ? (
                   <div className="video-empty">{t('video.authRequired')}</div>
-                ) : playlistVideos.length > 0 || processingPlaylistVideos.length > 0 ? (
+                ) : visiblePlaylistVideos.length > 0 || processingPlaylistVideos.length > 0 ? (
                   <>
                     {processingPlaylistVideos.length > 0 && (
                       <div className="video-playlist-grid">
@@ -3982,7 +4011,7 @@ export default function VideoConnected() {
                       </div>
                     )}
                     <div className="video-playlist-grid">
-                      {playlistVideos.map((video, index) => (
+                      {visiblePlaylistVideos.map((video, index) => (
                         <VideoCard
                           key={video.id}
                           video={video}

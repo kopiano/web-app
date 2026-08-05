@@ -47,7 +47,7 @@ function normalizeCategory(category) {
 
 function normalizeFeaturedVideo(video) {
   return {
-    coverUrl: resolveAssetUrl(video.cover_url),
+    coverUrl: resolveAssetUrl(video.cover_url || video.poster_url || video.poster),
     duration: Number(video.duration) || 0,
     width: video.width == null ? null : Number(video.width),
     height: video.height == null ? null : Number(video.height),
@@ -67,7 +67,7 @@ function normalizeVideo(video) {
     avatar: resolveAssetUrl(video.avatar),
     title: String(video.title || ''),
     description: String(video.description || ''),
-    coverUrl: resolveAssetUrl(video.cover_url),
+    coverUrl: resolveAssetUrl(video.cover_url || video.poster_url || video.poster || video.poster_webp),
     duration: Number(video.duration) || 0,
     width: video.width == null ? null : Number(video.width),
     height: video.height == null ? null : Number(video.height),
