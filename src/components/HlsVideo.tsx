@@ -11,6 +11,7 @@ import {
 
 const VIDEO_AUDIO_STORAGE_KEY = 'lume-video-audio-v1';
 const VIDEO_VIEW_QUALIFICATION_MS = 3_000;
+const VIDEO_STARTUP_FALLBACK_MS = 3_000;
 
 interface NavigatorWithUserAgentData extends Navigator {
   userAgentData?: {
@@ -222,20 +223,26 @@ export default function HlsVideo({
     applyStoredVideoAudio(video);
     playbackReadyRef.current = false;
 
-    const restorePlaybackPosition = () => {
-      if (!playbackStorageKey || !Number.isFinite(video.duration) || video.duration <= 0) return;
+    const readSavedPlaybackPosition = () => {
+      if (!playbackStorageKey) return -1;
       try {
         const saved = Number(window.localStorage.getItem(playbackStorageKey));
-        if (Number.isFinite(saved) && saved > 0 && saved < video.duration - 3) {
-          video.currentTime = saved;
-          lastPlaybackTimeRef.current = saved;
-        }
+        return Number.isFinite(saved) && saved > 0 ? saved : -1;
       } catch {
-        // Playback persistence is optional when storage is unavailable.
+        return -1;
+      }
+    };
+    const savedPlaybackPosition = readSavedPlaybackPosition();
+    const restorePlaybackPosition = () => {
+      if (!playbackStorageKey || !Number.isFinite(video.duration) || video.duration <= 0) return;
+      if (savedPlaybackPosition > 0 && savedPlaybackPosition < video.duration - 3) {
+        video.currentTime = savedPlaybackPosition;
+        lastPlaybackTimeRef.current = savedPlaybackPosition;
       }
     };
     const startPlayback = () => {
       if (!autoPlayRef.current && !resumeAfterInterruptionRef.current) return;
+      if (!video.currentSrc || video.readyState < HTMLMediaElement.HAVE_METADATA) return;
       resumeAfterInterruptionRef.current = false;
       void video.play().catch((error: DOMException) => {
         if (error.name === 'AbortError') return;
@@ -295,6 +302,7 @@ export default function HlsVideo({
     let mediaRetryCount = 0;
     let startupFallbackTimer: number | undefined;
     let hasStartedPlayback = false;
+    let startupHasProgress = false;
     let stalledRecoveryTimer: number | undefined;
     let lastStalledRecoveryAt = 0;
     let handleHlsLoadedMetadata: (() => void) | null = null;
@@ -386,6 +394,7 @@ export default function HlsVideo({
       hls = new Hls({
         autoStartLoad: true,
         enableWorker: true,
+        startPosition: savedPlaybackPosition,
         // Keep enough VOD data to absorb normal jitter without allowing one
         // player to consume the connection and memory needed by other views.
         lowLatencyMode: false,
@@ -416,14 +425,16 @@ export default function HlsVideo({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         networkRetryCount = 0;
         mediaRetryCount = 0;
-        restorePlaybackPosition();
         playbackReadyRef.current = true;
+        startPlayback();
       });
       hls.on(Hls.Events.FRAG_LOADED, () => {
+        startupHasProgress = true;
         networkRetryCount = 0;
         mediaRetryCount = 0;
       });
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        startupHasProgress = true;
         startPlayback();
       });
       markStarted = () => {
@@ -431,16 +442,19 @@ export default function HlsVideo({
         clearStartupFallbackTimer();
       };
       video.addEventListener('playing', markStarted, { once: true });
-      startPlayback();
       // Do not leave the user on an endless spinner when the manifest or
       // first fragment is unavailable. The original file is a valid VOD
       // fallback and can usually start independently of HLS.
       if (fallbackSrc) {
         startupFallbackTimer = window.setTimeout(() => {
-          if (!hasStartedPlayback) {
+          if (
+            !hasStartedPlayback
+            && !startupHasProgress
+            && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA
+          ) {
             switchToFallback();
           }
-        }, 2_500);
+        }, VIDEO_STARTUP_FALLBACK_MS);
       }
       recoverStalledBuffer = () => {
         if (disposed || !hls || video.ended) return;
@@ -523,6 +537,7 @@ export default function HlsVideo({
     if (!video || !shouldAttachMedia) return;
 
     if (autoPlay) {
+      if (!video.currentSrc || video.readyState < HTMLMediaElement.HAVE_METADATA) return;
       void video.play().catch((error: DOMException) => {
         if (error.name === 'AbortError') return;
         if (!video.muted && autoplayFallbackAvailableRef.current) {

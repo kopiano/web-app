@@ -428,6 +428,27 @@ function preloadImage(src: string) {
   });
 }
 
+const preparedVideoOrigins = new Set<string>();
+
+function prepareVideoOrigin(src: string) {
+  if (!src) return;
+  try {
+    const origin = new URL(src, window.location.href).origin;
+    if (origin === window.location.origin || preparedVideoOrigins.has(origin)) return;
+    preparedVideoOrigins.add(origin);
+
+    for (const rel of ['dns-prefetch', 'preconnect']) {
+      const link = document.createElement('link');
+      link.rel = rel;
+      link.href = origin;
+      if (rel === 'preconnect') link.crossOrigin = 'anonymous';
+      document.head.appendChild(link);
+    }
+  } catch {
+    // Invalid media URLs are handled by the player.
+  }
+}
+
 function CategoryNav({
   active,
   categories,
@@ -2766,6 +2787,7 @@ export default function VideoConnected() {
 
   const prepareVideo = useCallback((video: CardVideo) => {
     if (isMockVideoId(video.id)) return;
+    prepareVideoOrigin(video.src || video.raw.originFileUrl);
     void queryClient.prefetchQuery({
       queryKey: ['video', 'detail', video.id],
       queryFn: () => getVideo(video.id),
