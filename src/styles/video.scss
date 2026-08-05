@@ -1002,7 +1002,8 @@
   display: flex;
   align-items: flex-start;
   gap: 1rem;
-  background: rgba(255,255,255,0.26);
+  // background: rgba(255,255,255,0.26);
+  background-color: #29292942;
   // border-top: 1px solid rgba(255, 255, 255, 0.7);
   -webkit-backdrop-filter: blur(9px);
   backdrop-filter: blur(9px);
