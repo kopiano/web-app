@@ -259,15 +259,28 @@ export default function HlsVideo({
     };
 
     const source = usingFallback && fallbackSrc ? fallbackSrc : src;
+    if (!source) {
+      setPlaybackError(true);
+      return;
+    }
     if (!source.toLowerCase().split(/[?#]/, 1)[0].endsWith('.m3u8')) {
+      const handleDirectPlaybackError = () => {
+        if (fallbackSrc && !usingFallback) {
+          setUsingFallback(true);
+          return;
+        }
+        setPlaybackError(true);
+      };
       video.src = source;
       video.load();
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
       video.addEventListener('canplay', startPlayback);
+      video.addEventListener('error', handleDirectPlaybackError);
       startPlayback();
       return () => {
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         video.removeEventListener('canplay', startPlayback);
+        video.removeEventListener('error', handleDirectPlaybackError);
         video.pause();
         video.removeAttribute('src');
         video.load();
@@ -317,7 +330,11 @@ export default function HlsVideo({
     const attachNativeHls = () => {
       if (disposed) return;
       if (!video.canPlayType('application/vnd.apple.mpegurl')) {
-        setPlaybackError(true);
+        if (fallbackSrc && !usingFallback) {
+          switchToFallback();
+        } else {
+          setPlaybackError(true);
+        }
         return;
       }
 
@@ -462,9 +479,13 @@ export default function HlsVideo({
             hls.recoverMediaError();
           }, Math.min(3_000, mediaRetryCount * 500));
         } else {
-          setPlaybackError(true);
-          hls.destroy();
-          hls = null;
+          if (fallbackSrc && !usingFallback) {
+            switchToFallback();
+          } else {
+            setPlaybackError(true);
+            hls.destroy();
+            hls = null;
+          }
         }
       });
     }
