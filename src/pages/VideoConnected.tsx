@@ -2947,6 +2947,50 @@ export default function VideoConnected() {
     );
   }, [queryClient]);
 
+  const updateCachedVideoReaction = useCallback((
+    videoId: string,
+    kind: 'like' | 'favorite',
+    active: boolean,
+    count: number,
+  ) => {
+    const activeKey = kind === 'like' ? 'liked' : 'favorited';
+    const countKey = kind === 'like' ? 'likeCount' : 'favoriteCount';
+    const updatePages = (data: InfiniteData<VideoPage, Cursor> | undefined) => {
+      if (!data) return data;
+      return {
+        ...data,
+        pages: data.pages.map((page) => ({
+          ...page,
+          items: page.items.map((item) => (
+            item.id === videoId
+              ? { ...item, [activeKey]: active, [countKey]: count }
+              : item
+          )),
+        })),
+      };
+    };
+
+    queryClient.setQueryData<VideoApiItem>(['video', 'detail', videoId], (item) => (
+      item ? { ...item, [activeKey]: active, [countKey]: count } : item
+    ));
+    queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+      { queryKey: ['video', 'home'] },
+      updatePages,
+    );
+    queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+      { queryKey: ['video', 'playlist'] },
+      updatePages,
+    );
+    queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+      { queryKey: ['video', 'collection'] },
+      updatePages,
+    );
+    queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
+      { queryKey: ['video', 'watch-playlist'] },
+      updatePages,
+    );
+  }, [queryClient]);
+
   const updateCachedVideo = useCallback((updated: VideoApiItem) => {
     const updatePages = (data: InfiniteData<VideoPage, Cursor> | undefined) => {
       if (!data) return data;
@@ -3727,10 +3771,31 @@ export default function VideoConnected() {
                 return;
               }
               try {
-                if (kind === 'like') await updateVideoLike(displayedWatchVideo.id, active);
-                else await updateVideoFavorite(displayedWatchVideo.id, active);
-                await invalidateVideoData(displayedWatchVideo.id);
+                const countKey = kind === 'like' ? 'likeCount' : 'favoriteCount';
+                const previousCount = displayedWatchVideo[countKey];
+                const optimisticCount = Math.max(0, previousCount + (active ? 1 : -1));
+                updateCachedVideoReaction(
+                  displayedWatchVideo.id,
+                  kind,
+                  active,
+                  optimisticCount,
+                );
+                const result = kind === 'like'
+                  ? await updateVideoLike(displayedWatchVideo.id, active)
+                  : await updateVideoFavorite(displayedWatchVideo.id, active);
+                updateCachedVideoReaction(displayedWatchVideo.id, kind, result.active, result.count);
+                dispatch(setVideoDetails({
+                  ...displayedWatchVideo.raw,
+                  [kind === 'like' ? 'liked' : 'favorited']: result.active,
+                  [kind === 'like' ? 'likeCount' : 'favoriteCount']: result.count,
+                }));
               } catch {
+                updateCachedVideoReaction(
+                  displayedWatchVideo.id,
+                  kind,
+                  displayedWatchVideo[kind === 'like' ? 'liked' : 'favorited'],
+                  displayedWatchVideo[kind === 'like' ? 'likeCount' : 'favoriteCount'],
+                );
                 notify(t('video.actionFailed'), 'error');
               }
             }}
@@ -3771,14 +3836,48 @@ export default function VideoConnected() {
                 return;
               }
               try {
-                await createVideoComment(displayedWatchVideo.id, {
+                const temporaryId = `pending-comment-${Date.now()}`;
+                const temporaryComment: VideoApiComment = {
+                  id: temporaryId,
+                  videoId: displayedWatchVideo.id,
+                  userId: currentUser.id,
+                  username: currentUserName,
+                  avatar: currentUserAvatar,
+                  parentId: target?.rootId ?? null,
+                  replyToUserId: target?.userId ?? null,
+                  replyToUsername: target?.username ?? null,
+                  content,
+                  likeCount: 0,
+                  liked: false,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                };
+                queryClient.setQueryData<VideoApiComment[]>(
+                  ['video', 'comments', displayedWatchVideo.id],
+                  (comments = []) => [...comments, temporaryComment],
+                );
+                const comment = await createVideoComment(displayedWatchVideo.id, {
                   content,
                   parentId: target?.rootId,
                   replyToUserId: target?.userId,
                 });
-                await queryClient.invalidateQueries({ queryKey: ['video', 'comments', displayedWatchVideo.id] });
-                await queryClient.invalidateQueries({ queryKey: ['video', 'detail', displayedWatchVideo.id] });
+                queryClient.setQueryData<VideoApiComment[]>(
+                  ['video', 'comments', displayedWatchVideo.id],
+                  (comments = []) => comments.map((item) => (
+                    item.id === temporaryId ? comment : item
+                  )),
+                );
+                queryClient.setQueryData<VideoApiItem>(
+                  ['video', 'detail', displayedWatchVideo.id],
+                  (item) => item
+                    ? { ...item, commentCount: item.commentCount + 1 }
+                    : item,
+                );
               } catch {
+                queryClient.setQueryData<VideoApiComment[]>(
+                  ['video', 'comments', displayedWatchVideo.id],
+                  (comments = []) => comments.filter((item) => !item.id.startsWith('pending-comment-')),
+                );
                 notify(t('video.comments.failed'), 'error');
               }
             }}
@@ -3800,8 +3899,15 @@ export default function VideoConnected() {
                 return;
               }
               try {
-                await updateVideoCommentLike(comment.id, active);
-                await queryClient.invalidateQueries({ queryKey: ['video', 'comments', displayedWatchVideo.id] });
+                const result = await updateVideoCommentLike(comment.id, active);
+                queryClient.setQueryData<VideoApiComment[]>(
+                  ['video', 'comments', displayedWatchVideo.id],
+                  (comments = []) => comments.map((item) => (
+                    item.id === comment.id
+                      ? { ...item, liked: result.liked, likeCount: result.likeCount }
+                      : item
+                  )),
+                );
               } catch {
                 notify(t('video.actionFailed'), 'error');
               }
