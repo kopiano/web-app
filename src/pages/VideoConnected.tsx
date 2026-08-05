@@ -27,6 +27,7 @@ import {
   ChevronRight,
   Clock3,
   Expand,
+  Film,
   FolderPlus,
   ListFilter,
   LockKeyhole,
@@ -525,15 +526,15 @@ const VideoCard = memo(function VideoCard({
   const isProcessing = video.status === 'uploading' || video.status === 'processing';
   const [posterLoaded, setPosterLoaded] = useState(false);
   const [posterRetry, setPosterRetry] = useState(0);
+  const [posterFailed, setPosterFailed] = useState(false);
   const posterSource = video.poster
     ? `${video.poster}${video.poster.includes('?') ? '&' : '?'}retry=${posterRetry}`
     : '';
   useEffect(() => {
     setPosterRetry(0);
-  }, [video.id]);
-  useEffect(() => {
-    if (video.poster) setPosterLoaded(true);
-  }, [video.poster]);
+    setPosterFailed(false);
+    setPosterLoaded(false);
+  }, [video.id, video.poster]);
   const posterRef = useCallback((image: HTMLImageElement | null) => {
     if (image?.complete && image.naturalWidth > 0) setPosterLoaded(true);
   }, []);
@@ -549,7 +550,7 @@ const VideoCard = memo(function VideoCard({
         onFocus={() => onPrepare?.(video)}
         onClick={() => onPlay(video)}
       >
-        {video.poster && (
+        {video.poster && !posterFailed && (
           <img
             ref={posterRef}
             src={posterSource}
@@ -562,9 +563,16 @@ const VideoCard = memo(function VideoCard({
             onError={() => {
               if (posterRetry < 2) {
                 window.setTimeout(() => setPosterRetry((value) => value + 1), 1000);
+              } else {
+                setPosterFailed(true);
               }
             }}
           />
+        )}
+        {(!video.poster || posterFailed) && (
+          <span className="video-tile-poster-placeholder" aria-hidden="true">
+            <Film size={24} />
+          </span>
         )}
         <span className="video-quality">{video.resolution}</span>
         {variant !== 'playlist' && (
@@ -1834,7 +1842,20 @@ function VideoWatch({
               >
                 <span className="video-watch-queue-index">{index + 1}</span>
                 <span className="video-watch-queue-poster">
-                  <img src={item.poster} alt="" {...lazyImageProps()} />
+                  {item.poster ? (
+                    <img
+                      src={item.poster}
+                      alt=""
+                      {...lazyImageProps()}
+                      onError={(event) => {
+                        event.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <span className="video-watch-queue-poster-placeholder" aria-hidden="true">
+                      <Film size={18} />
+                    </span>
+                  )}
                   <small>{item.duration}</small>
                 </span>
                 <span className="video-watch-queue-copy">

@@ -441,14 +441,14 @@ export default function HlsVideo({
         // player to consume the connection and memory needed by other views.
         lowLatencyMode: false,
         startFragPrefetch: true,
-        startLevel: 0,
+        // Use the highest rendition from the master playlist. The video
+        // player must not silently downgrade the source quality.
+        startLevel: -1,
         // Start playback as soon as the first playable fragment is buffered.
         // The player can continue filling its VOD buffer in the background.
         maxStarvationDelay: 1,
         maxLoadingDelay: 2,
-        capLevelToPlayerSize: true,
-        abrBandWidthFactor: 0.7,
-        abrBandWidthUpFactor: 0.6,
+        capLevelToPlayerSize: false,
         maxBufferLength: 12,
         maxMaxBufferLength: 24,
         maxBufferSize: 48 * 1024 * 1024,
@@ -468,6 +468,12 @@ export default function HlsVideo({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         networkRetryCount = 0;
         mediaRetryCount = 0;
+        // Lock playback to the highest rendition advertised by the source.
+        // `currentLevel` is intentionally set after the manifest is parsed,
+        // because the available level count is unknown before then.
+        if (hls && hls.levels.length > 0) {
+          hls.currentLevel = hls.levels.length - 1;
+        }
         playbackReadyRef.current = true;
         startPlayback();
       });

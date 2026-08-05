@@ -841,6 +841,15 @@
   visibility: visible;
 }
 
+.video-tile-poster-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(40, 48, 44, 0.58);
+  background: linear-gradient(135deg, #d8ddda, #bcc5bf);
+}
+
 .video-tile-preview {
   position: absolute;
   z-index: 1;
@@ -3418,6 +3427,15 @@
   display: block;
   object-fit: cover;
   transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.video-watch-queue-poster-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: rgba(40, 48, 44, 0.58);
+  background: linear-gradient(135deg, #d8ddda, #bcc5bf);
 }
 
 .video-watch-queue-list > button:hover .video-watch-queue-poster img {
