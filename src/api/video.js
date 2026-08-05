@@ -47,7 +47,9 @@ function normalizeCategory(category) {
 
 function normalizeFeaturedVideo(video) {
   return {
-    coverUrl: resolveAssetUrl(video.cover_url || video.poster_url || video.poster),
+    coverUrl: resolveAssetUrl(
+      video.poster_webp || video.poster_url || video.poster || video.cover_url,
+    ),
     duration: Number(video.duration) || 0,
     width: video.width == null ? null : Number(video.width),
     height: video.height == null ? null : Number(video.height),
@@ -60,6 +62,10 @@ function normalizeFeaturedVideo(video) {
   }
 }
 function normalizeVideo(video) {
+  // Processing videos expose the generated poster.webp independently from an
+  // optional uploaded cover. Prefer the generated poster so the processing
+  // thumbnail is not replaced by an empty or stale cover_url.
+  const posterUrl = video.poster_webp || video.poster_url || video.poster || video.cover_url;
   return {
     id: String(video.id),
     userId: String(video.user_id),
@@ -67,7 +73,7 @@ function normalizeVideo(video) {
     avatar: resolveAssetUrl(video.avatar),
     title: String(video.title || ''),
     description: String(video.description || ''),
-    coverUrl: resolveAssetUrl(video.cover_url || video.poster_url || video.poster || video.poster_webp),
+    coverUrl: resolveAssetUrl(posterUrl),
     duration: Number(video.duration) || 0,
     width: video.width == null ? null : Number(video.width),
     height: video.height == null ? null : Number(video.height),

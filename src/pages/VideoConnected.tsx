@@ -2198,28 +2198,6 @@ export default function VideoConnected() {
     ].filter(Boolean).join('-');
     return `${coverUrl}${separator}preview=${encodeURIComponent(revision)}`;
   }, [uploadCoverUrl, uploadStatusQuery.data]);
-  const publishedProcessingQuery = useQuery({
-    queryKey: ['video', 'published-processing', publishedProcessingVideos.map((video) => video.id)],
-    queryFn: () => getVideos({
-      limit: 50,
-      scope: 'accessible',
-      _video_refresh: Date.now(),
-    }),
-    enabled: publishedProcessingVideos.length > 0,
-    refetchOnMount: 'always',
-    refetchInterval: (query) => {
-      if (publishedProcessingVideos.length === 0) return false;
-      const items = query.state.data?.items;
-      if (!items) return 800;
-      return publishedProcessingVideos.some((pending) => {
-        const current = items.find((video) => video.id === pending.id);
-        return !current || current.status === 'uploading' || current.status === 'processing';
-      })
-        ? 800
-        : false;
-    },
-  });
-
   const homeSourceItems = useMemo(
     () => homeQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [homeQuery.data],
@@ -2268,28 +2246,8 @@ export default function VideoConnected() {
       : collectionsQuery.data ?? [];
   const processingVideos = useMemo(
     () => publishedProcessingVideos
-      .map((pending) => {
-        const current = publishedProcessingQuery.data?.items.find((video) => video.id === pending.id);
-        if (!current) return pending;
-        return {
-          ...pending,
-          ...current,
-          // Preserve a user-uploaded cover when polling briefly returns the
-          // generated poster URL.
-          coverUrl: isUploadedVideoCover(pending.coverUrl)
-            ? pending.coverUrl
-            : current.coverUrl || pending.coverUrl,
-          processingProgress: Math.max(
-            pending.processingProgress,
-            current.processingProgress,
-          ),
-          title: current.title || pending.title,
-          username: current.username || pending.username,
-          avatar: current.avatar || pending.avatar,
-        };
-      })
       .filter((video) => video.status === 'uploading' || video.status === 'processing'),
-    [publishedProcessingQuery.data, publishedProcessingVideos],
+    [publishedProcessingVideos],
   );
   const homeVideos = useMemo(
     () => (useMockData ? effectiveMockItems : realHomeItems)
@@ -2798,17 +2756,12 @@ export default function VideoConnected() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const refreshPlaylistAfterPublish = useCallback(async () => {
+  const finishPublish = useCallback(() => {
     setSearchParams(new URLSearchParams({ view: 'playlist' }));
     setActiveCategory('all');
     setSearch('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    await queryClient.invalidateQueries({ queryKey: ['video', 'playlist'] });
-    await queryClient.refetchQueries({
-      queryKey: ['video', 'playlist'],
-      type: 'active',
-    });
-  }, [queryClient, setSearchParams]);
+  }, [setSearchParams]);
 
   const openVideo = useCallback((video: CardVideo) => {
     if (!isMockVideoId(video.id) && video.raw.hlsMasterUrl) {
@@ -3147,7 +3100,11 @@ export default function VideoConnected() {
         queryClient.setQueryData<VideoApiItem>(
           ['video', 'detail', videoId],
           item => item
-            ? { ...item, status, processingProgress: progress }
+            ? {
+              ...item,
+              status,
+              processingProgress: Math.max(item.processingProgress, progress),
+            }
             : item,
         );
         queryClient.setQueriesData<InfiniteData<VideoPage, Cursor>>(
@@ -3158,7 +3115,11 @@ export default function VideoConnected() {
               ...page,
               items: page.items.map(item => (
                 item.id === videoId
-                  ? { ...item, status, processingProgress: progress }
+                  ? {
+                    ...item,
+                    status,
+                    processingProgress: Math.max(item.processingProgress, progress),
+                  }
                   : item
               )),
             })),
@@ -3172,7 +3133,11 @@ export default function VideoConnected() {
               ...page,
               items: page.items.map(item => (
                 item.id === videoId
-                  ? { ...item, status, processingProgress: progress }
+                  ? {
+                    ...item,
+                    status,
+                    processingProgress: Math.max(item.processingProgress, progress),
+                  }
                   : item
               )),
             })),
@@ -3186,7 +3151,11 @@ export default function VideoConnected() {
               ...page,
               items: page.items.map(item => (
                 item.id === videoId
-                  ? { ...item, status, processingProgress: progress }
+                  ? {
+                    ...item,
+                    status,
+                    processingProgress: Math.max(item.processingProgress, progress),
+                  }
                   : item
               )),
             })),
@@ -3558,23 +3527,19 @@ export default function VideoConnected() {
     const poll = async () => {
       try {
         const updated = await getVideo(videoId);
+        updateCachedVideo(updated);
         setPublishedProcessingVideos((current) => current
-          .map((item) => {
-            if (item.id !== videoId) return item;
-            return {
+          .map((item) => item.id === videoId
+            ? {
               ...item,
               ...updated,
               coverUrl: isUploadedVideoCover(item.coverUrl)
                 ? item.coverUrl
                 : updated.coverUrl || item.coverUrl,
-              processingProgress: Math.max(
-                item.processingProgress,
-                updated.processingProgress,
-              ),
-            };
-          })
+              processingProgress: Math.max(item.processingProgress, updated.processingProgress),
+            }
+            : item)
           .filter((item) => item.status === 'uploading' || item.status === 'processing'));
-        updateCachedVideo(updated);
         if (updated.status === 'ready' || updated.status === 'failed') {
           if (publishedVideoPollingRef.current !== null) {
             window.clearInterval(publishedVideoPollingRef.current);
@@ -3678,7 +3643,7 @@ export default function VideoConnected() {
       ]);
       notify(t('video.upload.published'), 'success');
       closeUpload();
-      await refreshPlaylistAfterPublish();
+      finishPublish();
     } catch (error) {
       if (session !== uploadSessionRef.current) return;
       uploadPublishRequestedRef.current = false;
@@ -3722,7 +3687,7 @@ export default function VideoConnected() {
             ...current.filter((video) => video.id !== finalVideo.id),
           ]);
           closeUpload();
-          await refreshPlaylistAfterPublish();
+          finishPublish();
           notify(t('video.upload.published'), 'success');
         } catch (error) {
           const status = (error as ApiRequestError).response?.status;
@@ -3746,24 +3711,12 @@ export default function VideoConnected() {
     }
   }, [
     queryClient,
-    refreshPlaylistAfterPublish,
+    finishPublish,
     updateCachedVideo,
     uploadPublishRequested,
     uploadCoverFile,
     uploadStatusQuery.data,
     uploadVideoId,
-  ]);
-
-  useEffect(() => {
-    const currentItems = publishedProcessingQuery.data?.items ?? [];
-    currentItems
-      .filter((video) => publishedProcessingVideos.some((pending) => pending.id === video.id))
-      .forEach((video) => updateCachedVideo(video));
-
-  }, [
-    publishedProcessingQuery.data,
-    publishedProcessingVideos,
-    updateCachedVideo,
   ]);
 
   const openUpload = () => {

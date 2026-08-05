@@ -52,13 +52,15 @@ export function resolveChatAvatarUrl(
 
 export function resolveAssetUrl(asset?: string | null): string {
   if (!asset) return '';
-  if (/^(?:data:|blob:|https?:)/i.test(asset)) return asset;
+  const normalizedAsset = String(asset).trim();
+  if (!normalizedAsset) return '';
+  if (/^(?:data:|blob:|https?:)/i.test(normalizedAsset)) return normalizedAsset;
 
   const apiUrl = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 
   try {
-    return new URL(asset, new URL(apiUrl).origin).toString();
+    return new URL(normalizedAsset, new URL(apiUrl).origin).toString();
   } catch {
-    return asset;
+    return normalizedAsset;
   }
 }
