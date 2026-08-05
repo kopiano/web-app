@@ -298,7 +298,8 @@ function versionedVideoPoster(video: VideoApiItem) {
   if (!video.coverUrl) return '';
   if (video.status === 'uploading' || video.status === 'processing') {
     const separator = video.coverUrl.includes('?') ? '&' : '?';
-    return `${video.coverUrl}${separator}poster_refresh=${video.processingProgress}`;
+    const revision = video.updatedAt || video.status;
+    return `${video.coverUrl}${separator}poster_refresh=${encodeURIComponent(revision)}`;
   }
   return video.coverUrl;
 }
@@ -497,9 +498,11 @@ const VideoCard = memo(function VideoCard({
     ? `${video.poster}${video.poster.includes('?') ? '&' : '?'}retry=${posterRetry}`
     : '';
   useEffect(() => {
-    setPosterLoaded(false);
     setPosterRetry(0);
-  }, [video.id, video.poster]);
+  }, [video.id]);
+  useEffect(() => {
+    if (video.poster) setPosterLoaded(true);
+  }, [video.poster]);
   const posterRef = useCallback((image: HTMLImageElement | null) => {
     if (image?.complete && image.naturalWidth > 0) setPosterLoaded(true);
   }, []);
@@ -526,7 +529,7 @@ const VideoCard = memo(function VideoCard({
             className={posterLoaded ? 'is-loaded' : undefined}
             onLoad={() => setPosterLoaded(true)}
             onError={() => {
-              if (!posterLoaded && posterRetry < 2) {
+              if (posterRetry < 2) {
                 window.setTimeout(() => setPosterRetry((value) => value + 1), 1000);
               }
             }}
@@ -2199,6 +2202,10 @@ export default function VideoConnected() {
           coverUrl: isUploadedVideoCover(pending.coverUrl)
             ? pending.coverUrl
             : current.coverUrl || pending.coverUrl,
+          processingProgress: Math.max(
+            pending.processingProgress,
+            current.processingProgress,
+          ),
           title: current.title || pending.title,
           username: current.username || pending.username,
           avatar: current.avatar || pending.avatar,
@@ -2960,7 +2967,7 @@ export default function VideoConnected() {
         const videoId = String(message.video_id || '');
         if (!videoId) return;
         const progress = Math.max(0, Math.min(100, Number(message.progress) || 0));
-        const status = message.status === 'uploading'
+        const status: VideoApiItem['status'] | null = message.status === 'uploading'
           || message.status === 'processing'
           || message.status === 'ready'
           || message.status === 'failed'
@@ -2968,6 +2975,14 @@ export default function VideoConnected() {
           : null;
         if (!status) return;
 
+        setPublishedProcessingVideos(current => current.map(item => {
+          if (item.id !== videoId) return item;
+          return {
+            ...item,
+            status,
+            processingProgress: Math.max(item.processingProgress, progress),
+          };
+        }));
         queryClient.setQueryData<VideoApiItem>(
           ['video', 'detail', videoId],
           item => item
@@ -3382,6 +3397,22 @@ export default function VideoConnected() {
     const poll = async () => {
       try {
         const updated = await getVideo(videoId);
+        setPublishedProcessingVideos((current) => current
+          .map((item) => {
+            if (item.id !== videoId) return item;
+            return {
+              ...item,
+              ...updated,
+              coverUrl: isUploadedVideoCover(item.coverUrl)
+                ? item.coverUrl
+                : updated.coverUrl || item.coverUrl,
+              processingProgress: Math.max(
+                item.processingProgress,
+                updated.processingProgress,
+              ),
+            };
+          })
+          .filter((item) => item.status === 'uploading' || item.status === 'processing'));
         updateCachedVideo(updated);
         if (updated.status === 'ready' || updated.status === 'failed') {
           if (publishedVideoPollingRef.current !== null) {
@@ -4003,14 +4034,10 @@ export default function VideoConnected() {
                   <div className="video-empty">{t('video.authRequired')}</div>
                 ) : visiblePlaylistVideos.length > 0 || processingPlaylistVideos.length > 0 ? (
                   <>
-                    {processingPlaylistVideos.length > 0 && (
-                      <div className="video-playlist-grid">
-                        {processingPlaylistVideos.map((video) => (
-                          <ProcessingVideoCard key={video.id} video={video} onPlay={openVideo} />
-                        ))}
-                      </div>
-                    )}
                     <div className="video-playlist-grid">
+                      {processingPlaylistVideos.map((video) => (
+                        <ProcessingVideoCard key={video.id} video={video} onPlay={openVideo} />
+                      ))}
                       {visiblePlaylistVideos.map((video, index) => (
                         <VideoCard
                           key={video.id}
