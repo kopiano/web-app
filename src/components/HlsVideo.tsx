@@ -30,10 +30,13 @@ function isGoogleChromeBrowser() {
 }
 
 function configureAutoplayAudio(video: HTMLVideoElement) {
-  void isGoogleChromeBrowser();
   if (video.dataset.autoplayAudioConfigured === 'true') return;
-  video.defaultMuted = true;
-  video.muted = true;
+  // Chrome generally requires muted autoplay. Keep this as a fallback only;
+  // Safari should get a chance to autoplay with the user's stored preference.
+  if (isGoogleChromeBrowser()) {
+    video.defaultMuted = true;
+    video.muted = true;
+  }
   video.dataset.autoplayAudioConfigured = 'true';
 }
 
@@ -63,6 +66,7 @@ function applyStoredVideoAudio(video: HTMLVideoElement) {
 
 interface HlsVideoProps {
   src: string;
+  fallbackSrc?: string;
   poster?: string;
   className?: string;
   width?: number;
@@ -81,6 +85,7 @@ interface HlsVideoProps {
 
 export default function HlsVideo({
   src,
+  fallbackSrc,
   poster,
   className,
   width,
@@ -102,16 +107,21 @@ export default function HlsVideo({
   const autoPlayRef = useRef(autoPlay);
   const onViewQualifiedRef = useRef(onViewQualified);
   const resumeAfterInterruptionRef = useRef(false);
+  const autoplayFallbackAvailableRef = useRef(true);
+  const autoplayFallbackMutedRef = useRef(false);
   const lastPersistedSecondRef = useRef(-1);
   const playbackReadyRef = useRef(false);
   const lastPlaybackTimeRef = useRef(0);
   const persistPlaybackPositionRef = useRef<(force?: boolean) => void>(() => undefined);
   const [playbackError, setPlaybackError] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isInViewport, setIsInViewport] = useState(false);
   const hasDimensions = Boolean(width && height && width > 0 && height > 0);
   const aspectRatio = hasDimensions ? `${width} / ${height}` : '16 / 9';
-  const shouldAttachMedia = active && isInViewport;
+  // The watch page has only one active player. Attach it immediately instead
+  // of waiting for the observer callback, which can delay the first request.
+  const shouldAttachMedia = active && (isInViewport || Boolean(onVideoElement));
   const playbackStorageKey = playbackId ? `lume-video-progress:${playbackId}` : null;
   autoPlayRef.current = autoPlay;
   onViewQualifiedRef.current = onViewQualified;
@@ -226,9 +236,21 @@ export default function HlsVideo({
     };
     const startPlayback = () => {
       if (!autoPlayRef.current && !resumeAfterInterruptionRef.current) return;
-      configureAutoplayAudio(video);
       resumeAfterInterruptionRef.current = false;
-      void video.play().catch(() => undefined);
+      void video.play().catch((error: DOMException) => {
+        if (error.name === 'AbortError') return;
+        // Fall back to muted autoplay only when the browser blocks audio.
+        if (!video.muted && autoplayFallbackAvailableRef.current) {
+          autoplayFallbackAvailableRef.current = false;
+          autoplayFallbackMutedRef.current = true;
+          video.muted = true;
+          void video.play().catch((retryError: DOMException) => {
+            if (retryError.name !== 'AbortError') setPlaybackError(true);
+          });
+          return;
+        }
+        setPlaybackError(true);
+      });
     };
     const handleLoadedMetadata = () => {
       restorePlaybackPosition();
@@ -236,10 +258,13 @@ export default function HlsVideo({
       startPlayback();
     };
 
-    if (!src.toLowerCase().split(/[?#]/, 1)[0].endsWith('.m3u8')) {
-      video.src = src;
+    const source = usingFallback && fallbackSrc ? fallbackSrc : src;
+    if (!source.toLowerCase().split(/[?#]/, 1)[0].endsWith('.m3u8')) {
+      video.src = source;
+      video.load();
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
       video.addEventListener('canplay', startPlayback);
+      startPlayback();
       return () => {
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         video.removeEventListener('canplay', startPlayback);
@@ -255,10 +280,13 @@ export default function HlsVideo({
     let retryTimer: number | undefined;
     let networkRetryCount = 0;
     let mediaRetryCount = 0;
+    let startupFallbackTimer: number | undefined;
+    let hasStartedPlayback = false;
     let stalledRecoveryTimer: number | undefined;
     let lastStalledRecoveryAt = 0;
     let handleHlsLoadedMetadata: (() => void) | null = null;
     let recoverStalledBuffer: (() => void) | null = null;
+    let markStarted: (() => void) | null = null;
     const clearRetryTimer = () => {
       if (retryTimer !== undefined) {
         window.clearTimeout(retryTimer);
@@ -271,6 +299,21 @@ export default function HlsVideo({
         stalledRecoveryTimer = undefined;
       }
     };
+    const clearStartupFallbackTimer = () => {
+      if (startupFallbackTimer !== undefined) {
+        window.clearTimeout(startupFallbackTimer);
+        startupFallbackTimer = undefined;
+      }
+    };
+    const switchToFallback = () => {
+      if (disposed || !fallbackSrc || usingFallback) return false;
+      clearRetryTimer();
+      clearStartupFallbackTimer();
+      setUsingFallback(true);
+      hls?.destroy();
+      hls = null;
+      return true;
+    };
     const attachNativeHls = () => {
       if (disposed) return;
       if (!video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -279,7 +322,8 @@ export default function HlsVideo({
       }
 
       nativeHlsAttached = true;
-      video.src = src;
+      video.src = source;
+      video.load();
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
       video.addEventListener('canplay', startPlayback);
     };
@@ -328,8 +372,12 @@ export default function HlsVideo({
         // Keep enough VOD data to absorb normal jitter without allowing one
         // player to consume the connection and memory needed by other views.
         lowLatencyMode: false,
-        startFragPrefetch: false,
+        startFragPrefetch: true,
         startLevel: 0,
+        // Start playback as soon as the first playable fragment is buffered.
+        // The player can continue filling its VOD buffer in the background.
+        maxStarvationDelay: 1,
+        maxLoadingDelay: 2,
         capLevelToPlayerSize: true,
         abrBandWidthFactor: 0.7,
         abrBandWidthUpFactor: 0.6,
@@ -339,14 +387,14 @@ export default function HlsVideo({
         backBufferLength: 8,
         maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 2,
-        fragLoadingMaxRetry: 6,
-        fragLoadingRetryDelay: 500,
-        fragLoadingMaxRetryTimeout: 8000,
-        manifestLoadingMaxRetry: 4,
-        manifestLoadingRetryDelay: 500,
-        manifestLoadingMaxRetryTimeout: 8000,
+        fragLoadingMaxRetry: 3,
+        fragLoadingRetryDelay: 250,
+        fragLoadingMaxRetryTimeout: 4000,
+        manifestLoadingMaxRetry: 2,
+        manifestLoadingRetryDelay: 250,
+        manifestLoadingMaxRetryTimeout: 4000,
       });
-      hls.loadSource(src);
+      hls.loadSource(source);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         networkRetryCount = 0;
@@ -358,6 +406,25 @@ export default function HlsVideo({
         networkRetryCount = 0;
         mediaRetryCount = 0;
       });
+      hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        startPlayback();
+      });
+      markStarted = () => {
+        hasStartedPlayback = true;
+        clearStartupFallbackTimer();
+      };
+      video.addEventListener('playing', markStarted, { once: true });
+      startPlayback();
+      // Do not leave the user on an endless spinner when the manifest or
+      // first fragment is unavailable. The original file is a valid VOD
+      // fallback and can usually start independently of HLS.
+      if (fallbackSrc) {
+        startupFallbackTimer = window.setTimeout(() => {
+          if (!hasStartedPlayback) {
+            switchToFallback();
+          }
+        }, 2_500);
+      }
       recoverStalledBuffer = () => {
         if (disposed || !hls || video.ended) return;
         const now = performance.now();
@@ -379,12 +446,14 @@ export default function HlsVideo({
         if (!data.fatal || !hls) return;
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
           clearRetryTimer();
-          const delay = Math.min(10_000, 500 * (2 ** networkRetryCount));
+          const delay = Math.min(3_000, 250 * (2 ** networkRetryCount));
           networkRetryCount += 1;
+          if (fallbackSrc && networkRetryCount >= 2 && switchToFallback()) return;
           retryTimer = window.setTimeout(() => {
             if (!disposed && hls) hls.startLoad();
           }, delay);
         } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          if (fallbackSrc && mediaRetryCount >= 1 && switchToFallback()) return;
           clearRetryTimer();
           mediaRetryCount += 1;
           retryTimer = window.setTimeout(() => {
@@ -404,6 +473,7 @@ export default function HlsVideo({
       disposed = true;
       persistPlaybackPositionRef.current(true);
       clearRetryTimer();
+      clearStartupFallbackTimer();
       clearStalledRecoveryTimer();
       if (nativeHlsAttached) {
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
@@ -418,21 +488,33 @@ export default function HlsVideo({
         video.removeEventListener('waiting', recoverStalledBuffer);
         video.removeEventListener('stalled', recoverStalledBuffer);
       }
+      if (markStarted) video.removeEventListener('playing', markStarted);
       window.removeEventListener('online', handleOnline);
       hls?.destroy();
       video.pause();
       video.removeAttribute('src');
       video.load();
     };
-  }, [playbackStorageKey, shouldAttachMedia, src]);
+  }, [fallbackSrc, playbackStorageKey, shouldAttachMedia, src, usingFallback]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !shouldAttachMedia) return;
 
     if (autoPlay) {
-      configureAutoplayAudio(video);
-      void video.play().catch(() => undefined);
+      void video.play().catch((error: DOMException) => {
+        if (error.name === 'AbortError') return;
+        if (!video.muted && autoplayFallbackAvailableRef.current) {
+          autoplayFallbackAvailableRef.current = false;
+          autoplayFallbackMutedRef.current = true;
+          video.muted = true;
+          void video.play().catch((retryError: DOMException) => {
+            if (retryError.name !== 'AbortError') setPlaybackError(true);
+          });
+          return;
+        }
+        setPlaybackError(true);
+      });
     } else {
       video.pause();
     }
@@ -485,6 +567,11 @@ export default function HlsVideo({
       persistPlaybackPosition(true);
     };
     const persistAudio = () => {
+      // A browser-imposed autoplay fallback is not a user preference.
+      if (autoplayFallbackMutedRef.current) {
+        autoplayFallbackMutedRef.current = false;
+        return;
+      }
       try {
         window.localStorage.setItem(VIDEO_AUDIO_STORAGE_KEY, JSON.stringify({
           volume: video.volume,
@@ -581,7 +668,7 @@ export default function HlsVideo({
         controls={controls}
         playsInline
         muted
-        preload="metadata"
+        preload={autoPlay ? 'auto' : 'metadata'}
         poster={poster}
         className={className}
       />

@@ -6,3 +6,5 @@ run:
 	@pnpm run dev
 app:
 	@pnpm tauri dev
+preview:
+	@pnpm build --mode preview && pnpm preview

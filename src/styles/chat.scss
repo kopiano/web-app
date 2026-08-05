@@ -408,7 +408,8 @@ $chat-margin-left: 100px;
 }
 
 .contact-avatar.has-pro-frame {
-    // filter: drop-shadow(0 6px 10px rgba(50, 50, 50, 0.32));
+    filter: none;
+    -webkit-filter: none;
 }
 
 .avatar-img {
@@ -431,6 +432,8 @@ $chat-margin-left: 100px;
     pointer-events: none;
     user-select: none;
     transform: translate(-50%, -50%);
+    filter: drop-shadow(0 4px 8px rgba(50, 50, 50, 0.32));
+    -webkit-filter: drop-shadow(0 4px 8px rgba(50, 50, 50, 0.32));
 }
 
 .contact-online {

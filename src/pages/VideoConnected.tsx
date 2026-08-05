@@ -472,12 +472,14 @@ function CategoryNav({
 const VideoCard = memo(function VideoCard({
   video,
   onPlay,
+  onPrepare,
   onFavorite,
   priority = false,
   variant = 'playlist',
 }: {
   video: CardVideo;
   onPlay: (video: CardVideo) => void;
+  onPrepare?: (video: CardVideo) => void;
   onFavorite: (video: CardVideo) => void;
   priority?: boolean;
   variant?: 'playlist' | 'default';
@@ -491,7 +493,14 @@ const VideoCard = memo(function VideoCard({
     <article
       className={`video-tile is-${variant}${isProcessing ? ' is-processing' : ''}${video.status === 'failed' ? ' is-failed' : ''}`}
     >
-      <button type="button" className="video-tile-hit" onClick={() => onPlay(video)}>
+      <button
+        type="button"
+        className="video-tile-hit"
+        onPointerEnter={() => onPrepare?.(video)}
+        onPointerDown={() => onPrepare?.(video)}
+        onFocus={() => onPrepare?.(video)}
+        onClick={() => onPlay(video)}
+      >
         {video.poster && (
           <img
             ref={posterRef}
@@ -1481,6 +1490,7 @@ function VideoWatch({
               <HlsVideo
                 key={video.id}
                 src={video.src}
+                fallbackSrc={video.raw.originFileUrl}
                 poster={video.poster}
                 playbackId={video.id}
                 active
@@ -1998,10 +2008,12 @@ export default function VideoConnected() {
   const watchQuery = useQuery({
     queryKey: ['video', 'detail', requestedVideoId],
     queryFn: () => getVideo(requestedVideoId as string),
-    placeholderData: (previousData) => previousData,
     enabled: activeView === 'watch'
       && Boolean(requestedVideoId)
       && !isMockVideoId(requestedVideoId),
+    // The clicked card already contains the playable URL. Use it immediately
+    // and refresh the full detail only when the cache is stale.
+    staleTime: 60_000,
     refetchOnMount: 'always',
     refetchInterval: (query) => (
       query.state.data?.status === 'ready' || query.state.data?.status === 'failed'
@@ -2681,6 +2693,12 @@ export default function VideoConnected() {
   }, [setSearchParams]);
 
   const openVideo = useCallback((video: CardVideo) => {
+    if (!isMockVideoId(video.id) && video.raw.hlsMasterUrl) {
+      // Avoid a blank detail page while the detail request is in flight.
+      // The detail query will replace this partial cache entry in the
+      // background with the authoritative response.
+      queryClient.setQueryData(['video', 'detail', video.id], video.raw);
+    }
     const nextParams: Record<string, string> = { view: 'watch', video: video.id };
     if (activeView === 'playlist' || watchFromPlaylist) {
       nextParams.from = 'playlist';
@@ -2698,11 +2716,21 @@ export default function VideoConnected() {
     activeCategory,
     activeView,
     playlistPage,
+    queryClient,
     selectedCollectionId,
     setSearchParams,
     watchFromFavorites,
     watchFromPlaylist,
   ]);
+
+  const prepareVideo = useCallback((video: CardVideo) => {
+    if (isMockVideoId(video.id)) return;
+    void queryClient.prefetchQuery({
+      queryKey: ['video', 'detail', video.id],
+      queryFn: () => getVideo(video.id),
+      staleTime: 60_000,
+    });
+  }, [queryClient]);
 
   const returnFromWatch = useCallback(() => {
     const category = searchParams.get('category');
@@ -3749,6 +3777,9 @@ export default function VideoConnected() {
                     <button
                       type="button"
                       className="video-featured-media"
+                      onPointerEnter={() => prepareVideo(featured)}
+                      onPointerDown={() => prepareVideo(featured)}
+                      onFocus={() => prepareVideo(featured)}
                       onClick={() => openVideo(featured)}
                     >
                       {featuredVideos.map((video) => (
@@ -3804,6 +3835,7 @@ export default function VideoConnected() {
                           key={video.id}
                           video={video}
                           onPlay={openVideo}
+                          onPrepare={prepareVideo}
                           onFavorite={toggleFavorite}
                           priority={index < homeVisibleCardCount}
                         />
@@ -3913,6 +3945,7 @@ export default function VideoConnected() {
                           key={video.id}
                           video={video}
                           onPlay={openVideo}
+                          onPrepare={prepareVideo}
                           onFavorite={toggleFavorite}
                           priority={index < 12}
                         />
@@ -3954,6 +3987,7 @@ export default function VideoConnected() {
                           key={video.id}
                           video={video}
                           onPlay={openVideo}
+                          onPrepare={prepareVideo}
                           onFavorite={toggleFavorite}
                           priority={index < 8}
                         />
