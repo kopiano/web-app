@@ -445,7 +445,7 @@ function VideoQueuePoster({ src }: { src: string }) {
   const [retry, setRetry] = useState(0);
   const [failed, setFailed] = useState(!src);
   const imageSource = src
-    ? `${src}${src.includes('?') ? '&' : '?'}queue_retry=${retry}`
+    ? retry > 0 ? `${src}${src.includes('?') ? '&' : '?'}queue_retry=${retry}` : src
     : '';
 
   useEffect(() => {
@@ -581,7 +581,9 @@ const VideoCard = memo(function VideoCard({
   const [posterRetry, setPosterRetry] = useState(0);
   const [posterFailed, setPosterFailed] = useState(false);
   const posterSource = video.poster
-    ? `${video.poster}${video.poster.includes('?') ? '&' : '?'}retry=${posterRetry}`
+    ? posterRetry > 0
+      ? `${video.poster}${video.poster.includes('?') ? '&' : '?'}retry=${posterRetry}`
+      : video.poster
     : '';
   useEffect(() => {
     setPosterRetry(0);
@@ -2377,19 +2379,6 @@ export default function VideoConnected() {
     playlistQuery.isFetchingNextPage,
     useMockData,
   ]);
-  useEffect(() => {
-    if (activeView !== 'playlist') return;
-    const posters = [...processingPlaylistVideos, ...playlistVideos]
-      .slice(0, 12)
-      .map((video) => video.poster)
-      .filter(Boolean);
-    posters.forEach((src) => {
-      const image = new Image();
-      image.decoding = 'async';
-      image.fetchPriority = 'high';
-      image.src = src;
-    });
-  }, [activeView, playlistVideos, processingPlaylistVideos]);
   useEffect(() => {
     if (
       !watchFromPlaylist
@@ -4224,7 +4213,7 @@ export default function VideoConnected() {
                           onPlay={openVideo}
                           onPrepare={prepareVideo}
                           onFavorite={toggleFavorite}
-                          priority={index < 12}
+                          priority={index < 4}
                         />
                       ))}
                     </div>
