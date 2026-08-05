@@ -179,14 +179,16 @@ const Layout = () => {
     <ThemeProvider>
       <MusicPlaybackProvider>
         <BackgroundImg />
-        <Header />
+        <div className="app-content">
+          <Header />
         {shouldMountMusic && (
           <div className={`persistent-music-page${isMusicRoute ? '' : ' is-hidden'}`}>
             <Music isActive={isMusicRoute} />
           </div>
         )}
         {!isMusicRoute && <Outlet />}
-        {!isMusicRoute && <MiniMusicPlayer />}
+          {!isMusicRoute && <MiniMusicPlayer />}
+        </div>
       </MusicPlaybackProvider>
     </ThemeProvider>
   );

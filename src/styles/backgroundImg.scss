@@ -1,15 +1,16 @@
+.background-ready .bg-fallback {
+  display: none;
+}
+
 .background-wrapper {
     position: fixed;
-    z-index: -1;
+    z-index: 0;
+    pointer-events: none;
     width: 100%;
     height: 100%;
 }
 
 /* Override the HTML fallback once React renders */
-.background-wrapper ~ .bg-fallback {
-  display: none;
-}
-
 .wrapper-img {
   position: absolute;
   inset: 0;
@@ -78,4 +79,9 @@
     border-radius: 2px;
     background: rgba(255, 255, 255, 0.8);
     will-change: width;
+}
+
+.app-content {
+  position: relative;
+  z-index: 1;
 }

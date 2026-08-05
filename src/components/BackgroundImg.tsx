@@ -5,10 +5,9 @@ import bg2 from '@/assets/images/bg-2.webp';
 import bg3 from '@/assets/images/bg-3.webp';
 import bg4 from '@/assets/images/bg-4.webp';
 import bg5 from '@/assets/images/bg-5.webp';
+import bg0 from '@/assets/images/bg-0.webp';
 
-// Reuse the HTML fallback URL for the first frame so React hydration does
-// not download the same large image a second time under a hashed URL.
-const BACKGROUNDS = ['/bg-0.webp', bg1, bg2, bg3, bg4, bg5];
+const BACKGROUNDS = [bg0, bg1, bg2, bg3, bg4, bg5];
 const BACKGROUND_INTERVAL_MS = 8_000;
 
 export default function BackgroundImg() {
@@ -17,6 +16,14 @@ export default function BackgroundImg() {
   const barRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    document.documentElement.classList.add('background-ready');
+    // Decode the first frame immediately so the background is ready before
+    // the rotating background timer starts.
+    const firstImage = new Image();
+    firstImage.decoding = 'async';
+    firstImage.fetchPriority = 'high';
+    firstImage.src = BACKGROUNDS[0];
+
     const timer = setInterval(() => {
       startTimeRef.current = Date.now();
       if (barRef.current) {
@@ -37,6 +44,7 @@ export default function BackgroundImg() {
     rafId = requestAnimationFrame(tick);
 
     return () => {
+      document.documentElement.classList.remove('background-ready');
       clearInterval(timer);
       cancelAnimationFrame(rafId);
     };
