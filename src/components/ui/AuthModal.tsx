@@ -78,11 +78,15 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
         return;
       } else {
         const response = await login({ username: trimmedUsername, password }) as {
-          data?: { user?: Parameters<typeof setUser>[0] };
+          token?: string;
+          user?: Parameters<typeof setUser>[0];
         };
+        if (response.token) {
+          authStorage.setToken(response.token);
+        }
         authStorage.markAuthenticated();
-        if (response.data?.user) {
-          dispatch(setUser(response.data.user));
+        if (response.user) {
+          dispatch(setUser(response.user));
         } else {
           await dispatch(fetchCurrentUser()).unwrap();
         }

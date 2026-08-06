@@ -1,9 +1,18 @@
 import axios from 'axios'
+import { authStorage } from '../lib/auth'
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   timeout: 30000,
   withCredentials: true,  // 允许浏览器携带跨域 Cookie。
+})
+
+request.interceptors.request.use((config) => {
+  const token = authStorage.getToken()
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 request.interceptors.response.use((response) => {
