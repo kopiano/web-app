@@ -15,7 +15,9 @@ const VIDEO_STARTUP_FALLBACK_MS = 3_000;
 const VIDEO_NETWORK_RETRY_LIMIT = 3;
 const VIDEO_MEDIA_RETRY_LIMIT = 2;
 const VIDEO_QUALITY_RECOVERY_MS = 20_000;
-const VIDEO_LOW_BUFFER_SECONDS = 4;
+const VIDEO_LOW_BUFFER_SECONDS = 5;
+const VIDEO_CRITICAL_BUFFER_SECONDS = 2;
+const VIDEO_STALL_DETECTION_MS = 3_000;
 
 interface NavigatorWithUserAgentData extends Navigator {
   userAgentData?: {
@@ -345,7 +347,10 @@ export default function HlsVideo({
     let recoverStalledBuffer: (() => void) | null = null;
     let markStarted: (() => void) | null = null;
     let qualityRecoveryTimer: number | undefined;
+    let bufferWatchdogTimer: number | undefined;
     let lastQualityDowngradeAt = 0;
+    let lastObservedPlaybackTime = -1;
+    let lastPlaybackProgressAt = performance.now();
     const clearRetryTimer = () => {
       if (retryTimer !== undefined) {
         window.clearTimeout(retryTimer);
@@ -370,6 +375,12 @@ export default function HlsVideo({
         qualityRecoveryTimer = undefined;
       }
     };
+    const clearBufferWatchdogTimer = () => {
+      if (bufferWatchdogTimer !== undefined) {
+        window.clearInterval(bufferWatchdogTimer);
+        bufferWatchdogTimer = undefined;
+      }
+    };
     const getBufferedSeconds = () => {
       if (!Number.isFinite(video.currentTime)) return 0;
       for (let index = 0; index < video.buffered.length; index += 1) {
@@ -381,7 +392,11 @@ export default function HlsVideo({
     };
     const downgradeQuality = () => {
       if (!hls || hls.levels.length < 2) return;
-      const currentLevel = hls.currentLevel >= 0 ? hls.currentLevel : hls.nextAutoLevel;
+      const currentLevel = hls.currentLevel >= 0
+        ? hls.currentLevel
+        : hls.nextAutoLevel >= 0
+          ? hls.nextAutoLevel
+          : hls.levels.length - 1;
       if (currentLevel <= 0) return;
       const now = performance.now();
       if (now - lastQualityDowngradeAt < 2_000) return;
@@ -395,6 +410,32 @@ export default function HlsVideo({
           hls.currentLevel = -1;
         }
       }, VIDEO_QUALITY_RECOVERY_MS);
+    };
+    const monitorBuffer = () => {
+      if (disposed || !hls || video.paused || video.ended) return;
+      const bufferedSeconds = getBufferedSeconds();
+      const now = performance.now();
+      if (video.currentTime !== lastObservedPlaybackTime) {
+        lastObservedPlaybackTime = video.currentTime;
+        lastPlaybackProgressAt = now;
+      }
+      if (
+        bufferedSeconds <= VIDEO_LOW_BUFFER_SECONDS
+        || video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA
+      ) {
+        downgradeQuality();
+      }
+      if (bufferedSeconds <= VIDEO_CRITICAL_BUFFER_SECONDS) {
+        hls.startLoad(Math.max(0, video.currentTime));
+      }
+      if (
+        now - lastPlaybackProgressAt >= VIDEO_STALL_DETECTION_MS
+        && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA
+      ) {
+        hls.startLoad(Math.max(0, video.currentTime));
+        void requestPlayback(video, true);
+        lastPlaybackProgressAt = now;
+      }
     };
     const switchToFallback = () => {
       if (disposed || !fallbackSrc || usingFallback) return false;
@@ -479,6 +520,12 @@ export default function HlsVideo({
         startFragPrefetch: true,
         // Let hls.js select quality from measured bandwidth.
         startLevel: -1,
+        // Leave headroom for network jitter and require stronger evidence
+        // before moving back to a higher rendition after a downgrade.
+        abrBandWidthFactor: 0.7,
+        abrBandWidthUpFactor: 0.5,
+        abrEwmaFastVoD: 3,
+        abrEwmaSlowVoD: 9,
         // Start playback as soon as the first playable fragment is buffered.
         // The player can continue filling its VOD buffer in the background.
         maxStarvationDelay: 1,
@@ -487,14 +534,16 @@ export default function HlsVideo({
         // 缓冲控制
         // maxBufferLength: 12,
         // maxMaxBufferLength: 24,
+        // Keep a larger forward buffer so short network drops do not stop
+        // playback. hls.js expresses this in seconds rather than fragment count.
         maxBufferLength: 30,
         maxMaxBufferLength: 60,
-        maxBufferSize: 48 * 1024 * 1024,
+        maxBufferSize: 80 * 1024 * 1024,
         backBufferLength: 8,
         maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 2,
-        fragLoadingTimeOut: 15_000,
-        fragLoadingMaxRetry: 6,
+        fragLoadingTimeOut: 10_000,
+        fragLoadingMaxRetry: 4,
         fragLoadingRetryDelay: 250,
         fragLoadingMaxRetryTimeout: 8_000,
         manifestLoadingMaxRetry: 2,
@@ -555,9 +604,7 @@ export default function HlsVideo({
       };
       video.addEventListener('waiting', recoverStalledBuffer);
       video.addEventListener('stalled', recoverStalledBuffer);
-      hls.on(Hls.Events.FRAG_LOADED, () => {
-        if (getBufferedSeconds() < VIDEO_LOW_BUFFER_SECONDS) downgradeQuality();
-      });
+      bufferWatchdogTimer = window.setInterval(monitorBuffer, 1_000);
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!hls) return;
         if (!data.fatal) {
@@ -620,6 +667,7 @@ export default function HlsVideo({
       clearStartupFallbackTimer();
       clearStalledRecoveryTimer();
       clearQualityRecoveryTimer();
+      clearBufferWatchdogTimer();
       if (nativeHlsAttached) {
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         video.removeEventListener('canplay', startPlayback);
