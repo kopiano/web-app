@@ -148,7 +148,12 @@ export default function Docs() {
           </div>
         </div>
 
-        {filteredDocuments.length ? (
+        {!remoteLoaded && currentUser ? (
+          <div className="docs-empty docs-loading" aria-live="polite">
+            <FileText size={30} />
+            <strong>{t('docs.loading')}</strong>
+          </div>
+        ) : filteredDocuments.length ? (
           <div key={viewMode} className={`docs-results is-${viewMode}`}>
             {filteredDocuments.map((document) => (
               <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(`/docs/${document.id}`)}>
