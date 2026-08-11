@@ -173,6 +173,13 @@
 .docs-results.is-timeline .doc-card p { min-height: 0; max-width: 58rem; }
 .docs-results.is-timeline .doc-read-button { margin-top: 1.2rem; }
 .docs-empty { min-height: 24rem; display: grid; place-items: center; align-content: center; gap: .8rem; color: var(--docs-muted); }
+.docs-create-button { position: fixed; right: 2.4rem; bottom: 2.4rem; z-index: 8; display: grid;
+  width: 4rem; height: 4rem;
+  place-items: center;
+  border: 1px solid rgba(95, 95, 95, 0.8); border-radius: 50%; color: #fff;
+  background: #000000; box-shadow: 0 1rem 2.4rem rgba(75,48,86,.28); }
+.docs-create-button:hover { background: #5e3e70; transform: translateY(-.2rem); }
+.docs-create-button:focus-visible { outline: 2px solid #6f4d83; outline-offset: 3px; }
 .docs-empty strong { color: var(--docs-ink); font-size: 1.8rem; }
 
 @media (max-width: 900px) {

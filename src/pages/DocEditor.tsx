@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js/lib/common';
-import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Italic, Link2, List, Pencil, Quote, Rows3, Save, Table2 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Info, Italic, Link2, List, Pencil, Quote, Rows3, Save, Table2, X } from 'lucide-react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store/store';
+import { deleteDocument, getDocument, resolveDocumentAsset, updateDocument, updateDocumentInfo } from '@/api/docs';
 import { documents } from './Docs';
 import '@/styles/doc-editor.scss';
 
@@ -303,23 +306,63 @@ function renderMarkdown(markdown: string) {
 
 export default function DocEditor() {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const document = documents.find((item) => item.id === id) ?? documents[0];
-  const storageKey = `lume-doc-markdown-${document.id}`;
-  const [mode, setMode] = useState<EditorMode>('preview');
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+  const documentId = id ?? document.id;
+  const storageKey = `lume-doc-markdown-${documentId}`;
+  const [remoteTitle, setRemoteTitle] = useState('');
+  const [remoteCategory, setRemoteCategory] = useState('');
+  const [remoteImage, setRemoteImage] = useState<string | undefined>();
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [infoTab, setInfoTab] = useState<'detail' | 'delete'>('detail');
+  const [infoTitle, setInfoTitle] = useState('');
+  const [infoCategory, setInfoCategory] = useState('');
+  const [infoImage, setInfoImage] = useState<File | null>(null);
+  const [infoPreview, setInfoPreview] = useState('');
+  const [infoSaving, setInfoSaving] = useState(false);
+  const [infoDeleting, setInfoDeleting] = useState(false);
+  const [infoError, setInfoError] = useState('');
+  const [mode, setMode] = useState<EditorMode>(() => (
+    (location.state as { startInEdit?: boolean } | null)?.startInEdit ? 'edit' : 'preview'
+  ));
   const [activeHeading, setActiveHeading] = useState('');
   const [markdown, setMarkdown] = useState(() => localStorage.getItem(storageKey) || seedMarkdown(document.title, document.excerpt));
   const [savedAt, setSavedAt] = useState(() => Boolean(localStorage.getItem(storageKey)));
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLElement>(null);
+  const displayTitle = remoteTitle || document.title;
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    if (!currentUser || !id || documents.some((item) => item.id === id)) return;
+    let cancelled = false;
+    getDocument(id).then((remote) => {
+      if (cancelled) return;
+      setRemoteTitle(remote.title);
+      setRemoteCategory(remote.category);
+      setRemoteImage(resolveDocumentAsset(remote.image, Date.now()));
+      setMarkdown(remote.content);
+      setSavedAt(true);
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [currentUser?.id, id]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
       localStorage.setItem(storageKey, markdown);
+      if (currentUser && id && !documents.some((item) => item.id === id)) {
+        try {
+          await updateDocument(id, markdown);
+        } catch {
+          setSavedAt(false);
+          return;
+        }
+      }
       setSavedAt(true);
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [markdown, storageKey]);
+  }, [currentUser?.id, id, markdown, storageKey]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -369,6 +412,44 @@ export default function DocEditor() {
       const cursor = start + before.length + selected.length + after.length;
       editor.setSelectionRange(cursor, cursor);
     });
+  };
+
+  const openInfo = () => {
+    setInfoTitle(remoteTitle || document.title);
+    setInfoCategory(remoteCategory || document.category);
+    setInfoImage(null);
+    setInfoPreview(remoteImage || document.image);
+    setInfoTab('detail');
+    setInfoError('');
+    setInfoOpen(true);
+  };
+
+  const removeDocument = async () => {
+    if (!id || infoDeleting) return;
+    setInfoDeleting(true);
+    setInfoError('');
+    try {
+      await deleteDocument(id);
+      navigate('/docs', { replace: true });
+    } catch {
+      setInfoError('Unable to delete this document.');
+      setInfoDeleting(false);
+    }
+  };
+
+  const saveInfo = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!id || documents.some((item) => item.id === id) || !infoTitle.trim() || !infoCategory.trim() || infoSaving) return;
+    setInfoSaving(true);
+    try {
+      const updated = await updateDocumentInfo(id, { title: infoTitle.trim(), category: infoCategory.trim(), image: infoImage });
+      setRemoteTitle(updated.title);
+      setRemoteCategory(updated.category);
+      setRemoteImage(resolveDocumentAsset(updated.image, Date.now()));
+      setInfoOpen(false);
+    } finally {
+      setInfoSaving(false);
+    }
   };
 
   const insertCodeBlock = () => {
@@ -546,10 +627,11 @@ export default function DocEditor() {
 
   return (
     <main className="doc-editor-page">
-      <header className="doc-editor-header" style={{ backgroundImage: `url("${document.image}")` }}>
+      <header className="doc-editor-header" style={{ backgroundImage: `url("${remoteImage || document.image}")` }}>
         <div className="doc-editor-header-shade">
           <div className="doc-editor-header-top">
             <button type="button" className="doc-back-button" onClick={() => navigate('/docs')}><ArrowLeft size={17} /> Back</button>
+            {currentUser && id && !documents.some((item) => item.id === id) && <button type="button" className="doc-info-button" onClick={openInfo} aria-label="Document information"><Info size={17} /></button>}
             <div className="doc-editor-save-status">{savedAt ? <><Check size={15} /> Saved locally</> : <><Save size={15} /> Saving...</>}</div>
           </div>
           <div className="doc-editor-header-mode">
@@ -586,13 +668,59 @@ export default function DocEditor() {
               <button type="button" onClick={insertUnicodeTable} aria-label="Insert Unicode table"><Rows3 size={16} /></button>
               <button type="button" onClick={() => insertMarkdown('[', '](https://)', 'link text')} aria-label="Link"><Link2 size={16} /></button>
             </div>
-            <textarea ref={editorRef} className="doc-markdown-editor" value={markdown} onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }} onKeyDown={handleEditorKeyDown} spellCheck={false} aria-label="Markdown editor" />
+            <textarea ref={editorRef} className="doc-markdown-editor" value={markdown} onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }} onKeyDown={handleEditorKeyDown} spellCheck={false} aria-label={`Markdown editor for ${displayTitle}`} />
           </div>
         )}
         {mode === 'preview' && (
           <article ref={previewRef} className="doc-markdown-preview">{renderMarkdown(markdown)}</article>
         )}
       </div>
+      {infoOpen && (
+        <main className="doc-create-overlay">
+          <button type="button" className="doc-create-backdrop" onClick={() => setInfoOpen(false)} aria-label="Close document information" />
+          <div className="doc-info-dialog" role="dialog" aria-modal="true" aria-labelledby="doc-info-title">
+            <button type="button" className="doc-create-close" onClick={() => setInfoOpen(false)} aria-label="Close"><X size={17} /></button>
+            <aside className="doc-info-sidebar">
+              <p>DOCUMENT</p>
+              <h2>{displayTitle}</h2>
+              <nav>
+                <button type="button" className={infoTab === 'detail' ? 'is-active' : ''} onClick={() => setInfoTab('detail')}><Info size={16} /> Detail</button>
+                <button type="button" className={`is-danger${infoTab === 'delete' ? ' is-active' : ''}`} onClick={() => setInfoTab('delete')}><X size={16} /> Delete</button>
+              </nav>
+            </aside>
+            <section className="doc-info-content">
+              {infoTab === 'detail' ? (
+                <form onSubmit={saveInfo}>
+                  <div className="doc-create-heading"><span className="doc-create-icon"><Info size={22} /></span><div><h2 id="doc-info-title">Document details</h2><p>Update the document card details.</p></div></div>
+                  <div className="doc-create-form">
+                    <div className="doc-new-image-wrap">
+                      <label className={`doc-new-image${infoPreview ? ' has-preview' : ''}`} style={infoPreview ? { backgroundImage: `url("${infoPreview}")` } : undefined} aria-label="Change cover image">
+                        <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0] ?? null; setInfoImage(file); setInfoPreview(file ? URL.createObjectURL(file) : infoPreview); }} />
+                        {!infoPreview && <span>Choose cover image</span>}
+                      </label>
+                      <small>Cover is cropped to 720 × 480 WebP.</small>
+                    </div>
+                    <div className="doc-create-fields">
+                      <label className="doc-new-inline-field"><span className="doc-new-field-label">Title</span><input value={infoTitle} onChange={(event) => setInfoTitle(event.target.value)} autoFocus /></label>
+                      <label className="doc-new-inline-field"><span className="doc-new-field-label">Category</span><input value={infoCategory} onChange={(event) => setInfoCategory(event.target.value)} /></label>
+                    </div>
+                  </div>
+                  <div className="doc-create-actions"><button type="submit" className="doc-create-next" disabled={!infoTitle.trim() || !infoCategory.trim() || infoSaving}>{infoSaving ? 'Saving...' : 'Save'} <Check size={16} /></button></div>
+                </form>
+              ) : (
+                <div className="doc-info-delete">
+                  <span className="doc-info-delete-icon"><X size={24} /></span>
+                  <p className="doc-info-danger-label">PERMANENT ACTION</p>
+                  <h2>Delete this document?</h2>
+                  <p>This will remove the document and its cover image. This action cannot be undone.</p>
+                  {infoError && <p className="doc-new-error" role="alert">{infoError}</p>}
+                  <button type="button" className="doc-info-delete-confirm" onClick={removeDocument} disabled={infoDeleting}>{infoDeleting ? 'Deleting...' : 'Delete document'}</button>
+                </div>
+              )}
+            </section>
+          </div>
+        </main>
+      )}
     </main>
   );
 }

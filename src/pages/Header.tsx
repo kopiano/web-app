@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/context/ThemeContext';
 import AuthModal from '@/components/ui/AuthModal';
-import nav_logo from '@/assets/images/z-logo.png';
 import avatarFrame from '@/assets/images/avatar-frame.webp';
 import '@/styles/header.scss';
 import '@/styles/header-extras.scss';

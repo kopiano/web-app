@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock3, FileText, Grid2X2, List, Search, Sparkles } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store/store';
+import { listDocuments, resolveDocumentAsset, type RemoteDocument } from '@/api/docs';
+import NewDocEditor from './NewDocEditor';
 import bg0 from '@/assets/images/bg-0.webp';
 import bg1 from '@/assets/images/bg-1.webp';
 import bg2 from '@/assets/images/bg-2.webp';
@@ -10,8 +15,6 @@ import bg5 from '@/assets/images/bg-5.webp';
 import '@/styles/docs.scss';
 
 type ViewMode = 'grid' | 'timeline';
-
-const categories = ['All documents', 'Product', 'Design', 'Engineering', 'Research'];
 
 export const documents = [
   { id: 'quiet-system', title: 'A quiet system for brighter days', category: 'Design', date: 'Aug 08, 2026', image: bg0, accent: 'violet', excerpt: 'Notes on shaping interfaces that feel calm, clear, and quietly alive.' },
@@ -28,6 +31,27 @@ export default function Docs() {
   const [activeCategory, setActiveCategory] = useState('All documents');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const searchRef = useRef<HTMLInputElement>(null);
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+  const [remoteDocuments, setRemoteDocuments] = useState<RemoteDocument[]>([]);
+  const [remoteLoaded, setRemoteLoaded] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [coverVersion, setCoverVersion] = useState(() => Date.now());
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentUser) {
+      setRemoteDocuments([]);
+      setRemoteLoaded(true);
+      return () => { cancelled = true; };
+    }
+    setRemoteLoaded(false);
+    setCoverVersion(Date.now());
+    listDocuments()
+      .then((items) => { if (!cancelled) setRemoteDocuments(items); })
+      .catch(() => { if (!cancelled) setRemoteDocuments([]); })
+      .finally(() => { if (!cancelled) setRemoteLoaded(true); });
+    return () => { cancelled = true; };
+  }, [currentUser?.id]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -44,15 +68,27 @@ export default function Docs() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  const libraryDocuments = currentUser && remoteLoaded ? remoteDocuments : documents;
+  const categories = useMemo(() => [
+    'All documents',
+    ...Array.from(new Set(libraryDocuments.map((document) => document.category.trim()).filter(Boolean))),
+  ], [libraryDocuments]);
+
+  useEffect(() => {
+    if (activeCategory !== 'All documents' && !categories.includes(activeCategory)) {
+      setActiveCategory('All documents');
+    }
+  }, [activeCategory, categories]);
+
   const filteredDocuments = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return documents.filter((document) => {
+    return libraryDocuments.filter((document) => {
       const matchesCategory = activeCategory === 'All documents' || document.category === activeCategory;
       const matchesQuery = !normalizedQuery
         || `${document.title} ${document.category} ${document.excerpt}`.toLowerCase().includes(normalizedQuery);
       return matchesCategory && matchesQuery;
     });
-  }, [activeCategory, query]);
+  }, [activeCategory, libraryDocuments, query]);
 
   return (
     <main className="docs-page">
@@ -107,7 +143,7 @@ export default function Docs() {
             {filteredDocuments.map((document) => (
               <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(`/docs/${document.id}`)}>
                 <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`} onClick={() => navigate(`/docs/${document.id}`)}>
-                  <img src={document.image} alt="" />
+                  <img src={resolveDocumentAsset(document.image, coverVersion)} alt="" />
                 </button>
                 <div className="doc-card-body">
                   <h2>{document.title}</h2>
@@ -129,6 +165,10 @@ export default function Docs() {
           </div>
         )}
       </div>
+      <button type="button" className="docs-create-button" onClick={() => setIsCreateOpen(true)} aria-label="Create document" title="Create document">
+        <Plus size={24} />
+      </button>
+      {isCreateOpen && <NewDocEditor onClose={() => setIsCreateOpen(false)} />}
     </main>
   );
 }

@@ -4,5 +4,7 @@
 /music / 200
 /video /index.html 200
 /video/* /index.html 200
+/docs /index.html 200
+/docs/* /index.html 200
 /oauth/success / 200
 /subscription/success / 200
