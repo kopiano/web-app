@@ -11,6 +11,7 @@ import Overview from '@/pages/Overview';
 import Chat from '@/pages/Chat';
 import Music from '@/pages/Music';
 import Video from '@/pages/VideoConnected';
+import Docs from '@/pages/Docs';
 import Header from '@/pages/Header';
 import BackgroundImg from '@/components/BackgroundImg';
 import MiniMusicPlayer from '@/components/MiniMusicPlayer';
@@ -214,6 +215,7 @@ const router = createBrowserRouter([
       { path: '/chat', element: <Chat /> },
       { path: '/music', element: <></> },
       { path: '/video', element: <Video /> },
+      { path: '/docs', element: <Docs /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

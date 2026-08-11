@@ -61,10 +61,14 @@ export default function BackgroundImg() {
     <>
       <div className="background-wrapper">
         <div className="wrapper-images">
-          <div
-            className="wrapper-img active"
-            style={{ backgroundImage: `url("${BACKGROUNDS[active]}")` }}
-          />
+          {BACKGROUNDS.map((background, index) => (
+            <div
+              key={background}
+              className={`wrapper-img${index === active ? ' active' : ''}`}
+              style={{ backgroundImage: `url("${background}")` }}
+              aria-hidden="true"
+            />
+          ))}
         </div>
         <div className="wrapper-blur"></div>
         <div className="wrapper-color"></div>
