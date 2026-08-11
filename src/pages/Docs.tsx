@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Clock3, FileText, Grid2X2, List, Search, Sparkles } from 'lucide-react';
 import bg0 from '@/assets/images/bg-0.webp';
 import bg1 from '@/assets/images/bg-1.webp';
@@ -12,16 +13,17 @@ type ViewMode = 'grid' | 'timeline';
 
 const categories = ['All documents', 'Product', 'Design', 'Engineering', 'Research'];
 
-const documents = [
-  { title: 'A quiet system for brighter days', category: 'Design', date: 'Aug 08, 2026', image: bg0, accent: 'violet', excerpt: 'Notes on shaping interfaces that feel calm, clear, and quietly alive.' },
-  { title: 'Building for the next horizon', category: 'Product', date: 'Aug 02, 2026', image: bg1, accent: 'blue', excerpt: 'A field guide to turning a strong idea into a useful, enduring product.' },
-  { title: 'The language of small details', category: 'Research', date: 'Jul 26, 2026', image: bg2, accent: 'gold', excerpt: 'Observations on motion, rhythm, and the moments that make a tool memorable.' },
-  { title: 'A map of unfinished worlds', category: 'Engineering', date: 'Jul 18, 2026', image: bg3, accent: 'rose', excerpt: 'Practical patterns for making complex systems easier to explore and change.' },
-  { title: 'Light, depth, and readable space', category: 'Design', date: 'Jul 09, 2026', image: bg4, accent: 'mint', excerpt: 'A visual study of contrast, atmosphere, and the discipline of restraint.' },
-  { title: 'Notes from beyond the interface', category: 'Product', date: 'Jun 28, 2026', image: bg5, accent: 'peach', excerpt: 'What product teams can learn from stories, games, and imagined futures.' },
+export const documents = [
+  { id: 'quiet-system', title: 'A quiet system for brighter days', category: 'Design', date: 'Aug 08, 2026', image: bg0, accent: 'violet', excerpt: 'Notes on shaping interfaces that feel calm, clear, and quietly alive.' },
+  { id: 'next-horizon', title: 'Building for the next horizon', category: 'Product', date: 'Aug 02, 2026', image: bg1, accent: 'blue', excerpt: 'A field guide to turning a strong idea into a useful, enduring product.' },
+  { id: 'small-details', title: 'The language of small details', category: 'Research', date: 'Jul 26, 2026', image: bg2, accent: 'gold', excerpt: 'Observations on motion, rhythm, and the moments that make a tool memorable.' },
+  { id: 'unfinished-worlds', title: 'A map of unfinished worlds', category: 'Engineering', date: 'Jul 18, 2026', image: bg3, accent: 'rose', excerpt: 'Practical patterns for making complex systems easier to explore and change.' },
+  { id: 'readable-space', title: 'Light, depth, and readable space', category: 'Design', date: 'Jul 09, 2026', image: bg4, accent: 'mint', excerpt: 'A visual study of contrast, atmosphere, and the discipline of restraint.' },
+  { id: 'beyond-interface', title: 'Notes from beyond the interface', category: 'Product', date: 'Jun 28, 2026', image: bg5, accent: 'peach', excerpt: 'What product teams can learn from stories, games, and imagined futures.' },
 ];
 
 export default function Docs() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All documents');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -103,8 +105,8 @@ export default function Docs() {
         {filteredDocuments.length ? (
           <div key={viewMode} className={`docs-results is-${viewMode}`}>
             {filteredDocuments.map((document) => (
-              <article className="doc-card" key={document.title} data-accent={document.accent}>
-                <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`}>
+              <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(`/docs/${document.id}`)}>
+                <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`} onClick={() => navigate(`/docs/${document.id}`)}>
                   <img src={document.image} alt="" />
                 </button>
                 <div className="doc-card-body">
@@ -114,7 +116,7 @@ export default function Docs() {
                     <span><Clock3 size={13} /> {document.date}</span>
                   </div>
                   <p>{document.excerpt}</p>
-                  <button type="button" className="doc-read-button">Read document <span aria-hidden="true">↗</span></button>
+                  <button type="button" className="doc-read-button" onClick={() => navigate(`/docs/${document.id}`)}>Read document <span aria-hidden="true">↗</span></button>
                 </div>
               </article>
             ))}
