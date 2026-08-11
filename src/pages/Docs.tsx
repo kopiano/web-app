@@ -90,6 +90,7 @@ export default function Docs() {
             ))}
           </div>
           <div className="docs-view-toggle" aria-label="Document view">
+            <span className={`docs-view-toggle-thumb is-${viewMode}`} aria-hidden="true" />
             <button type="button" className={viewMode === 'grid' ? 'is-active' : ''} onClick={() => setViewMode('grid')} aria-label="Card view">
               <Grid2X2 size={16} />
             </button>
@@ -100,7 +101,7 @@ export default function Docs() {
         </div>
 
         {filteredDocuments.length ? (
-          <div className={`docs-results is-${viewMode}`}>
+          <div key={viewMode} className={`docs-results is-${viewMode}`}>
             {filteredDocuments.map((document) => (
               <article className="doc-card" key={document.title} data-accent={document.accent}>
                 <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`}>
