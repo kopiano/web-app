@@ -1,4 +1,5 @@
 import request from '@/api/request';
+import { resolveAssetUrl } from '@/lib/avatar';
 
 export interface RemoteDocument {
   id: string;
@@ -20,20 +21,7 @@ export interface RemoteDocumentContent {
 
 export function resolveDocumentAsset(value?: string | null, cacheBust?: string | number) {
   if (!value) return undefined;
-  let resolved: string;
-  if (/^https?:\/\//.test(value)) {
-    resolved = value;
-  } else if (value.startsWith('/') && !value.startsWith('/api/')) {
-    resolved = value;
-  } else {
-    const apiUrl = String(import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
-    if (!apiUrl) resolved = value;
-    else {
-      const origin = new URL(apiUrl).origin;
-      if (value.startsWith('/api/')) resolved = `${origin}${value}`;
-      else resolved = `${apiUrl}${value.startsWith('/') ? value : `/${value}`}`;
-    }
-  }
+  const resolved = resolveAssetUrl(value);
 
   if (cacheBust === undefined) return resolved;
   const separator = resolved.includes('?') ? '&' : '?';

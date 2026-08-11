@@ -69,7 +69,9 @@ export default function Docs() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  const libraryDocuments = currentUser && remoteLoaded ? remoteDocuments : documents;
+  const libraryDocuments = currentUser
+    ? (remoteLoaded ? remoteDocuments : [])
+    : documents;
   const categories = useMemo(() => [
     'All documents',
     ...Array.from(new Set(libraryDocuments.map((document) => document.category.trim()).filter(Boolean))),
