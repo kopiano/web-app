@@ -95,7 +95,10 @@
 .doc-markdown-image { max-width: 72rem; margin: 2.4rem 0 2.8rem; }
 .doc-markdown-image img { display: block; width: 100%; max-height: 52rem; object-fit: cover; border: 1px solid rgba(255,255,255,.72); border-radius: 1.5rem; background: rgba(255,255,255,.36); box-shadow: 0 1.2rem 2.8rem rgba(55,63,61,.14); }
 .doc-markdown-image figcaption { margin-top: .85rem; color: rgba(38,48,46,.5); font-size: 1.1rem; line-height: 1.5; text-align: center; }
-.doc-markdown-preview ul { max-width: 72rem; margin: 1.2rem 0 2.2rem; padding-left: 2.2rem; }
+.doc-markdown-preview ul { max-width: 72rem; margin: 1.2rem 0 2.2rem; padding-left: 2.2rem; list-style: disc; }
+.doc-markdown-preview ol { max-width: 72rem; margin: 1.2rem 0 2.2rem; padding-left: 2.8rem; list-style: decimal; }
+.doc-markdown-preview ul li { list-style: inherit; }
+.doc-markdown-preview ol li { list-style: inherit; }
 .doc-markdown-preview li { margin: .65rem 0; padding-left: .45rem; }
 .doc-markdown-table-wrap { max-width: 100%; margin: 2.2rem 0 2.8rem; overflow-x: auto; border: 1px solid rgba(38,48,46,.12); border-radius: 1rem; background: rgba(255,255,255,.58); }
 .doc-markdown-table { width: 100%; min-width: 52rem; border-collapse: collapse; color: rgba(38,48,46,.74); font-size: 1.4rem; line-height: 1.6; }
@@ -160,6 +163,7 @@
 .doc-code-block .hljs-type, .doc-code-block .hljs-built_in, .doc-code-block .hljs-class .hljs-title, .doc-code-block .hljs-title.class_ { color: #ffa657; }
 .doc-code-block .hljs-function .hljs-title, .doc-code-block .hljs-title.function_, .doc-code-block .hljs-params { color: #d2a8ff; }
 .doc-code-block .hljs-meta, .doc-code-block .hljs-doctag { color: #d2a8ff; }
+.doc-code-block .hljs-custom-keyword { color: #fddc81; font-weight: 650; }
 .doc-code-block .hljs-deletion { color: #ffa198; background: rgba(248,81,73,.12); }
 .doc-code-line { display: grid; grid-template-columns: 4.8rem minmax(max-content, 1fr); min-width: max-content; }
 .doc-code-line:hover { background: #161b22; }

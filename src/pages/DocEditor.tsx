@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '@/store/store';
 import { deleteDocument, getDocument, resolveDocumentAsset, updateDocument, updateDocumentInfo } from '@/api/docs';
 import { documents } from './Docs';
+import customCodeKeywords from '@/config/codeKeywords.json';
 import '@/styles/doc-editor.scss';
 
 type EditorMode = 'preview' | 'edit';
@@ -65,7 +66,18 @@ function highlightCode(line: string, language: string) {
     const highlighted = languageName && hljs.getLanguage(languageName)
       ? hljs.highlight(expandedLine, { language: languageName, ignoreIllegals: true }).value
       : hljs.highlightAuto(expandedLine).value;
-    return <span dangerouslySetInnerHTML={{ __html: highlighted || '&nbsp;' }} />;
+    const customKeywords = customCodeKeywords[normalizedLanguage as keyof typeof customCodeKeywords] ?? [];
+    const keywordPattern = customKeywords.length
+      ? new RegExp(`\\b(?:${customKeywords.map((keyword) => keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'gi')
+      : null;
+    const highlightedWithCustomKeywords = keywordPattern
+      ? highlighted.split(/(<[^>]+>)/g).map((part) => (
+        part.startsWith('<')
+          ? part
+          : part.replace(keywordPattern, '<span class="hljs-custom-keyword">$&</span>')
+      )).join('')
+      : highlighted;
+    return <span dangerouslySetInnerHTML={{ __html: highlightedWithCustomKeywords || '&nbsp;' }} />;
   } catch {
     return <span>{expandedLine || ' '}</span>;
   }
@@ -268,7 +280,25 @@ function separateMarkdownTables(markdown: string) {
 }
 
 function renderMarkdown(markdown: string) {
-  const blocks = separateMarkdownTables(markdown)
+  const markdownWithBlockBoundaries = separateMarkdownTables(markdown)
+    .split('\n')
+    .reduce<{ lines: string[]; inFence: boolean }>((state, line, index, lines) => {
+      const previous = lines[index - 1] ?? '';
+      const isFence = /^```/.test(line);
+      const isInsideFence = state.inFence;
+      const isHeading = !isInsideFence && /^#{1,3}\s+/.test(line);
+      const isListItem = !isInsideFence && /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(line);
+      const previousIsListItem = /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(previous);
+      if (line.trim() && previous.trim() && (isHeading || (isListItem && !previousIsListItem))) {
+        state.lines.push('');
+      }
+      state.lines.push(line);
+      if (isFence) state.inFence = !state.inFence;
+      return state;
+    }, { lines: [], inFence: false })
+    .lines
+    .join('\n');
+  const blocks = markdownWithBlockBoundaries
     .split(/(::::[\s\S]*?::::|```[^\n]*\n[\s\S]*?```)/g)
     .flatMap((segment) => segment.startsWith('```') ? [segment] : segment.split(/\n{2,}/))
     .filter((block) => block.trim());
@@ -293,8 +323,13 @@ function renderMarkdown(markdown: string) {
     if (headingLevel === 1) return <h1 id={createHeadingId(headingLabel, headingOccurrence)} key={index}>{headingLabel}</h1>;
     if (headingLevel === 2) return <h2 id={createHeadingId(headingLabel, headingOccurrence)} key={index}>{headingLabel}</h2>;
     if (headingLevel === 3) return <h3 id={createHeadingId(headingLabel, headingOccurrence)} key={index}>{headingLabel}</h3>;
-    if (lines.every((line) => line.startsWith('- '))) {
-      return <ul key={index}>{lines.map((line) => <li key={line}>{renderInlineMarkdown(line.slice(2))}</li>)}</ul>;
+    const unorderedItems = lines.map((line) => line.match(/^\s*[-*+]\s+(.+)$/)?.[1]);
+    if (unorderedItems.every((item): item is string => Boolean(item))) {
+      return <ul key={index}>{unorderedItems.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item)}</li>)}</ul>;
+    }
+    const orderedItems = lines.map((line) => line.match(/^\s*\d+[.)]\s+(.+)$/)?.[1]);
+    if (orderedItems.every((item): item is string => Boolean(item))) {
+      return <ol key={index}>{orderedItems.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item)}</li>)}</ol>;
     }
     if (first.startsWith('> ')) return <blockquote key={index}>{renderInlineMarkdown(first.slice(2))}</blockquote>;
     if (first.startsWith('```')) {

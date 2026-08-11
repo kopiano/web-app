@@ -1,0 +1,7 @@
+{
+  "sh": [
+    "cloudflared tunnel",
+    "vim",
+    "brew"
+  ]
+}
