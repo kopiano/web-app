@@ -197,18 +197,12 @@
 .docs-create-button:focus-visible { outline: 2px solid #6f4d83; outline-offset: 3px; }
 .docs-empty strong { color: var(--docs-ink); font-size: 1.8rem; }
 
-@media (max-width: 900px) {
-  .docs-hero { align-items: stretch; flex-direction: column; }
-  .docs-search-wrap { width: 100%; }
-  .docs-results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.doc-date time {
+  font-size: 12px;
+  color: #323232;
 }
-@media (max-width: 620px) {
-  .docs-page { padding: 7rem 1.6rem 5rem; }
-  .docs-hero { padding: 3rem 0; }
-  .docs-toolbar { align-items: flex-start; flex-direction: column; }
-  .docs-results { grid-template-columns: 1fr; }
-  .docs-results.is-timeline { padding-left: 1.8rem; }
-  .docs-results.is-timeline .doc-card { grid-template-columns: 1fr; }
-  .docs-results.is-timeline .doc-card-image { min-height: 0; aspect-ratio: 400 / 180; }
-  .docs-results.is-timeline .doc-card::before { left: -2.5rem; }
+.doc-date svg {
+  width: 16px;
+  height: 16px;
+  padding-right: 3px;
 }

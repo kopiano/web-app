@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock3, FileText, Grid2X2, List, Search, Sparkles } from 'lucide-react';
-import { Plus } from 'lucide-react';
+import { Clock3, FileText, Grid2X2, List, Plus, Search } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store/store';
 import { listDocuments, resolveDocumentAsset, type RemoteDocument } from '@/api/docs';
@@ -102,9 +101,8 @@ export default function Docs() {
     <main className="docs-page">
       <section className="docs-hero">
         <div className="docs-hero-copy">
-          <span className="docs-kicker"><Sparkles size={14} /> A living archive</span>
-          <h1>追寻未来</h1>
-          <p>Chasing the future, one idea at a time.</p>
+          <span className="docs-kicker"><FileText size={14} aria-hidden="true" />Docs Library</span>
+          <h1>Search Future</h1>
         </div>
         <div className="docs-search-wrap">
           <Search size={20} aria-hidden="true" />
@@ -157,7 +155,7 @@ export default function Docs() {
                   <h2>{document.title}</h2>
                   <div className="doc-card-meta">
                     <span className="doc-category">{document.category}</span>
-                    <span><Clock3 size={13} /> {document.date}</span>
+                    <span className="doc-date"><Clock3 size={9} aria-hidden="true" /><time>{document.date}</time></span>
                   </div>
                   <p>{document.content}</p>
                   <button type="button" className="doc-read-button" onClick={() => navigate(`/docs/${document.id}`)}>Read document <span aria-hidden="true">↗</span></button>
