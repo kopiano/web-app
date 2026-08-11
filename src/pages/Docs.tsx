@@ -106,7 +106,7 @@ export default function Docs() {
       <section className="docs-hero">
         <div className="docs-hero-copy">
           <span className="docs-kicker"><FileText size={14} aria-hidden="true" />{t('docs.kicker')}</span>
-          <h1>{t('docs.title')}</h1>
+          <h1>{t('docs.subtitle')}</h1>
         </div>
         <div className="docs-search-wrap">
           <Search size={20} aria-hidden="true" />

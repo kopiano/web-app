@@ -15,7 +15,7 @@
   },
   "docs": {
     "kicker": "Docs Library",
-    "title": "Search Future",
+    "subtitle": "Search Future",
     "searchPlaceholder": "Search the archive...",
     "searchLabel": "Search documents",
     "allDocuments": "All documents",
