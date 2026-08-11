@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js/lib/common';
-import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, Heading2, Italic, Link2, List, Pencil, Quote, Save } from 'lucide-react';
+import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Italic, Link2, List, Pencil, Quote, Save } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { documents } from './Docs';
 import '@/styles/doc-editor.scss';
@@ -311,6 +311,92 @@ export default function DocEditor() {
     });
   };
 
+  const insertCodeTabs = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const selected = markdown.slice(start, end) || 'const pi = 3.14;';
+    const beforeContent = markdown.slice(0, start);
+    const afterContent = markdown.slice(end);
+    const prefix = beforeContent.length === 0
+      ? ''
+      : beforeContent.endsWith('\n\n')
+        ? ''
+        : beforeContent.endsWith('\n')
+          ? '\n'
+          : '\n\n';
+    const suffix = afterContent.length === 0
+      ? ''
+      : afterContent.startsWith('\n\n')
+        ? ''
+        : afterContent.startsWith('\n')
+          ? '\n'
+          : '\n\n';
+    const codeTabs = `::::
+::: index.html
+\`\`\`html
+\`\`\`
+:::
+::: style.css
+\`\`\`css
+\`\`\`
+:::
+::::`;
+    const next = `${beforeContent}${prefix}${codeTabs}${suffix}${afterContent}`;
+    setMarkdown(next);
+    setSavedAt(false);
+    requestAnimationFrame(() => {
+      editor.focus();
+      const cursor = start + prefix.length + codeTabs.indexOf(selected) + selected.length;
+      editor.setSelectionRange(cursor, cursor);
+    });
+  };
+
+  const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((event.metaKey || event.ctrlKey) && ['l', 'n', 't', 'w'].includes(event.key.toLowerCase())) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      event.stopPropagation();
+      window.document.execCommand(event.shiftKey ? 'redo' : 'undo');
+      return;
+    }
+    if (event.key !== 'Tab') return;
+
+    event.preventDefault();
+    const editor = event.currentTarget;
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const lineStart = markdown.lastIndexOf('\n', start - 1) + 1;
+    const selectedEnd = end > start && markdown[end - 1] === '\n' ? end - 1 : end;
+    const lineEnd = markdown.indexOf('\n', selectedEnd);
+    const rangeEnd = lineEnd === -1 ? markdown.length : lineEnd;
+    const selectedLines = markdown.slice(lineStart, rangeEnd);
+    const lines = selectedLines.split('\n');
+    const nextLines = event.shiftKey
+      ? lines.map((line) => line.startsWith('  ') ? line.slice(2) : line.startsWith(' ') ? line.slice(1) : line)
+      : lines.map((line) => `  ${line}`);
+    const replacement = nextLines.join('\n');
+    const next = `${markdown.slice(0, lineStart)}${replacement}${markdown.slice(rangeEnd)}`;
+    const offset = event.shiftKey
+      ? lines.reduce((total, line) => total + (line.startsWith('  ') ? 2 : line.startsWith(' ') ? 1 : 0), 0)
+      : lines.length * 2;
+    setMarkdown(next);
+    setSavedAt(false);
+    requestAnimationFrame(() => {
+      editor.focus();
+      const nextStart = event.shiftKey ? Math.max(lineStart, start - Math.min(offset, start - lineStart)) : start + 2;
+      const nextEnd = end > start
+        ? (event.shiftKey ? Math.max(nextStart, end - offset) : end + offset)
+        : nextStart;
+      editor.setSelectionRange(nextStart, nextEnd);
+    });
+  };
+
   const outline = useMemo(() => {
     const headingOccurrences = new Map<string, number>();
     return markdown.split('\n').filter((line) => /^#{1,3} /.test(line)).map((line) => {
@@ -361,9 +447,10 @@ export default function DocEditor() {
               <button type="button" onClick={() => insertMarkdown('> ', '', 'Quote')} aria-label="Quote"><Quote size={16} /></button>
               <button type="button" onClick={() => insertMarkdown('`', '`', 'code')} aria-label="Inline code"><Code2 size={16} /></button>
               <button type="button" onClick={insertCodeBlock} aria-label="Code block"><Braces size={16} /></button>
+              <button type="button" onClick={insertCodeTabs} aria-label="Code group"><FolderCode size={16} /></button>
               <button type="button" onClick={() => insertMarkdown('[', '](https://)', 'link text')} aria-label="Link"><Link2 size={16} /></button>
             </div>
-            <textarea ref={editorRef} className="doc-markdown-editor" value={markdown} onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }} spellCheck={false} aria-label="Markdown editor" />
+            <textarea ref={editorRef} className="doc-markdown-editor" value={markdown} onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }} onKeyDown={handleEditorKeyDown} spellCheck={false} aria-label="Markdown editor" />
           </div>
         )}
         {mode === 'preview' && (
