@@ -82,6 +82,12 @@
 .doc-markdown-image figcaption { margin-top: .85rem; color: rgba(38,48,46,.5); font-size: 1.1rem; line-height: 1.5; text-align: center; }
 .doc-markdown-preview ul { max-width: 72rem; margin: 1.2rem 0 2.2rem; padding-left: 2.2rem; }
 .doc-markdown-preview li { margin: .65rem 0; padding-left: .45rem; }
+.doc-markdown-table-wrap { max-width: 100%; margin: 2.2rem 0 2.8rem; overflow-x: auto; border: 1px solid rgba(38,48,46,.12); border-radius: 1rem; background: rgba(255,255,255,.58); }
+.doc-markdown-table { width: 100%; min-width: 52rem; border-collapse: collapse; color: rgba(38,48,46,.74); font-size: 1.4rem; line-height: 1.6; }
+.doc-markdown-table th, .doc-markdown-table td { padding: 1.15rem 1.35rem; border-bottom: 1px solid rgba(38,48,46,.1); text-align: left; vertical-align: top; }
+.doc-markdown-table th { color: #26302e; background: rgba(231,220,238,.42); font-weight: 700; }
+.doc-markdown-table tr:last-child td { border-bottom: 0; }
+.doc-markdown-table tbody tr:nth-child(even) { background: rgba(255,255,255,.34); }
 .doc-markdown-preview blockquote { max-width: 72rem; margin: 2.8rem 0; padding: 1.8rem 2.2rem; border-left: 3px solid #aa8cba; border-radius: 0 1rem 1rem 0; color: rgba(38,48,46,.74); background: rgba(255,255,255,.56); font-family: inherit; font-size: 1.7rem; line-height: 1.7; }
 .doc-code-block { overflow: hidden; margin: 1.8rem 0; border: 1px solid #30363d; border-radius: 2rem; background: #0d1117; box-shadow: 0 1.4rem 3rem rgba(13,17,23,.24); }
 .doc-code-tabs { margin: 1.8rem 0; }

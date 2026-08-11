@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js/lib/common';
-import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Italic, Link2, List, Pencil, Quote, Save } from 'lucide-react';
+import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Italic, Link2, List, Pencil, Quote, Save, Table2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { documents } from './Docs';
 import '@/styles/doc-editor.scss';
@@ -176,8 +176,63 @@ function CodeTabs({ content }: { content: string }) {
   );
 }
 
+function MarkdownTable({ lines }: { lines: string[] }) {
+  const cells = (line: string) => line.trim().replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim());
+  const headers = cells(lines[0]);
+  const rows = lines.slice(2).map(cells);
+
+  return (
+    <div className="doc-markdown-table-wrap">
+      <table className="doc-markdown-table">
+        <thead><tr>{headers.map((cell, index) => <th key={`${cell}-${index}`}>{renderInlineMarkdown(cell)}</th>)}</tr></thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {headers.map((_, index) => <td key={`${rowIndex}-${index}`}>{renderInlineMarkdown(row[index] ?? '')}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function separateMarkdownTables(markdown: string) {
+  const lines = markdown.split('\n');
+  const result: string[] = [];
+  let inFence = false;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line.startsWith('```')) {
+      inFence = !inFence;
+      result.push(line);
+      continue;
+    }
+    const separator = lines[index + 1];
+    const isTableStart = !inFence
+      && line.includes('|')
+      && Boolean(separator && /^\s*\|?[\s:-]+(\|[\s:-]+)+\|?\s*$/.test(separator));
+
+    if (isTableStart && result.length && result[result.length - 1] !== '') result.push('');
+    result.push(line);
+
+    if (isTableStart) {
+      index += 1;
+      result.push(lines[index]);
+      while (index + 1 < lines.length && lines[index + 1].includes('|')) {
+        index += 1;
+        result.push(lines[index]);
+      }
+      if (index + 1 < lines.length && lines[index + 1] !== '') result.push('');
+    }
+  }
+
+  return result.join('\n');
+}
+
 function renderMarkdown(markdown: string) {
-  const blocks = markdown
+  const blocks = separateMarkdownTables(markdown)
     .split(/(::::[\s\S]*?::::|```[^\n]*\n[\s\S]*?```)/g)
     .flatMap((segment) => segment.startsWith('```') ? [segment] : segment.split(/\n{2,}/))
     .filter((block) => block.trim());
@@ -188,6 +243,9 @@ function renderMarkdown(markdown: string) {
     const first = lines[0];
     if (block.startsWith('::::') && block.endsWith('::::')) {
       return <CodeTabs key={index} content={block.slice(4, -4).trim()} />;
+    }
+    if (lines.length >= 2 && lines[0].includes('|') && /^\s*\|?[\s:-]+(\|[\s:-]+)+\|?\s*$/.test(lines[1])) {
+      return <MarkdownTable key={index} lines={lines} />;
     }
     const headingLevel = first.match(/^(#{1,3}) /)?.[1].length;
     const headingLabel = headingLevel ? first.slice(headingLevel + 1) : '';
@@ -353,6 +411,24 @@ export default function DocEditor() {
     });
   };
 
+  const insertTable = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const table = `| Column 1 | Column 2 | Column 3 |
+| --- | --- | --- |
+| Value | Value | Value |`;
+    const next = `${markdown.slice(0, start)}${table}${markdown.slice(end)}`;
+    setMarkdown(next);
+    setSavedAt(false);
+    requestAnimationFrame(() => {
+      editor.focus();
+      const cursor = start + table.length;
+      editor.setSelectionRange(cursor, cursor);
+    });
+  };
+
   const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((event.metaKey || event.ctrlKey) && ['l', 'n', 't', 'w'].includes(event.key.toLowerCase())) {
       event.preventDefault();
@@ -448,6 +524,7 @@ export default function DocEditor() {
               <button type="button" onClick={() => insertMarkdown('`', '`', 'code')} aria-label="Inline code"><Code2 size={16} /></button>
               <button type="button" onClick={insertCodeBlock} aria-label="Code block"><Braces size={16} /></button>
               <button type="button" onClick={insertCodeTabs} aria-label="Code group"><FolderCode size={16} /></button>
+              <button type="button" onClick={insertTable} aria-label="Insert table"><Table2 size={16} /></button>
               <button type="button" onClick={() => insertMarkdown('[', '](https://)', 'link text')} aria-label="Link"><Link2 size={16} /></button>
             </div>
             <textarea ref={editorRef} className="doc-markdown-editor" value={markdown} onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }} onKeyDown={handleEditorKeyDown} spellCheck={false} aria-label="Markdown editor" />
