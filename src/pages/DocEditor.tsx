@@ -88,7 +88,7 @@ function renderInlineMarkdown(text: string) {
   });
 }
 
-function CodeBlock({ content, language }: { content: string; language: string }) {
+function CodeBlock({ content, language, headerContent }: { content: string; language: string; headerContent?: React.ReactNode }) {
   const [copied, setCopied] = useState(false);
   const lines = content.split('\n');
 
@@ -118,7 +118,7 @@ function CodeBlock({ content, language }: { content: string; language: string })
   return (
     <div className="doc-code-block">
       <div className="doc-code-header">
-        <span className="doc-code-language">{(language || 'text').toLowerCase()}</span>
+        {headerContent ?? <span className="doc-code-language">{(language || 'text').toLowerCase()}</span>}
         <button type="button" className={`doc-code-copy${copied ? ' is-copied' : ''}`} onClick={copyCode} aria-label="Copy code">
           {copied ? <Check size={14} /> : <Copy size={14} />}
           {copied ? 'Copied' : 'Copy'}
@@ -138,9 +138,47 @@ function CodeBlock({ content, language }: { content: string; language: string })
   );
 }
 
+function CodeTabs({ content }: { content: string }) {
+  const tabs = Array.from(content.matchAll(/:::\s*([^\n]+)\n```([^\n]*)\n([\s\S]*?)\n```\s*:::/g))
+    .map((match) => ({
+      label: match[1].trim(),
+      language: match[2].trim(),
+      content: match[3],
+    }));
+  const [activeTab, setActiveTab] = useState(0);
+
+  if (!tabs.length) return null;
+  const active = tabs[Math.min(activeTab, tabs.length - 1)];
+
+  return (
+    <div className="doc-code-tabs">
+      <CodeBlock
+        content={active.content}
+        language={active.language}
+        headerContent={(
+          <div className="doc-code-tab-list" role="tablist" aria-label="Code files">
+            {tabs.map((tab, index) => (
+              <button
+                type="button"
+                className={`doc-code-tab${index === activeTab ? ' is-active' : ''}`}
+                role="tab"
+                aria-selected={index === activeTab}
+                key={`${tab.label}-${index}`}
+                onClick={() => setActiveTab(index)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
+      />
+    </div>
+  );
+}
+
 function renderMarkdown(markdown: string) {
   const blocks = markdown
-    .split(/(```[^\n]*\n[\s\S]*?```)/g)
+    .split(/(::::[\s\S]*?::::|```[^\n]*\n[\s\S]*?```)/g)
     .flatMap((segment) => segment.startsWith('```') ? [segment] : segment.split(/\n{2,}/))
     .filter((block) => block.trim());
   const headingOccurrences = new Map<string, number>();
@@ -148,6 +186,9 @@ function renderMarkdown(markdown: string) {
   return blocks.map((block, index) => {
     const lines = block.split('\n');
     const first = lines[0];
+    if (block.startsWith('::::') && block.endsWith('::::')) {
+      return <CodeTabs key={index} content={block.slice(4, -4).trim()} />;
+    }
     const headingLevel = first.match(/^(#{1,3}) /)?.[1].length;
     const headingLabel = headingLevel ? first.slice(headingLevel + 1) : '';
     const headingOccurrence = headingLabel ? headingOccurrences.get(headingLabel) ?? 0 : 0;
