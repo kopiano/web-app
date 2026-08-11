@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js/lib/common';
 import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Info, Italic, Link2, List, Pencil, Quote, Rows3, Save, Table2, X } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -10,9 +10,9 @@ import '@/styles/doc-editor.scss';
 
 type EditorMode = 'preview' | 'edit';
 
-const seedMarkdown = (title: string, excerpt: string) => `# ${title}
+const seedMarkdown = (title: string, content: string) => `# ${title}
 
-${excerpt}
+${content}
 
 ## The premise
 
@@ -328,11 +328,41 @@ export default function DocEditor() {
     (location.state as { startInEdit?: boolean } | null)?.startInEdit ? 'edit' : 'preview'
   ));
   const [activeHeading, setActiveHeading] = useState('');
-  const [markdown, setMarkdown] = useState(() => localStorage.getItem(storageKey) || seedMarkdown(document.title, document.excerpt));
+  const [markdown, setMarkdown] = useState(() => localStorage.getItem(storageKey) || seedMarkdown(document.title, document.content));
   const [savedAt, setSavedAt] = useState(() => Boolean(localStorage.getItem(storageKey)));
+  const [isSaving, setIsSaving] = useState(false);
+  const [remoteLoaded, setRemoteLoaded] = useState(() => !Boolean(currentUser && id && !documents.some((item) => item.id === id)));
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLElement>(null);
+  const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const displayTitle = remoteTitle || document.title;
+  const isRemoteDocument = Boolean(currentUser && id && !documents.some((item) => item.id === id));
+
+  const saveDocument = useCallback(() => {
+    const contentToSave = markdown;
+    const save = async () => {
+      localStorage.setItem(storageKey, contentToSave);
+      if (!isRemoteDocument) {
+        setSavedAt(true);
+        return true;
+      }
+      setIsSaving(true);
+      try {
+        await updateDocument(id!, contentToSave);
+        setSavedAt(true);
+        return true;
+      } catch {
+        setSavedAt(false);
+        return false;
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    const queuedSave = saveQueueRef.current.then(save, save);
+    saveQueueRef.current = queuedSave;
+    return queuedSave;
+  }, [id, isRemoteDocument, markdown, storageKey]);
 
   useEffect(() => {
     if (!currentUser || !id || documents.some((item) => item.id === id)) return;
@@ -342,27 +372,19 @@ export default function DocEditor() {
       setRemoteTitle(remote.title);
       setRemoteCategory(remote.category);
       setRemoteImage(resolveDocumentAsset(remote.image, Date.now()));
-      setMarkdown(remote.content);
-      setSavedAt(true);
+      const localDraft = localStorage.getItem(storageKey);
+      setMarkdown(localDraft ?? remote.content);
+      setSavedAt(Boolean(localDraft) || Boolean(remote.content));
+      setRemoteLoaded(true);
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [currentUser?.id, id]);
+  }, [currentUser?.id, id, storageKey]);
 
   useEffect(() => {
-    const timer = window.setTimeout(async () => {
-      localStorage.setItem(storageKey, markdown);
-      if (currentUser && id && !documents.some((item) => item.id === id)) {
-        try {
-          await updateDocument(id, markdown);
-        } catch {
-          setSavedAt(false);
-          return;
-        }
-      }
-      setSavedAt(true);
-    }, 450);
+    if (isRemoteDocument && !remoteLoaded) return;
+    const timer = window.setTimeout(() => { void saveDocument(); }, 450);
     return () => window.clearTimeout(timer);
-  }, [currentUser?.id, id, markdown, storageKey]);
+  }, [isRemoteDocument, remoteLoaded, saveDocument]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -390,13 +412,12 @@ export default function DocEditor() {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        localStorage.setItem(storageKey, markdown);
-        setSavedAt(true);
+        void saveDocument();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [markdown, storageKey]);
+  }, [saveDocument]);
 
   const insertMarkdown = (before: string, after = '', placeholder = 'text') => {
     const editor = editorRef.current;
@@ -632,7 +653,9 @@ export default function DocEditor() {
           <div className="doc-editor-header-top">
             <button type="button" className="doc-back-button" onClick={() => navigate('/docs')}><ArrowLeft size={17} /> Back</button>
             {currentUser && id && !documents.some((item) => item.id === id) && <button type="button" className="doc-info-button" onClick={openInfo} aria-label="Document information"><Info size={17} /></button>}
-            <div className="doc-editor-save-status">{savedAt ? <><Check size={15} /> Saved locally</> : <><Save size={15} /> Saving...</>}</div>
+            <div className="doc-editor-save-status">
+              {savedAt && !isSaving ? <><Check size={15} /> {isRemoteDocument ? 'Saved' : 'Saved locally'}</> : <><Save size={15} /> Saving...</>}
+            </div>
           </div>
           <div className="doc-editor-header-mode">
             <div className="doc-editor-modes" role="tablist" aria-label="Editor mode">

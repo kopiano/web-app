@@ -7,7 +7,7 @@ export interface RemoteDocument {
   date: string;
   image?: string | null;
   accent: string;
-  excerpt: string;
+  content: string;
 }
 
 export interface RemoteDocumentContent {
@@ -51,7 +51,8 @@ export async function getDocument(id: string) {
 }
 
 export async function updateDocument(id: string, content: string) {
-  await request.put(`/docs/${id}`, { content });
+  const { data } = await request.put<RemoteDocumentContent>(`/docs/${id}`, { content });
+  return data;
 }
 
 export async function updateDocumentInfo(id: string, input: {
@@ -75,10 +76,12 @@ export async function createDocument(input: {
   title: string;
   category: string;
   image?: File | null;
+  content?: string;
 }) {
   const form = new FormData();
   form.append('title', input.title);
   form.append('category', input.category);
+  if (input.content !== undefined) form.append('content', input.content);
   if (input.image) form.append('image', input.image);
   const { data } = await request.post<RemoteDocument>('/docs', form);
   return data;

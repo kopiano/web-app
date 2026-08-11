@@ -17,12 +17,12 @@ import '@/styles/docs.scss';
 type ViewMode = 'grid' | 'timeline';
 
 export const documents = [
-  { id: 'quiet-system', title: 'A quiet system for brighter days', category: 'Design', date: 'Aug 08, 2026', image: bg0, accent: 'violet', excerpt: 'Notes on shaping interfaces that feel calm, clear, and quietly alive.' },
-  { id: 'next-horizon', title: 'Building for the next horizon', category: 'Product', date: 'Aug 02, 2026', image: bg1, accent: 'blue', excerpt: 'A field guide to turning a strong idea into a useful, enduring product.' },
-  { id: 'small-details', title: 'The language of small details', category: 'Research', date: 'Jul 26, 2026', image: bg2, accent: 'gold', excerpt: 'Observations on motion, rhythm, and the moments that make a tool memorable.' },
-  { id: 'unfinished-worlds', title: 'A map of unfinished worlds', category: 'Engineering', date: 'Jul 18, 2026', image: bg3, accent: 'rose', excerpt: 'Practical patterns for making complex systems easier to explore and change.' },
-  { id: 'readable-space', title: 'Light, depth, and readable space', category: 'Design', date: 'Jul 09, 2026', image: bg4, accent: 'mint', excerpt: 'A visual study of contrast, atmosphere, and the discipline of restraint.' },
-  { id: 'beyond-interface', title: 'Notes from beyond the interface', category: 'Product', date: 'Jun 28, 2026', image: bg5, accent: 'peach', excerpt: 'What product teams can learn from stories, games, and imagined futures.' },
+  { id: 'quiet-system', title: 'A quiet system for brighter days', category: 'Design', date: 'Aug 08, 2026', image: bg0, accent: 'violet', content: 'Notes on shaping interfaces that feel calm, clear, and quietly alive.' },
+  { id: 'next-horizon', title: 'Building for the next horizon', category: 'Product', date: 'Aug 02, 2026', image: bg1, accent: 'blue', content: 'A field guide to turning a strong idea into a useful, enduring product.' },
+  { id: 'small-details', title: 'The language of small details', category: 'Research', date: 'Jul 26, 2026', image: bg2, accent: 'gold', content: 'Observations on motion, rhythm, and the moments that make a tool memorable.' },
+  { id: 'unfinished-worlds', title: 'A map of unfinished worlds', category: 'Engineering', date: 'Jul 18, 2026', image: bg3, accent: 'rose', content: 'Practical patterns for making complex systems easier to explore and change.' },
+  { id: 'readable-space', title: 'Light, depth, and readable space', category: 'Design', date: 'Jul 09, 2026', image: bg4, accent: 'mint', content: 'A visual study of contrast, atmosphere, and the discipline of restraint.' },
+  { id: 'beyond-interface', title: 'Notes from beyond the interface', category: 'Product', date: 'Jun 28, 2026', image: bg5, accent: 'peach', content: 'What product teams can learn from stories, games, and imagined futures.' },
 ];
 
 export default function Docs() {
@@ -73,6 +73,14 @@ export default function Docs() {
     'All documents',
     ...Array.from(new Set(libraryDocuments.map((document) => document.category.trim()).filter(Boolean))),
   ], [libraryDocuments]);
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>([['All documents', libraryDocuments.length]]);
+    libraryDocuments.forEach((document) => {
+      const category = document.category.trim();
+      if (category) counts.set(category, (counts.get(category) ?? 0) + 1);
+    });
+    return counts;
+  }, [libraryDocuments]);
 
   useEffect(() => {
     if (activeCategory !== 'All documents' && !categories.includes(activeCategory)) {
@@ -85,7 +93,7 @@ export default function Docs() {
     return libraryDocuments.filter((document) => {
       const matchesCategory = activeCategory === 'All documents' || document.category === activeCategory;
       const matchesQuery = !normalizedQuery
-        || `${document.title} ${document.category} ${document.excerpt}`.toLowerCase().includes(normalizedQuery);
+        || `${document.title} ${document.category} ${document.content}`.toLowerCase().includes(normalizedQuery);
       return matchesCategory && matchesQuery;
     });
   }, [activeCategory, libraryDocuments, query]);
@@ -123,7 +131,7 @@ export default function Docs() {
                 className={activeCategory === category ? 'is-active' : ''}
                 onClick={() => setActiveCategory(category)}
               >
-                {category}
+                {category} <span className="docs-category-count">{categoryCounts.get(category) ?? 0}</span>
               </button>
             ))}
           </div>
@@ -151,7 +159,7 @@ export default function Docs() {
                     <span className="doc-category">{document.category}</span>
                     <span><Clock3 size={13} /> {document.date}</span>
                   </div>
-                  <p>{document.excerpt}</p>
+                  <p>{document.content}</p>
                   <button type="button" className="doc-read-button" onClick={() => navigate(`/docs/${document.id}`)}>Read document <span aria-hidden="true">↗</span></button>
                 </div>
               </article>
