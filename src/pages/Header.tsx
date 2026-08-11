@@ -187,8 +187,8 @@ export default function Header() {
     <header className="header" id="header">
       <nav className="nav">
         <Link to="/" className="logo">
-          <img src={nav_logo} alt="Z" className="nav_logo" />
-          <span>Coulson Zero</span>
+          {/* <img src={nav_logo} alt="Z" className="nav_logo" /> */}
+          <span>Kopiano</span>
         </Link>
 
         <ul className="navbar">
