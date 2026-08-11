@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js/lib/common';
-import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Italic, Link2, List, Pencil, Quote, Save, Table2 } from 'lucide-react';
+import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Italic, Link2, List, Pencil, Quote, Rows3, Save, Table2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { documents } from './Docs';
 import '@/styles/doc-editor.scss';
@@ -197,6 +197,28 @@ function MarkdownTable({ lines }: { lines: string[] }) {
   );
 }
 
+function BoxTable({ lines }: { lines: string[] }) {
+  const rows = lines
+    .filter((line) => line.startsWith('│'))
+    .map((line) => line.slice(1, -1).split('│').map((cell) => cell.trim()));
+  const headers = rows[0] ?? [];
+
+  return (
+    <div className="doc-markdown-table-wrap">
+      <table className="doc-markdown-table">
+        <thead><tr>{headers.map((cell, index) => <th key={`${cell}-${index}`}>{renderInlineMarkdown(cell)}</th>)}</tr></thead>
+        <tbody>
+          {rows.slice(1).map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {headers.map((_, index) => <td key={`${rowIndex}-${index}`}>{renderInlineMarkdown(row[index] ?? '')}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function separateMarkdownTables(markdown: string) {
   const lines = markdown.split('\n');
   const result: string[] = [];
@@ -207,6 +229,17 @@ function separateMarkdownTables(markdown: string) {
     if (line.startsWith('```')) {
       inFence = !inFence;
       result.push(line);
+      continue;
+    }
+    if (!inFence && line.startsWith('┌')) {
+      if (result.length && result[result.length - 1] !== '') result.push('');
+      result.push(line);
+      while (index + 1 < lines.length) {
+        index += 1;
+        result.push(lines[index]);
+        if (lines[index].startsWith('└')) break;
+      }
+      if (index + 1 < lines.length && lines[index + 1] !== '') result.push('');
       continue;
     }
     const separator = lines[index + 1];
@@ -243,6 +276,9 @@ function renderMarkdown(markdown: string) {
     const first = lines[0];
     if (block.startsWith('::::') && block.endsWith('::::')) {
       return <CodeTabs key={index} content={block.slice(4, -4).trim()} />;
+    }
+    if (first.startsWith('┌') && lines.some((line) => line.startsWith('└'))) {
+      return <BoxTable key={index} lines={lines} />;
     }
     if (lines.length >= 2 && lines[0].includes('|') && /^\s*\|?[\s:-]+(\|[\s:-]+)+\|?\s*$/.test(lines[1])) {
       return <MarkdownTable key={index} lines={lines} />;
@@ -429,6 +465,28 @@ export default function DocEditor() {
     });
   };
 
+  const insertUnicodeTable = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const table = `┌────────┬─────────────────┬──────────────┐
+│  方法   │      路径       │     功能      │
+├────────┼─────────────────┼──────────────┤
+│ POST   │  /api/register  │     注册      │
+├────────┼─────────────────┼──────────────┤
+│ POST   │  /api/login     │     登录      │
+└────────┴─────────────────┴──────────────┘`;
+    const next = `${markdown.slice(0, start)}${table}${markdown.slice(end)}`;
+    setMarkdown(next);
+    setSavedAt(false);
+    requestAnimationFrame(() => {
+      editor.focus();
+      const cursor = start + table.length;
+      editor.setSelectionRange(cursor, cursor);
+    });
+  };
+
   const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((event.metaKey || event.ctrlKey) && ['l', 'n', 't', 'w'].includes(event.key.toLowerCase())) {
       event.preventDefault();
@@ -525,6 +583,7 @@ export default function DocEditor() {
               <button type="button" onClick={insertCodeBlock} aria-label="Code block"><Braces size={16} /></button>
               <button type="button" onClick={insertCodeTabs} aria-label="Code group"><FolderCode size={16} /></button>
               <button type="button" onClick={insertTable} aria-label="Insert table"><Table2 size={16} /></button>
+              <button type="button" onClick={insertUnicodeTable} aria-label="Insert Unicode table"><Rows3 size={16} /></button>
               <button type="button" onClick={() => insertMarkdown('[', '](https://)', 'link text')} aria-label="Link"><Link2 size={16} /></button>
             </div>
             <textarea ref={editorRef} className="doc-markdown-editor" value={markdown} onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }} onKeyDown={handleEditorKeyDown} spellCheck={false} aria-label="Markdown editor" />
