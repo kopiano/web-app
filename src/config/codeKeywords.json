@@ -2,6 +2,8 @@
   "sh": [
     "cloudflared tunnel",
     "vim",
-    "brew"
+    "brew",
+    "git",
+    "pnpm"
   ]
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock3, FileText, Grid2X2, List, Plus, Search } from 'lucide-react';
 import { useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import type { RootState } from '@/store/store';
 import { listDocuments, resolveDocumentAsset, type RemoteDocument } from '@/api/docs';
 import NewDocEditor from './NewDocEditor';
@@ -25,6 +26,7 @@ export const documents = [
 ];
 
 export default function Docs() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All documents');
@@ -101,8 +103,8 @@ export default function Docs() {
     <main className="docs-page">
       <section className="docs-hero">
         <div className="docs-hero-copy">
-          <span className="docs-kicker"><FileText size={14} aria-hidden="true" />Docs Library</span>
-          <h1>Search Future</h1>
+          <span className="docs-kicker"><FileText size={14} aria-hidden="true" />{t('docs.kicker')}</span>
+          <h1>{t('docs.title')}</h1>
         </div>
         <div className="docs-search-wrap">
           <Search size={20} aria-hidden="true" />
@@ -110,18 +112,18 @@ export default function Docs() {
             ref={searchRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search the archive..."
-            aria-label="Search documents"
+            placeholder={t('docs.searchPlaceholder')}
+            aria-label={t('docs.searchLabel')}
           />
           <kbd>⌘ K</kbd>
         </div>
       </section>
 
-      <div className="docs-library" aria-label="Document library">
+        <div className="docs-library" aria-label={t('docs.documentView')}>
         <div className="docs-toolbar">
           <div className="docs-categories" role="tablist" aria-label="Document categories">
             {categories.map((category) => (
-              <button
+            <button
                 key={category}
                 type="button"
                 role="tab"
@@ -129,16 +131,16 @@ export default function Docs() {
                 className={activeCategory === category ? 'is-active' : ''}
                 onClick={() => setActiveCategory(category)}
               >
-                {category} <span className="docs-category-count">{categoryCounts.get(category) ?? 0}</span>
+                {category === 'All documents' ? t('docs.allDocuments') : category} <span className="docs-category-count">{categoryCounts.get(category) ?? 0}</span>
               </button>
             ))}
           </div>
-          <div className="docs-view-toggle" aria-label="Document view">
+          <div className="docs-view-toggle" aria-label={t('docs.documentView')}>
             <span className={`docs-view-toggle-thumb is-${viewMode}`} aria-hidden="true" />
-            <button type="button" className={viewMode === 'grid' ? 'is-active' : ''} onClick={() => setViewMode('grid')} aria-label="Card view">
+            <button type="button" className={viewMode === 'grid' ? 'is-active' : ''} onClick={() => setViewMode('grid')} aria-label={t('docs.cardView')}>
               <Grid2X2 size={16} />
             </button>
-            <button type="button" className={viewMode === 'timeline' ? 'is-active' : ''} onClick={() => setViewMode('timeline')} aria-label="Timeline view">
+            <button type="button" className={viewMode === 'timeline' ? 'is-active' : ''} onClick={() => setViewMode('timeline')} aria-label={t('docs.timelineView')}>
               <List size={18} />
             </button>
           </div>
@@ -158,7 +160,7 @@ export default function Docs() {
                     <span className="doc-date"><Clock3 size={9} aria-hidden="true" /><time>{document.date}</time></span>
                   </div>
                   <p>{document.content}</p>
-                  <button type="button" className="doc-read-button" onClick={() => navigate(`/docs/${document.id}`)}>Read document <span aria-hidden="true">↗</span></button>
+                  <button type="button" className="doc-read-button" onClick={() => navigate(`/docs/${document.id}`)}>{t('docs.readDocument')} <span aria-hidden="true">↗</span></button>
                 </div>
               </article>
             ))}
@@ -166,12 +168,12 @@ export default function Docs() {
         ) : (
           <div className="docs-empty">
             <FileText size={30} />
-            <strong>No documents found</strong>
-            <span>Try another search or category.</span>
+            <strong>{t('docs.noDocuments')}</strong>
+            <span>{t('docs.tryAnotherSearch')}</span>
           </div>
         )}
       </div>
-      <button type="button" className="docs-create-button" onClick={() => setIsCreateOpen(true)} aria-label="Create document" title="Create document">
+      <button type="button" className="docs-create-button" onClick={() => setIsCreateOpen(true)} aria-label={t('docs.createDocument')} title={t('docs.createDocument')}>
         <Plus size={24} />
       </button>
       {isCreateOpen && <NewDocEditor onClose={() => setIsCreateOpen(false)} />}

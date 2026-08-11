@@ -1,10 +1,12 @@
 import { ChangeEvent, FormEvent, useState } from 'react';
 import { ArrowRight, ImagePlus, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { createDocument } from '@/api/docs';
 import '@/styles/doc-editor.scss';
 
 export default function NewDocEditor({ onClose }: { onClose?: () => void }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const close = onClose ?? (() => navigate('/docs'));
   const [title, setTitle] = useState('');
@@ -54,36 +56,36 @@ export default function NewDocEditor({ onClose }: { onClose?: () => void }) {
         <button type="button" className="doc-create-close" onClick={close} aria-label="Close"><X size={17} /></button>
         <div className="doc-create-heading">
           <span className="doc-create-icon"><ImagePlus size={22} /></span>
-          <div><h2 id="doc-create-title">Create document</h2><p>Set up the document card, then write in the editor.</p></div>
+          <div><h2 id="doc-create-title">{t('docs.createDocument')}</h2><p>{t('docs.updateCardDetails')}</p></div>
         </div>
         <div className="doc-create-form">
           <div className="doc-new-image-wrap">
             <label
               className={`doc-new-image${preview ? ' has-preview' : ''}`}
               style={preview ? { backgroundImage: `url("${preview}")` } : undefined}
-              aria-label={preview ? 'Change cover image' : 'Choose cover image'}
-              title={preview ? 'Click to change cover image' : 'Choose cover image'}
+              aria-label={preview ? t('docs.changeCover') : t('docs.chooseCover')}
+              title={preview ? t('docs.changeCover') : t('docs.chooseCover')}
             >
               <input type="file" accept="image/png,image/jpeg,image/webp" onChange={selectImage} />
               {!preview && <ImagePlus size={24} />}
-              {!preview && <span>Choose cover image</span>}
+              {!preview && <span>{t('docs.chooseCover')}</span>}
             </label>
-            <small>Cover is cropped to 720 × 480 WebP.</small>
+            <small>{t('docs.coverCropHint')}</small>
           </div>
           <div className="doc-create-fields">
             <label className="doc-new-inline-field">
-              <span className="doc-new-field-label">Title</span>
-              <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Document title" autoFocus />
+              <span className="doc-new-field-label">{t('docs.title')}</span>
+              <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t('docs.titlePlaceholder')} autoFocus />
             </label>
             <label className="doc-new-inline-field">
-              <span className="doc-new-field-label">Category</span>
-              <input value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Personal" />
+              <span className="doc-new-field-label">{t('docs.category')}</span>
+              <input value={category} onChange={(event) => setCategory(event.target.value)} placeholder={t('docs.categoryPlaceholder')} />
             </label>
           </div>
         </div>
         {error && <p className="doc-new-error" role="alert">{error}</p>}
         <div className="doc-create-actions">
-          <button type="submit" className="doc-create-next" disabled={!title.trim() || !category.trim() || saving}>{saving ? 'Creating...' : 'Next'} <ArrowRight size={16} /></button>
+          <button type="submit" className="doc-create-next" disabled={!title.trim() || !category.trim() || saving}>{saving ? t('docs.creating') : t('docs.next')} <ArrowRight size={16} /></button>
         </div>
       </form>
     </main>

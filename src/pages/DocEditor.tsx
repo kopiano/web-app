@@ -3,6 +3,7 @@ import hljs from 'highlight.js/lib/common';
 import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Info, Italic, Link2, List, Pencil, Quote, Rows3, Save, Table2, X } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import type { RootState } from '@/store/store';
 import { deleteDocument, getDocument, resolveDocumentAsset, updateDocument, updateDocumentInfo } from '@/api/docs';
 import { documents } from './Docs';
@@ -104,6 +105,7 @@ function renderInlineMarkdown(text: string) {
 }
 
 function CodeBlock({ content, language, headerContent }: { content: string; language: string; headerContent?: React.ReactNode }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const lines = content.split('\n');
 
@@ -134,9 +136,9 @@ function CodeBlock({ content, language, headerContent }: { content: string; lang
     <div className="doc-code-block">
       <div className="doc-code-header">
         {headerContent ?? <span className="doc-code-language">{(language || 'text').toLowerCase()}</span>}
-        <button type="button" className={`doc-code-copy${copied ? ' is-copied' : ''}`} onClick={copyCode} aria-label="Copy code">
+        <button type="button" className={`doc-code-copy${copied ? ' is-copied' : ''}`} onClick={copyCode} aria-label={t('docs.copyCode')}>
           {copied ? <Check size={14} /> : <Copy size={14} />}
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t('docs.copied') : t('docs.copy')}
         </button>
       </div>
       <pre>
@@ -154,6 +156,7 @@ function CodeBlock({ content, language, headerContent }: { content: string; lang
 }
 
 function CodeTabs({ content }: { content: string }) {
+  const { t } = useTranslation();
   const tabs = Array.from(content.matchAll(/:::\s*([^\n]+)\n```([^\n]*)\n([\s\S]*?)\n```\s*:::/g))
     .map((match) => ({
       label: match[1].trim(),
@@ -171,7 +174,7 @@ function CodeTabs({ content }: { content: string }) {
         content={active.content}
         language={active.language}
         headerContent={(
-          <div className="doc-code-tab-list" role="tablist" aria-label="Code files">
+          <div className="doc-code-tab-list" role="tablist" aria-label={t('docs.codeFiles')}>
             {tabs.map((tab, index) => (
               <button
                 type="button"
@@ -340,6 +343,7 @@ function renderMarkdown(markdown: string) {
 }
 
 export default function DocEditor() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -488,7 +492,7 @@ export default function DocEditor() {
       await deleteDocument(id);
       navigate('/docs', { replace: true });
     } catch {
-      setInfoError('Unable to delete this document.');
+      setInfoError(t('docs.deleteFailed'));
       setInfoDeleting(false);
     }
   };
@@ -686,47 +690,47 @@ export default function DocEditor() {
       <header className="doc-editor-header" style={{ backgroundImage: `url("${remoteImage || document.image}")` }}>
         <div className="doc-editor-header-shade">
           <div className="doc-editor-header-top">
-            <button type="button" className="doc-back-button" onClick={() => navigate('/docs')}><ArrowLeft size={17} /> Back</button>
-            {currentUser && id && !documents.some((item) => item.id === id) && <button type="button" className="doc-info-button" onClick={openInfo} aria-label="Document information"><Info size={17} /></button>}
+            <button type="button" className="doc-back-button" onClick={() => navigate('/docs')}><ArrowLeft size={17} /> {t('docs.back')}</button>
+            {currentUser && id && !documents.some((item) => item.id === id) && <button type="button" className="doc-info-button" onClick={openInfo} aria-label={t('docs.documentInformation')}><Info size={17} /></button>}
             <div className="doc-editor-save-status">
-              {savedAt && !isSaving ? <><Check size={15} /> {isRemoteDocument ? 'Saved' : 'Saved locally'}</> : <><Save size={15} /> Saving...</>}
+              {savedAt && !isSaving ? <><Check size={15} /> {isRemoteDocument ? t('docs.saved') : t('docs.savedLocally')}</> : <><Save size={15} /> {t('docs.saving')}</>}
             </div>
           </div>
           <div className="doc-editor-header-mode">
-            <div className="doc-editor-modes" role="tablist" aria-label="Editor mode">
+            <div className="doc-editor-modes" role="tablist" aria-label={t('docs.editorMode')}>
               <span className={`doc-editor-modes-thumb is-${mode}`} aria-hidden="true" />
-              <button type="button" className={mode === 'preview' ? 'is-active' : ''} onClick={() => setMode('preview')}><Eye size={16} /> Preview</button>
-              <button type="button" className={mode === 'edit' ? 'is-active' : ''} onClick={() => setMode('edit')}><Pencil size={16} /> Edit</button>
+              <button type="button" className={mode === 'preview' ? 'is-active' : ''} onClick={() => setMode('preview')}><Eye size={16} /> {t('docs.preview')}</button>
+              <button type="button" className={mode === 'edit' ? 'is-active' : ''} onClick={() => setMode('edit')}><Pencil size={16} /> {t('docs.edit')}</button>
             </div>
           </div>
         </div>
       </header>
       <aside className="doc-outline">
         <div className="doc-outline-heading">
-          <div className="doc-outline-heading-title"><FileText size={15} /><span>INDEX</span></div>
+          <div className="doc-outline-heading-title"><FileText size={15} /><span>{t('docs.index')}</span></div>
         </div>
         <div className="doc-outline-rule" aria-hidden="true"><span style={{ width: `${outline.length ? ((outline.findIndex((item) => item.id === activeHeading) + 1) / outline.length) * 100 : 0}%` }} /></div>
-        <nav aria-label="Document outline">
+        <nav aria-label={t('docs.documentOutline')}>
           {outline.map((item) => <a className={`level-${item.level}${activeHeading === item.id ? ' is-active' : ''}`} href={`#${item.id}`} key={item.id} aria-current={activeHeading === item.id ? 'location' : undefined} onClick={(event) => { setActiveHeading(item.id); event.currentTarget.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }}><span className="doc-outline-marker" aria-hidden="true" /><span className="doc-outline-level">H{item.level}</span><span className="doc-outline-label">{item.label}</span></a>)}
         </nav>
       </aside>
       <div className={`doc-editor-workspace is-${mode}`}>
         {mode === 'edit' && (
           <div className="doc-editor-edit-pane">
-            <div className="doc-markdown-toolbar" aria-label="Markdown formatting">
-              <button type="button" onClick={() => insertMarkdown('**', '**', 'bold')} aria-label="Bold"><Bold size={16} /></button>
-              <button type="button" onClick={() => insertMarkdown('*', '*', 'italic')} aria-label="Italic"><Italic size={16} /></button>
-              <button type="button" onClick={() => insertMarkdown('## ', '', 'Heading')} aria-label="Heading"><Heading2 size={16} /></button>
-              <button type="button" onClick={() => insertMarkdown('- ', '', 'List item')} aria-label="Bullet list"><List size={16} /></button>
-              <button type="button" onClick={() => insertMarkdown('> ', '', 'Quote')} aria-label="Quote"><Quote size={16} /></button>
-              <button type="button" onClick={() => insertMarkdown('`', '`', 'code')} aria-label="Inline code"><Code2 size={16} /></button>
-              <button type="button" onClick={insertCodeBlock} aria-label="Code block"><Braces size={16} /></button>
-              <button type="button" onClick={insertCodeTabs} aria-label="Code group"><FolderCode size={16} /></button>
-              <button type="button" onClick={insertTable} aria-label="Insert table"><Table2 size={16} /></button>
-              <button type="button" onClick={insertUnicodeTable} aria-label="Insert Unicode table"><Rows3 size={16} /></button>
-              <button type="button" onClick={() => insertMarkdown('[', '](https://)', 'link text')} aria-label="Link"><Link2 size={16} /></button>
+            <div className="doc-markdown-toolbar" aria-label={t('docs.markdownFormatting')}>
+              <button type="button" onClick={() => insertMarkdown('**', '**', 'bold')} aria-label={t('docs.bold')}><Bold size={16} /></button>
+              <button type="button" onClick={() => insertMarkdown('*', '*', 'italic')} aria-label={t('docs.italic')}><Italic size={16} /></button>
+              <button type="button" onClick={() => insertMarkdown('## ', '', 'Heading')} aria-label={t('docs.heading')}><Heading2 size={16} /></button>
+              <button type="button" onClick={() => insertMarkdown('- ', '', 'List item')} aria-label={t('docs.bulletList')}><List size={16} /></button>
+              <button type="button" onClick={() => insertMarkdown('> ', '', 'Quote')} aria-label={t('docs.quote')}><Quote size={16} /></button>
+              <button type="button" onClick={() => insertMarkdown('`', '`', 'code')} aria-label={t('docs.inlineCode')}><Code2 size={16} /></button>
+              <button type="button" onClick={insertCodeBlock} aria-label={t('docs.codeBlock')}><Braces size={16} /></button>
+              <button type="button" onClick={insertCodeTabs} aria-label={t('docs.codeGroup')}><FolderCode size={16} /></button>
+              <button type="button" onClick={insertTable} aria-label={t('docs.insertTable')}><Table2 size={16} /></button>
+              <button type="button" onClick={insertUnicodeTable} aria-label={t('docs.insertUnicodeTable')}><Rows3 size={16} /></button>
+              <button type="button" onClick={() => insertMarkdown('[', '](https://)', 'link text')} aria-label={t('docs.link')}><Link2 size={16} /></button>
             </div>
-            <textarea ref={editorRef} className="doc-markdown-editor" value={markdown} onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }} onKeyDown={handleEditorKeyDown} spellCheck={false} aria-label={`Markdown editor for ${displayTitle}`} />
+            <textarea ref={editorRef} className="doc-markdown-editor" value={markdown} onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }} onKeyDown={handleEditorKeyDown} spellCheck={false} aria-label={`${t('docs.markdownEditor')} ${displayTitle}`} />
           </div>
         )}
         {mode === 'preview' && (
@@ -735,44 +739,44 @@ export default function DocEditor() {
       </div>
       {infoOpen && (
         <main className="doc-create-overlay">
-          <button type="button" className="doc-create-backdrop" onClick={() => setInfoOpen(false)} aria-label="Close document information" />
+          <button type="button" className="doc-create-backdrop" onClick={() => setInfoOpen(false)} aria-label={t('docs.closeDocumentInformation')} />
           <div className="doc-info-dialog" role="dialog" aria-modal="true" aria-labelledby="doc-info-title">
-            <button type="button" className="doc-create-close" onClick={() => setInfoOpen(false)} aria-label="Close"><X size={17} /></button>
+            <button type="button" className="doc-create-close" onClick={() => setInfoOpen(false)} aria-label={t('docs.close')}><X size={17} /></button>
             <aside className="doc-info-sidebar">
-              <p>DOCUMENT</p>
+              <p>{t('docs.documentInformationLabel')}</p>
               <h2>{displayTitle}</h2>
               <nav>
-                <button type="button" className={infoTab === 'detail' ? 'is-active' : ''} onClick={() => setInfoTab('detail')}><Info size={16} /> Detail</button>
-                <button type="button" className={`is-danger${infoTab === 'delete' ? ' is-active' : ''}`} onClick={() => setInfoTab('delete')}><X size={16} /> Delete</button>
+                <button type="button" className={infoTab === 'detail' ? 'is-active' : ''} onClick={() => setInfoTab('detail')}><Info size={16} /> {t('docs.detail')}</button>
+                <button type="button" className={`is-danger${infoTab === 'delete' ? ' is-active' : ''}`} onClick={() => setInfoTab('delete')}><X size={16} /> {t('docs.delete')}</button>
               </nav>
             </aside>
             <section className="doc-info-content">
               {infoTab === 'detail' ? (
                 <form onSubmit={saveInfo}>
-                  <div className="doc-create-heading"><span className="doc-create-icon"><Info size={22} /></span><div><h2 id="doc-info-title">Document details</h2><p>Update the document card details.</p></div></div>
+                  <div className="doc-create-heading"><span className="doc-create-icon"><Info size={22} /></span><div><h2 id="doc-info-title">{t('docs.documentDetails')}</h2><p>{t('docs.updateCardDetails')}</p></div></div>
                   <div className="doc-create-form">
                     <div className="doc-new-image-wrap">
-                      <label className={`doc-new-image${infoPreview ? ' has-preview' : ''}`} style={infoPreview ? { backgroundImage: `url("${infoPreview}")` } : undefined} aria-label="Change cover image">
+                      <label className={`doc-new-image${infoPreview ? ' has-preview' : ''}`} style={infoPreview ? { backgroundImage: `url("${infoPreview}")` } : undefined} aria-label={t('docs.changeCover')}>
                         <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0] ?? null; setInfoImage(file); setInfoPreview(file ? URL.createObjectURL(file) : infoPreview); }} />
-                        {!infoPreview && <span>Choose cover image</span>}
+                        {!infoPreview && <span>{t('docs.chooseCover')}</span>}
                       </label>
-                      <small>Cover is cropped to 720 × 480 WebP.</small>
+                      <small>{t('docs.coverCropHint')}</small>
                     </div>
                     <div className="doc-create-fields">
-                      <label className="doc-new-inline-field"><span className="doc-new-field-label">Title</span><input value={infoTitle} onChange={(event) => setInfoTitle(event.target.value)} autoFocus /></label>
-                      <label className="doc-new-inline-field"><span className="doc-new-field-label">Category</span><input value={infoCategory} onChange={(event) => setInfoCategory(event.target.value)} /></label>
+                      <label className="doc-new-inline-field"><span className="doc-new-field-label">{t('docs.title')}</span><input value={infoTitle} onChange={(event) => setInfoTitle(event.target.value)} autoFocus /></label>
+                      <label className="doc-new-inline-field"><span className="doc-new-field-label">{t('docs.category')}</span><input value={infoCategory} onChange={(event) => setInfoCategory(event.target.value)} /></label>
                     </div>
                   </div>
-                  <div className="doc-create-actions"><button type="submit" className="doc-create-next" disabled={!infoTitle.trim() || !infoCategory.trim() || infoSaving}>{infoSaving ? 'Saving...' : 'Save'} <Check size={16} /></button></div>
+                  <div className="doc-create-actions"><button type="submit" className="doc-create-next" disabled={!infoTitle.trim() || !infoCategory.trim() || infoSaving}>{infoSaving ? t('docs.saving') : t('docs.save')} <Check size={16} /></button></div>
                 </form>
               ) : (
                 <div className="doc-info-delete">
                   <span className="doc-info-delete-icon"><X size={24} /></span>
-                  <p className="doc-info-danger-label">PERMANENT ACTION</p>
-                  <h2>Delete this document?</h2>
-                  <p>This will remove the document and its cover image. This action cannot be undone.</p>
+                  <p className="doc-info-danger-label">{t('docs.permanentAction')}</p>
+                  <h2>{t('docs.deleteDocumentTitle')}</h2>
+                  <p>{t('docs.deleteDocumentDescription')}</p>
                   {infoError && <p className="doc-new-error" role="alert">{infoError}</p>}
-                  <button type="button" className="doc-info-delete-confirm" onClick={removeDocument} disabled={infoDeleting}>{infoDeleting ? 'Deleting...' : 'Delete document'}</button>
+                  <button type="button" className="doc-info-delete-confirm" onClick={removeDocument} disabled={infoDeleting}>{infoDeleting ? t('docs.deleting') : t('docs.deleteDocument')}</button>
                 </div>
               )}
             </section>
