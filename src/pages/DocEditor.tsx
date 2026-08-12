@@ -47,7 +47,8 @@ function createHeadingId(label: string, occurrence: number) {
 const languageAliases: Record<string, string> = {
   html: 'xml',
   htm: 'xml',
-  jsx: 'xml',
+  jsx: 'javascript',
+  tsx: 'javascript',
   vue: 'xml',
   sh: 'bash',
   shell: 'bash',
@@ -657,7 +658,10 @@ export default function DocEditor() {
     if (event.key !== 'Tab') return;
 
     event.preventDefault();
+    event.stopPropagation();
     const editor = event.currentTarget;
+    const pageScrollX = window.scrollX;
+    const pageScrollY = window.scrollY;
     const start = editor.selectionStart;
     const end = editor.selectionEnd;
     const indent = '    ';
@@ -671,6 +675,7 @@ export default function DocEditor() {
       requestAnimationFrame(() => {
         editor.focus();
         editor.setSelectionRange(start + indent.length, start + indent.length);
+        window.scrollTo(pageScrollX, pageScrollY);
       });
       return;
     }
@@ -682,12 +687,12 @@ export default function DocEditor() {
     const selectedLines = markdown.slice(lineStart, rangeEnd);
     const lines = selectedLines.split('\n');
     const nextLines = event.shiftKey
-      ? lines.map((line) => line.startsWith(indent) ? line.slice(indent.length) : line.replace(/^ {1,3}/, ''))
+      ? lines.map((line) => line.startsWith(indent) ? line.slice(indent.length) : line)
       : lines.map((line) => `${indent}${line}`);
     const replacement = nextLines.join('\n');
     const next = `${markdown.slice(0, lineStart)}${replacement}${markdown.slice(rangeEnd)}`;
     const offset = event.shiftKey
-      ? lines.reduce((total, line) => total + (line.startsWith(indent) ? indent.length : Math.min(line.match(/^ */)?.[0].length ?? 0, 3)), 0)
+      ? lines.reduce((total, line) => total + (line.startsWith(indent) ? indent.length : 0), 0)
       : lines.length * indent.length;
     setMarkdown(next);
     setSavedAt(false);
@@ -698,6 +703,7 @@ export default function DocEditor() {
         ? (event.shiftKey ? Math.max(nextStart, end - offset) : end + offset)
         : nextStart;
       editor.setSelectionRange(nextStart, nextEnd);
+      window.scrollTo(pageScrollX, pageScrollY);
     });
   };
 

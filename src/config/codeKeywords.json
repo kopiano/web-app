@@ -4,6 +4,10 @@
     "vim",
     "brew",
     "git",
+    "pnpm",
+    "cargo",
+    "docker compose",
+    "npm",
     "pnpm"
   ]
 }
