@@ -678,7 +678,15 @@ export default function DocEditor() {
 
   const outline = useMemo(() => {
     const headingOccurrences = new Map<string, number>();
-    return markdown.split('\n').filter((line) => /^#{1,3} /.test(line)).map((line) => {
+    let inFence = false;
+    return markdown.split('\n').filter((line) => {
+      if (/^```/.test(line.trim())) {
+        inFence = !inFence;
+        return false;
+      }
+      if (inFence || /^::::/.test(line.trim()) || /^:::/.test(line.trim())) return false;
+      return /^#{1,3} /.test(line);
+    }).map((line) => {
       const level = line.match(/^#+/)?.[0].length ?? 1;
       const label = line.slice(level + 1);
       const occurrence = headingOccurrences.get(label) ?? 0;
