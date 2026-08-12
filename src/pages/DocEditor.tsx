@@ -157,11 +157,11 @@ function CodeBlock({ content, language, headerContent }: { content: string; lang
 
 function CodeTabs({ content }: { content: string }) {
   const { t } = useTranslation();
-  const tabs = Array.from(content.matchAll(/:::\s*([^\n]+)\n```([^\n]*)\n([\s\S]*?)\n```\s*:::/g))
+  const tabs = Array.from(content.matchAll(/:::\s*([^\n]+)\n```([^\n]*)\n([\s\S]*?)```\s*:::/g))
     .map((match) => ({
       label: match[1].trim(),
       language: match[2].trim(),
-      content: match[3],
+      content: match[3].replace(/^\n/, '').replace(/\n$/, ''),
     }));
   const [activeTab, setActiveTab] = useState(0);
 
