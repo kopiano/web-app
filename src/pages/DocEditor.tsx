@@ -660,6 +660,21 @@ export default function DocEditor() {
     const editor = event.currentTarget;
     const start = editor.selectionStart;
     const end = editor.selectionEnd;
+    const indent = '    ';
+
+    // With no selection, Tab behaves like a literal four-space insertion
+    // instead of unexpectedly re-indenting the whole current line.
+    if (start === end && !event.shiftKey) {
+      const next = `${markdown.slice(0, start)}${indent}${markdown.slice(end)}`;
+      setMarkdown(next);
+      setSavedAt(false);
+      requestAnimationFrame(() => {
+        editor.focus();
+        editor.setSelectionRange(start + indent.length, start + indent.length);
+      });
+      return;
+    }
+
     const lineStart = markdown.lastIndexOf('\n', start - 1) + 1;
     const selectedEnd = end > start && markdown[end - 1] === '\n' ? end - 1 : end;
     const lineEnd = markdown.indexOf('\n', selectedEnd);
@@ -667,18 +682,18 @@ export default function DocEditor() {
     const selectedLines = markdown.slice(lineStart, rangeEnd);
     const lines = selectedLines.split('\n');
     const nextLines = event.shiftKey
-      ? lines.map((line) => line.startsWith('  ') ? line.slice(2) : line.startsWith(' ') ? line.slice(1) : line)
-      : lines.map((line) => `  ${line}`);
+      ? lines.map((line) => line.startsWith(indent) ? line.slice(indent.length) : line.replace(/^ {1,3}/, ''))
+      : lines.map((line) => `${indent}${line}`);
     const replacement = nextLines.join('\n');
     const next = `${markdown.slice(0, lineStart)}${replacement}${markdown.slice(rangeEnd)}`;
     const offset = event.shiftKey
-      ? lines.reduce((total, line) => total + (line.startsWith('  ') ? 2 : line.startsWith(' ') ? 1 : 0), 0)
-      : lines.length * 2;
+      ? lines.reduce((total, line) => total + (line.startsWith(indent) ? indent.length : Math.min(line.match(/^ */)?.[0].length ?? 0, 3)), 0)
+      : lines.length * indent.length;
     setMarkdown(next);
     setSavedAt(false);
     requestAnimationFrame(() => {
       editor.focus();
-      const nextStart = event.shiftKey ? Math.max(lineStart, start - Math.min(offset, start - lineStart)) : start + 2;
+      const nextStart = event.shiftKey ? Math.max(lineStart, start - Math.min(offset, start - lineStart)) : start + indent.length;
       const nextEnd = end > start
         ? (event.shiftKey ? Math.max(nextStart, end - offset) : end + offset)
         : nextStart;
