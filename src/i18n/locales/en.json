@@ -27,7 +27,6 @@
     "openDocument": "Open {{title}}",
     "readDocument": "Read document",
     "noDocuments": "No documents found",
-    "loading": "Loading documents...",
     "tryAnotherSearch": "Try another search or category.",
     "createDocument": "Create document",
     "documentInformation": "Document information",

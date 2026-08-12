@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock3, FileText, Grid2X2, List, Plus, Search } from 'lucide-react';
+import { Clock3, FileText, Grid2X2, List, LoaderCircle, Plus, Search } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import type { RootState } from '@/store/store';
@@ -150,8 +150,7 @@ export default function Docs() {
 
         {!remoteLoaded && currentUser ? (
           <div className="docs-empty docs-loading" aria-live="polite">
-            <FileText size={30} />
-            <strong>{t('docs.loading')}</strong>
+            <LoaderCircle className="docs-loading-icon" size={32} aria-hidden="true" />
           </div>
         ) : filteredDocuments.length ? (
           <div key={viewMode} className={`docs-results is-${viewMode}`}>

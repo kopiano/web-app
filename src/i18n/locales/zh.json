@@ -27,7 +27,6 @@
     "openDocument": "打开 {{title}}",
     "readDocument": "阅读文档",
     "noDocuments": "暂无文档",
-    "loading": "正在加载文档...",
     "tryAnotherSearch": "请尝试其他搜索词或分类。",
     "createDocument": "新建文档",
     "documentInformation": "文档信息",

@@ -188,6 +188,8 @@
 .docs-results.is-timeline .doc-card p { min-height: 0; max-width: 58rem; }
 .docs-results.is-timeline .doc-read-button { margin-top: 1.2rem; }
 .docs-empty { min-height: 24rem; display: grid; place-items: center; align-content: center; gap: .8rem; color: var(--docs-muted); }
+.docs-loading-icon { color: #6d557f; animation: docs-loading-spin .9s linear infinite; }
+@keyframes docs-loading-spin { to { transform: rotate(360deg); } }
 .docs-create-button { position: fixed; right: 2.4rem; bottom: 2.4rem; z-index: 8; display: grid;
   width: 4rem; height: 4rem;
   place-items: center;
