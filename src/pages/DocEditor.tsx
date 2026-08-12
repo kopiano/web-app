@@ -302,8 +302,12 @@ function renderMarkdown(markdown: string) {
     .lines
     .join('\n');
   const blocks = markdownWithBlockBoundaries
-    .split(/(::::[\s\S]*?::::|```[^\n]*\n[\s\S]*?```)/g)
-    .flatMap((segment) => segment.startsWith('```') ? [segment] : segment.split(/\n{2,}/))
+    .split(/(::::[\s\S]*?::::|```[^\r\n]*\r?\n[\s\S]*?```)/g)
+    .flatMap((segment) => (
+      segment.startsWith('```') || segment.startsWith('::::')
+        ? [segment]
+        : segment.split(/\n{2,}/)
+    ))
     .filter((block) => block.trim());
   const headingOccurrences = new Map<string, number>();
 
@@ -312,6 +316,9 @@ function renderMarkdown(markdown: string) {
     const first = lines[0];
     if (block.startsWith('::::') && block.endsWith('::::')) {
       return <CodeTabs key={index} content={block.slice(4, -4).trim()} />;
+    }
+    if (first.startsWith('```') && lines[lines.length - 1].trim() === '```') {
+      return <CodeBlock key={index} language={first.slice(3).trim()} content={lines.slice(1, -1).join('\n')} />;
     }
     if (first.startsWith('┌') && lines.some((line) => line.startsWith('└'))) {
       return <BoxTable key={index} lines={lines} />;
@@ -335,9 +342,6 @@ function renderMarkdown(markdown: string) {
       return <ol key={index}>{orderedItems.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item)}</li>)}</ol>;
     }
     if (first.startsWith('> ')) return <blockquote key={index}>{renderInlineMarkdown(first.slice(2))}</blockquote>;
-    if (first.startsWith('```')) {
-      return <CodeBlock key={index} language={first.slice(3).trim()} content={lines.slice(1, -1).join('\n')} />;
-    }
     return <p key={index}>{lines.map((line, lineIndex) => <span key={`${index}-${lineIndex}`}>{lineIndex > 0 && <br />}{renderInlineMarkdown(line)}</span>)}</p>;
   });
 }
