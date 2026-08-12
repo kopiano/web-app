@@ -287,15 +287,25 @@ function renderMarkdown(markdown: string) {
     .split('\n')
     .reduce<{ lines: string[]; inFence: boolean }>((state, line, index, lines) => {
       const previous = lines[index - 1] ?? '';
+      const next = lines[index + 1] ?? '';
       const isFence = /^```/.test(line);
       const isInsideFence = state.inFence;
       const isHeading = !isInsideFence && /^#{1,3}\s+/.test(line);
       const isListItem = !isInsideFence && /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(line);
       const previousIsListItem = /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(previous);
+      const nextIsListItem = /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(next);
       if (line.trim() && previous.trim() && (isHeading || (isListItem && !previousIsListItem))) {
         state.lines.push('');
       }
       state.lines.push(line);
+      // Treat standalone Markdown blocks as boundaries even when the author
+      // did not add a blank line after them.
+      if (line.trim() && next.trim() && (
+        isHeading
+        || (isListItem && !nextIsListItem)
+      )) {
+        state.lines.push('');
+      }
       if (isFence) state.inFence = !state.inFence;
       return state;
     }, { lines: [], inFence: false })
