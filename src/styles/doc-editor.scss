@@ -39,7 +39,8 @@
   padding: 1rem 3rem;
   border: 2px solid rgba(255,255,255,.48);
   border-radius: 3rem; color: rgba(255,255,255,.92); background: rgba(20,25,25,.22); box-shadow: 0 .5rem 1.2rem rgba(20,25,25,.12); backdrop-filter: blur(1rem); -webkit-backdrop-filter: blur(1rem); transition: color .2s ease, border-color .2s ease, background .2s ease, transform .2s ease; }
-.doc-editor-header .doc-back-button:hover { border-color: rgba(255,255,255,.82); color: #fff; background: rgba(20,25,25,.38); transform: translateX(-.2rem); }
+.doc-editor-header .doc-back-button:hover { border-color: rgba(255,255,255,.82); color: #fff; background: rgba(20,25,25,.38); transform: translateX(-.1rem); }
+.doc-editor-header .doc-back-button:active { transform: translateX(0); }
 .doc-editor-header .doc-back-button:focus-visible { outline: 2px solid rgba(255,255,255,.9); outline-offset: 3px; }
 .doc-editor-save-status { display: inline-flex; align-items: center; gap: .6rem; padding: .75rem 1rem; border: 1px solid rgba(255,255,255,.36); border-radius: 999px; color: rgba(255,255,255,.86); background: rgba(20,25,25,.24); font-size: 1.15rem; backdrop-filter: blur(1rem); }
 .doc-editor-save-status svg { color: #b9e5c3; }
