@@ -24,6 +24,8 @@
   width: 3rem; height: 3rem; margin-left: auto;
   border-radius: 50%; color: rgba(255,255,255,.92); background: rgba(20,25,25,.22); cursor: pointer; box-shadow: 0 .5rem 1.2rem rgba(20,25,25,.12); backdrop-filter: blur(1rem); -webkit-backdrop-filter: blur(1rem); transition: color .2s ease, border-color .2s ease, background .2s ease, transform .2s ease; }
 .doc-info-button:hover { border-color: rgba(255,255,255,.82); color: #fff; background: rgba(20,25,25,.38); transform: translateY(-1px); }
+.doc-info-button:disabled { cursor: not-allowed; opacity: .45; }
+.doc-info-button:disabled:hover { border-color: rgba(255,255,255,.46); color: rgba(255,255,255,.92); background: rgba(20,25,25,.22); transform: none; }
 .doc-info-button svg { width: 2.3rem; height: 2.3rem; }
 .doc-info-button:focus-visible { outline: 2px solid rgba(255,255,255,.9); outline-offset: 3px; }
 .doc-editor-header-mode {
@@ -50,6 +52,8 @@
   position: relative; display: grid; grid-template-columns: repeat(2, minmax(8rem, 1fr)); gap: var(--doc-mode-gap); padding: var(--doc-mode-padding); border: 1px solid rgba(255,255,255,.72);
   border-radius: 3rem; background: rgba(255,255,255,.4); backdrop-filter: blur(1.5rem); }
 .doc-editor-modes button { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: .7rem; padding: .85rem 1.3rem; border-radius: 1rem; color: rgba(38,48,46,.56); background: transparent; font: inherit; font-size: 1.25rem; transition: color .42s ease; }
+.doc-editor-modes button:disabled { color: rgba(38,48,46,.28); cursor: not-allowed; opacity: .55; }
+.doc-editor-modes button:disabled:hover { color: rgba(38,48,46,.28); background: transparent; }
 .doc-editor-modes button:hover, .doc-editor-modes button.is-active { color: #26302e; }
 .doc-editor-modes-thumb { position: absolute; z-index: 0; top: var(--doc-mode-padding); left: var(--doc-mode-padding); width: calc((100% - (var(--doc-mode-padding) * 2) - var(--doc-mode-gap)) / 2); height: 3.6rem;
   border-radius: 3rem; background: rgba(255,255,255,.86); box-shadow: 0 .5rem 1.4rem rgba(50,60,56,.08); transform: translate3d(0, 0, 0); will-change: transform; transition: transform .62s cubic-bezier(.16, 1, .3, 1); }

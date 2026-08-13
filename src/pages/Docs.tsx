@@ -159,8 +159,8 @@ export default function Docs() {
         ) : filteredDocuments.length ? (
           <div key={viewMode} className={`docs-results is-${viewMode}`}>
             {filteredDocuments.map((document) => (
-              <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(`/docs/${document.id}`)}>
-                <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`} onClick={() => navigate(`/docs/${document.id}`)}>
+            <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?from=library' : ''}`)}>
+                <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?from=library' : ''}`)}>
                   <img src={resolveDocumentAsset(document.image, coverVersion)} alt="" />
                 </button>
                 <div className="doc-card-body">
@@ -170,7 +170,7 @@ export default function Docs() {
                     <span className="doc-date"><Clock3 size={9} aria-hidden="true" /><time>{document.date}</time></span>
                   </div>
                   <p>{document.content}</p>
-                  <button type="button" className="doc-read-button" onClick={() => navigate(`/docs/${document.id}`)}>{t('docs.readDocument')} <span aria-hidden="true">↗</span></button>
+                  <button type="button" className="doc-read-button" onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?from=library' : ''}`)}>{t('docs.readDocument')} <span aria-hidden="true">↗</span></button>
                 </div>
               </article>
             ))}

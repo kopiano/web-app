@@ -362,6 +362,7 @@ export default function DocEditor() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const isLibraryDocument = new URLSearchParams(location.search).get('from') === 'library';
   const document = documents.find((item) => item.id === id) ?? documents[0];
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const documentId = id ?? document.id;
@@ -381,7 +382,7 @@ export default function DocEditor() {
   const [infoDeleting, setInfoDeleting] = useState(false);
   const [infoError, setInfoError] = useState('');
   const [mode, setMode] = useState<EditorMode>(() => (
-    (location.state as { startInEdit?: boolean } | null)?.startInEdit ? 'edit' : 'preview'
+    !isLibraryDocument && (location.state as { startInEdit?: boolean } | null)?.startInEdit ? 'edit' : 'preview'
   ));
   const [activeHeading, setActiveHeading] = useState('');
   const [markdown, setMarkdown] = useState(() => localStorage.getItem(storageKey) || seedMarkdown(document.title, document.content));
@@ -739,8 +740,8 @@ export default function DocEditor() {
       <header className="doc-editor-header" style={{ backgroundImage: `url("${remoteImage || document.image}")` }}>
         <div className="doc-editor-header-shade">
           <div className="doc-editor-header-top">
-            <button type="button" className="doc-back-button" onClick={() => navigate('/docs')}><ArrowLeft size={17} /> {t('docs.back')}</button>
-            {currentUser && id && !documents.some((item) => item.id === id) && <button type="button" className="doc-info-button" onClick={openInfo} aria-label={t('docs.documentInformation')}><Info size={17} /></button>}
+            <button type="button" className="doc-back-button" onClick={() => navigate(isLibraryDocument ? '/docs?view=library' : '/docs')}><ArrowLeft size={17} /> {t('docs.back')}</button>
+            {currentUser && id && !documents.some((item) => item.id === id) && <button type="button" className="doc-info-button" onClick={openInfo} disabled={isLibraryDocument} aria-disabled={isLibraryDocument} aria-label={t('docs.documentInformation')}><Info size={17} /></button>}
             <div className="doc-editor-save-status">
               {savedAt && !isSaving ? <><Check size={15} /> {isRemoteDocument ? t('docs.saved') : t('docs.savedLocally')}</> : <><Save size={15} /> {t('docs.saving')}</>}
             </div>
@@ -749,7 +750,7 @@ export default function DocEditor() {
             <div className="doc-editor-modes" role="tablist" aria-label={t('docs.editorMode')}>
               <span className={`doc-editor-modes-thumb is-${mode}`} aria-hidden="true" />
               <button type="button" className={mode === 'preview' ? 'is-active' : ''} onClick={() => setMode('preview')}><Eye size={16} /> {t('docs.preview')}</button>
-              <button type="button" className={mode === 'edit' ? 'is-active' : ''} onClick={() => setMode('edit')}><Pencil size={16} /> {t('docs.edit')}</button>
+              <button type="button" className={mode === 'edit' ? 'is-active' : ''} onClick={() => setMode('edit')} disabled={isLibraryDocument} aria-disabled={isLibraryDocument}><Pencil size={16} /> {t('docs.edit')}</button>
             </div>
           </div>
         </div>
