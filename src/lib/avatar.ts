@@ -44,7 +44,6 @@ export function resolveChatAvatarUrl(
   avatar?: string | null,
   username?: string | null,
 ): string {
-  if (isSystemNotificationUser(username)) return systemNotificationAvatar;
   return resolveAvatarUrl(avatar) || defaultAvatarDataUrl(username);
 }
 

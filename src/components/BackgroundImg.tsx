@@ -12,6 +12,8 @@ const BACKGROUND_INTERVAL_MS = 8_000;
 
 export default function BackgroundImg() {
   const [active, setActive] = useState(0);
+  const [activeLayer, setActiveLayer] = useState(0);
+  const [layerImages, setLayerImages] = useState<[string | null, string | null]>([BACKGROUNDS[0], null]);
   const startTimeRef = useRef(Date.now());
   const barRef = useRef<HTMLDivElement | null>(null);
 
@@ -29,7 +31,7 @@ export default function BackgroundImg() {
       if (barRef.current) {
         barRef.current.style.width = '0%';
       }
-      setActive(prev => (prev + 1) % 6);
+      setActive(prev => (prev + 1) % BACKGROUNDS.length);
     }, BACKGROUND_INTERVAL_MS);
 
     let rafId: number;
@@ -51,21 +53,35 @@ export default function BackgroundImg() {
   }, []);
 
   useEffect(() => {
-    const nextIndex = (active + 1) % BACKGROUNDS.length;
     const image = new Image();
     image.decoding = 'async';
-    image.src = BACKGROUNDS[nextIndex];
+    image.onload = () => {
+      if (active === 0) return;
+      const incomingLayer = activeLayer === 0 ? 1 : 0;
+      setLayerImages(current => {
+        const nextLayers: [string | null, string | null] = [...current];
+        nextLayers[incomingLayer] = BACKGROUNDS[active];
+        return nextLayers;
+      });
+      requestAnimationFrame(() => setActiveLayer(incomingLayer));
+    };
+    image.src = BACKGROUNDS[active];
+
+    const nextIndex = (active + 1) % BACKGROUNDS.length;
+    const nextImage = new Image();
+    nextImage.decoding = 'async';
+    nextImage.src = BACKGROUNDS[nextIndex];
   }, [active]);
 
   return (
     <>
       <div className="background-wrapper">
         <div className="wrapper-images">
-          {BACKGROUNDS.map((background, index) => (
+          {layerImages.map((background, index) => (
             <div
-              key={background}
-              className={`wrapper-img${index === active ? ' active' : ''}`}
-              style={{ backgroundImage: `url("${background}")` }}
+              key={index}
+              className={`wrapper-img${index === activeLayer ? ' active' : ''}`}
+              style={background ? { backgroundImage: `url("${background}")` } : undefined}
               aria-hidden="true"
             />
           ))}
