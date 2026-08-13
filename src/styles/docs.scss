@@ -2,7 +2,7 @@
   --docs-ink: #26302e;
   --docs-muted: rgba(38, 48, 46, 0.62);
   min-height: calc(100vh - 7.2rem);
-  padding: 8.5rem clamp(2rem, 6vw, 9rem) 8rem;
+  padding: 8.5rem clamp(2rem, 6vw, 9rem) 13rem;
   color: var(--docs-ink);
   user-select: none;
   -webkit-user-select: none;
@@ -191,7 +191,7 @@
 .docs-empty { min-height: 24rem; display: grid; place-items: center; align-content: center; gap: .8rem; color: var(--docs-muted); }
 .docs-loading-icon { color: #6d557f; animation: docs-loading-spin .9s linear infinite; }
 @keyframes docs-loading-spin { to { transform: rotate(360deg); } }
-.docs-create-button { position: fixed; right: 2.4rem; bottom: 2.4rem; z-index: 8; display: grid;
+.docs-create-button { position: fixed; right: 2.4rem; bottom: 8.8rem; z-index: 81; display: grid;
   width: 4rem; height: 4rem;
   place-items: center;
   border: 1px solid rgba(95, 95, 95, 0.8); border-radius: 50%; color: #fff;
@@ -199,6 +199,49 @@
 .docs-create-button:hover { background: #5e3e70; transform: translateY(-.2rem); }
 .docs-create-button:focus-visible { outline: 2px solid #6f4d83; outline-offset: 3px; }
 .docs-empty strong { color: var(--docs-ink); font-size: 1.8rem; }
+
+.docs-dock {
+  position: fixed;
+  z-index: 80;
+  left: 50%;
+  bottom: 2.6rem;
+  width: 206px;
+  min-width: 0;
+  height: 46px;
+  padding: 4px 6px;
+  display: grid;
+  grid-template-columns: repeat(2, 92px);
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, .92);
+  border-radius: 3.2rem;
+  background: rgba(255, 255, 255, .7);
+  box-shadow: 0 1.8rem 5rem rgba(38, 48, 42, .18), inset 0 1px 0 rgba(255, 255, 255, .96);
+  transform: translateX(-50%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  backdrop-filter: blur(22px) saturate(165%);
+}
+.docs-dock button {
+  position: relative;
+  z-index: 2;
+  min-width: 92px;
+  width: 92px;
+  height: 36px;
+  align-self: center;
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .7rem;
+  border-radius: 2rem;
+  color: #313131;
+  background: transparent;
+  font: inherit;
+  font-size: 1.16rem;
+  font-weight: 600;
+}
+.docs-dock button:hover { color: #1d2420; background: rgba(95, 95, 95, .11); }
+.docs-dock button.is-active { color: #fff; background: #1d2420; box-shadow: 0 .8rem 2rem rgba(29, 36, 32, .16); }
 
 .doc-date time {
   font-size: 12px;
@@ -208,4 +251,13 @@
   width: 16px;
   height: 16px;
   padding-right: 3px;
+}
+
+@media (max-width: 640px) {
+  .docs-create-button { right: 1.4rem; bottom: 8.2rem; }
+  .docs-dock {
+    bottom: 1.4rem;
+    width: calc(100% - 2.4rem);
+  }
+  .docs-dock button { min-width: 0; width: auto; }
 }

@@ -368,11 +368,13 @@ export default function DocEditor() {
   const storageKey = `lume-doc-markdown-${documentId}`;
   const [remoteTitle, setRemoteTitle] = useState('');
   const [remoteCategory, setRemoteCategory] = useState('');
+  const [remotePublic, setRemotePublic] = useState(false);
   const [remoteImage, setRemoteImage] = useState<string | undefined>();
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoTab, setInfoTab] = useState<'detail' | 'delete'>('detail');
   const [infoTitle, setInfoTitle] = useState('');
   const [infoCategory, setInfoCategory] = useState('');
+  const [infoPublic, setInfoPublic] = useState(false);
   const [infoImage, setInfoImage] = useState<File | null>(null);
   const [infoPreview, setInfoPreview] = useState('');
   const [infoSaving, setInfoSaving] = useState(false);
@@ -426,6 +428,7 @@ export default function DocEditor() {
       if (cancelled) return;
       setRemoteTitle(remote.title);
       setRemoteCategory(remote.category);
+      setRemotePublic(remote.public === true);
       setRemoteImage(resolveDocumentAsset(remote.image, Date.now()));
       const localDraft = localStorage.getItem(storageKey);
       setMarkdown(localDraft ?? remote.content);
@@ -493,6 +496,7 @@ export default function DocEditor() {
   const openInfo = () => {
     setInfoTitle(remoteTitle || document.title);
     setInfoCategory(remoteCategory || document.category);
+    setInfoPublic(remotePublic);
     setInfoImage(null);
     setInfoPreview(remoteImage || document.image);
     setInfoTab('detail');
@@ -518,9 +522,10 @@ export default function DocEditor() {
     if (!id || documents.some((item) => item.id === id) || !infoTitle.trim() || !infoCategory.trim() || infoSaving) return;
     setInfoSaving(true);
     try {
-      const updated = await updateDocumentInfo(id, { title: infoTitle.trim(), category: infoCategory.trim(), image: infoImage });
+      const updated = await updateDocumentInfo(id, { title: infoTitle.trim(), category: infoCategory.trim(), image: infoImage, public: infoPublic });
       setRemoteTitle(updated.title);
       setRemoteCategory(updated.category);
+      setInfoPublic(updated.public === true);
       setRemoteImage(resolveDocumentAsset(updated.image, Date.now()));
       setInfoOpen(false);
     } finally {
@@ -805,6 +810,17 @@ export default function DocEditor() {
                     <div className="doc-create-fields">
                       <label className="doc-new-inline-field"><span className="doc-new-field-label">{t('docs.title')}</span><input value={infoTitle} onChange={(event) => setInfoTitle(event.target.value)} autoFocus /></label>
                       <label className="doc-new-inline-field"><span className="doc-new-field-label">{t('docs.category')}</span><input value={infoCategory} onChange={(event) => setInfoCategory(event.target.value)} /></label>
+                      <div className={`doc-visibility-field${infoPublic ? ' is-public' : ''}`}>
+                        <div className="doc-visibility-copy">
+                          <span className="doc-new-field-label">{t('docs.visibility')}</span>
+                          <strong>{infoPublic ? t('docs.public') : t('docs.private')}</strong>
+                          <small>{infoPublic ? t('docs.publicDescription') : t('docs.privateDescription')}</small>
+                        </div>
+                        <button type="button" className="doc-visibility-toggle" role="switch" aria-checked={infoPublic} aria-label={t('docs.visibility')} onClick={() => setInfoPublic((value) => !value)}>
+                          <span className="doc-visibility-toggle-track"><span className="doc-visibility-toggle-thumb" /></span>
+                          <span className="doc-visibility-toggle-state">{infoPublic ? t('docs.on') : t('docs.off')}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div className="doc-create-actions"><button type="submit" className="doc-create-next" disabled={!infoTitle.trim() || !infoCategory.trim() || infoSaving}>{infoSaving ? t('docs.saving') : t('docs.save')} <Check size={16} /></button></div>

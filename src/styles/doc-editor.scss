@@ -206,14 +206,29 @@
 .doc-new-field-label { position: absolute; top: 50%; left: 1.2rem; z-index: 1; color: #303735; font-size: .95rem; font-weight: 600; letter-spacing: .04em; pointer-events: none; transform: translateY(-50%); }
 .doc-new-fields input { min-width: 0; width: 100%; height: 4rem; padding: 0 1.2rem 0 9rem; border: 0; outline: 0; color: #232323; background: transparent; font: inherit; font-size: 1.05rem; letter-spacing: .03em; }
 .doc-new-inline-field:focus-within { border-color: rgba(32,32,32,.95); background: rgba(255,255,255,.84); box-shadow: 0 0 0 3px rgba(32,32,32,.07); }
+.doc-visibility-field { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 1.2rem; min-height: 5.8rem; padding: .9rem 1.1rem 1rem 1.35rem; overflow: hidden; border: 1px solid rgba(32,32,32,.16); border-radius: 1.65rem; background: rgba(255,255,255,.45); transition: border-color .45s ease, background .45s ease, box-shadow .45s ease, transform .45s cubic-bezier(.16,1,.3,1); }
+.doc-visibility-field::before { position: absolute; inset: 0; content: ''; pointer-events: none; background: linear-gradient(110deg, transparent 20%, rgba(255,255,255,.78) 48%, transparent 75%); transform: translateX(-120%); transition: transform .8s cubic-bezier(.16,1,.3,1); }
+.doc-visibility-field:hover::before, .doc-visibility-field.is-public::before { transform: translateX(120%); }
+.doc-visibility-field.is-public { border-color: rgba(82,133,111,.44); background: linear-gradient(135deg, rgba(227,248,236,.76), rgba(255,255,255,.58)); box-shadow: 0 .8rem 2rem rgba(75,133,101,.12), inset 0 1px 0 rgba(255,255,255,.86); transform: translateY(-1px); }
+.doc-visibility-copy { position: relative; z-index: 1; min-width: 0; display: grid; gap: .18rem; }
+.doc-visibility-copy .doc-new-field-label { position: static; transform: none; }
+.doc-visibility-copy strong { color: #252b28; font-size: 1.1rem; font-weight: 700; }
+.doc-visibility-copy small { overflow: hidden; color: rgba(38,48,46,.58); font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
+.doc-visibility-toggle { position: relative; z-index: 1; display: flex; flex: 0 0 auto; align-items: center; gap: .55rem; padding: .25rem; border: 0; border-radius: 2rem; color: rgba(38,48,46,.56); background: rgba(255,255,255,.48); cursor: pointer; }
+.doc-visibility-toggle-track { position: relative; width: 3.9rem; height: 2.15rem; padding: .25rem; border-radius: 2rem; background: rgba(38,48,46,.2); box-shadow: inset 0 .15rem .3rem rgba(38,48,46,.12); transition: background .45s ease, box-shadow .45s ease; }
+.doc-visibility-toggle-thumb { display: block; width: 1.65rem; height: 1.65rem; border-radius: 50%; background: #fff; box-shadow: 0 .3rem .7rem rgba(38,48,46,.2); transform: translateX(0); transition: transform .55s cubic-bezier(.16,1,.3,1), background .35s ease; }
+.doc-visibility-toggle[aria-checked="true"] .doc-visibility-toggle-track { background: #4d9b70; box-shadow: 0 0 .9rem rgba(77,155,112,.42); }
+.doc-visibility-toggle[aria-checked="true"] .doc-visibility-toggle-thumb { background: #fafffb; transform: translateX(1.75rem); }
+.doc-visibility-toggle-state { min-width: 1.5rem; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.doc-visibility-toggle:focus-visible { outline: 2px solid #4d9b70; outline-offset: 3px; }
 .doc-new-content { margin-top: 2.4rem; }
 .doc-new-content > span { display: inline-flex; align-items: center; gap: .5rem; }
 .doc-new-content textarea { width: 100%; min-height: 32rem; resize: vertical; padding: 1.4rem; border: 1px solid rgba(38,48,46,.14); border-radius: .8rem; outline: 0; color: #34403c; background: rgba(255,255,255,.68); font: 1.35rem/1.8 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .doc-new-content textarea:focus { border-color: rgba(111,77,131,.62); box-shadow: 0 0 0 3px rgba(111,77,131,.12); }
 .doc-new-error { margin-top: 1rem; color: #a43b3b; font-size: 1.2rem; }
 
-.doc-create-overlay { position: fixed; inset: 0; z-index: 10000; isolation: isolate; display: grid; place-items: center; padding: 1.2rem; }
-.doc-create-backdrop { position: absolute; z-index: 0; inset: 0; border: 0; background: rgba(18,23,31,.28); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); cursor: default; }
+.doc-create-overlay { position: fixed; inset: 0; z-index: 100001; isolation: isolate; display: grid; place-items: center; padding: 1.2rem; }
+.doc-create-backdrop { position: absolute; z-index: 0; inset: 0; border: 0; background: rgba(18,23,31,.72); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); cursor: default; }
 .doc-create-dialog { position: relative; z-index: 1; width: min(60rem, calc(100vw - 2.4rem)); padding: 2.5rem; border: 1px solid rgba(255,255,255,.9); border-radius: 2rem; color: #17191e; background: linear-gradient(145deg, rgba(255,255,255,.92), rgba(246,249,251,.8)); box-shadow: 0 3rem 8rem -2rem rgba(15,23,42,.28), inset 0 1px 0 rgba(255,255,255,.96); backdrop-filter: blur(36px) saturate(145%); -webkit-backdrop-filter: blur(36px) saturate(145%); animation: doc-create-dialog-in .3s cubic-bezier(.16,1,.3,1); }
 @keyframes doc-create-dialog-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .doc-create-close { position: absolute; top: 1.35rem; right: 1.35rem; width: 3rem; height: 3rem; display: grid; place-items: center; border: 0; border-radius: 50%; color: #7c8491; background: rgba(15,23,42,.055); cursor: pointer; }

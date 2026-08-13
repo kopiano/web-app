@@ -9,6 +9,7 @@ export interface RemoteDocument {
   image?: string | null;
   accent: string;
   content: string;
+  public: boolean;
 }
 
 export interface RemoteDocumentContent {
@@ -17,6 +18,7 @@ export interface RemoteDocumentContent {
   category: string;
   image?: string | null;
   content: string;
+  public: boolean;
 }
 
 export function resolveDocumentAsset(value?: string | null, cacheBust?: string | number) {
@@ -30,6 +32,11 @@ export function resolveDocumentAsset(value?: string | null, cacheBust?: string |
 
 export async function listDocuments() {
   const { data } = await request.get<RemoteDocument[]>('/docs');
+  return data;
+}
+
+export async function listPublicDocuments() {
+  const { data } = await request.get<RemoteDocument[]>('/docs?public=true');
   return data;
 }
 
@@ -47,10 +54,12 @@ export async function updateDocumentInfo(id: string, input: {
   title: string;
   category: string;
   image?: File | null;
+  public: boolean;
 }) {
   const form = new FormData();
   form.append('title', input.title);
   form.append('category', input.category);
+  form.append('public', String(input.public));
   if (input.image) form.append('image', input.image);
   const { data } = await request.patch<RemoteDocumentContent>(`/docs/${id}`, form);
   return data;

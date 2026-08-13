@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Clock3, FileText, Grid2X2, List, LoaderCircle, Plus, Search } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Clock3, FileText, Grid2X2, Library, List, ListVideo, LoaderCircle, Plus, Search } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import type { RootState } from '@/store/store';
-import { listDocuments, resolveDocumentAsset, type RemoteDocument } from '@/api/docs';
+import { listDocuments, listPublicDocuments, resolveDocumentAsset, type RemoteDocument } from '@/api/docs';
 import NewDocEditor from './NewDocEditor';
 import bg0 from '@/assets/images/bg-0.webp';
 import bg1 from '@/assets/images/bg-1.webp';
@@ -28,6 +28,8 @@ export const documents = [
 export default function Docs() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isLibraryView = searchParams.get('view') === 'library';
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All documents');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -40,19 +42,19 @@ export default function Docs() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!currentUser) {
+    if (!currentUser && !isLibraryView) {
       setRemoteDocuments([]);
       setRemoteLoaded(true);
       return () => { cancelled = true; };
     }
     setRemoteLoaded(false);
     setCoverVersion(Date.now());
-    listDocuments()
+    (isLibraryView ? listPublicDocuments() : listDocuments())
       .then((items) => { if (!cancelled) setRemoteDocuments(items); })
       .catch(() => { if (!cancelled) setRemoteDocuments([]); })
       .finally(() => { if (!cancelled) setRemoteLoaded(true); });
     return () => { cancelled = true; };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isLibraryView]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -69,7 +71,9 @@ export default function Docs() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  const libraryDocuments = currentUser
+  const libraryDocuments = isLibraryView
+    ? (remoteLoaded ? remoteDocuments.filter((item) => item.public === true) : [])
+    : currentUser
     ? (remoteLoaded ? remoteDocuments : [])
     : documents;
   const categories = useMemo(() => [
@@ -103,10 +107,10 @@ export default function Docs() {
 
   return (
     <main className="docs-page">
-      <section className="docs-hero">
+      <section className={`docs-hero${isLibraryView ? ' is-library-view' : ''}`}>
         <div className="docs-hero-copy">
           <span className="docs-kicker"><FileText size={14} aria-hidden="true" />{t('docs.kicker')}</span>
-          <h1>{t('docs.subtitle')}</h1>
+          <h1>{isLibraryView ? t('docs.libraryTitle') : t('docs.subtitle')}</h1>
         </div>
         <div className="docs-search-wrap">
           <Search size={20} aria-hidden="true" />
@@ -182,6 +186,16 @@ export default function Docs() {
       <button type="button" className="docs-create-button" onClick={() => setIsCreateOpen(true)} aria-label={t('docs.createDocument')} title={t('docs.createDocument')}>
         <Plus size={24} />
       </button>
+      <nav className="docs-dock" aria-label="Docs navigation">
+        <button type="button" className={isLibraryView ? 'is-active' : ''} onClick={() => setSearchParams({ view: 'library' })} aria-label="Library" aria-current={isLibraryView ? 'page' : undefined}>
+          <Library size={17} strokeWidth={2} />
+          <span>Library</span>
+        </button>
+        <button type="button" className={!isLibraryView ? 'is-active' : ''} onClick={() => setSearchParams({})} aria-current={!isLibraryView ? 'page' : undefined} aria-label="List">
+          <ListVideo size={17} strokeWidth={2} />
+          <span>List</span>
+        </button>
+      </nav>
       {isCreateOpen && <NewDocEditor onClose={() => setIsCreateOpen(false)} />}
     </main>
   );
