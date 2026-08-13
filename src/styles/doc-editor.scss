@@ -43,13 +43,16 @@
 .doc-editor-header .doc-back-button:focus-visible { outline: 2px solid rgba(255,255,255,.9); outline-offset: 3px; }
 .doc-editor-save-status { display: inline-flex; align-items: center; gap: .6rem; padding: .75rem 1rem; border: 1px solid rgba(255,255,255,.36); border-radius: 999px; color: rgba(255,255,255,.86); background: rgba(20,25,25,.24); font-size: 1.15rem; backdrop-filter: blur(1rem); }
 .doc-editor-save-status svg { color: #b9e5c3; }
-.doc-editor-modes { position: relative; display: grid; grid-template-columns: repeat(2, minmax(8rem, 1fr)); gap: .35rem; padding: .4rem; border: 1px solid rgba(255,255,255,.72);
+.doc-editor-modes {
+  --doc-mode-gap: .35rem;
+  --doc-mode-padding: .4rem;
+  position: relative; display: grid; grid-template-columns: repeat(2, minmax(8rem, 1fr)); gap: var(--doc-mode-gap); padding: var(--doc-mode-padding); border: 1px solid rgba(255,255,255,.72);
   border-radius: 3rem; background: rgba(255,255,255,.4); backdrop-filter: blur(1.5rem); }
 .doc-editor-modes button { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: .7rem; padding: .85rem 1.3rem; border-radius: 1rem; color: rgba(38,48,46,.56); background: transparent; font: inherit; font-size: 1.25rem; transition: color .42s ease; }
 .doc-editor-modes button:hover, .doc-editor-modes button.is-active { color: #26302e; }
-.doc-editor-modes-thumb { position: absolute; z-index: 0; top: .4rem; left: .4rem; width: calc((100% - .75rem) / 2); height: 3.6rem;
+.doc-editor-modes-thumb { position: absolute; z-index: 0; top: var(--doc-mode-padding); left: var(--doc-mode-padding); width: calc((100% - (var(--doc-mode-padding) * 2) - var(--doc-mode-gap)) / 2); height: 3.6rem;
   border-radius: 3rem; background: rgba(255,255,255,.86); box-shadow: 0 .5rem 1.4rem rgba(50,60,56,.08); transform: translate3d(0, 0, 0); will-change: transform; transition: transform .62s cubic-bezier(.16, 1, .3, 1); }
-.doc-editor-modes-thumb.is-edit { transform: translate3d(calc(100% + .35rem), 0, 0); }
+.doc-editor-modes-thumb.is-edit { transform: translate3d(calc(100% + var(--doc-mode-gap)), 0, 0); }
 .doc-editor-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr); min-height: 62rem; border: 0; border-radius: 0 0 2rem 2rem; overflow: visible;
@@ -79,7 +82,8 @@
 .doc-outline-label { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .doc-outline a.level-1 .doc-outline-level { color: #70458a; }
 .doc-outline a.level-3 .doc-outline-level { color: #7c9d91; }
-.doc-editor-edit-pane { grid-column: 1; grid-row: 1; min-width: 0; min-height: 62rem; display: flex; flex-direction: column; overflow: visible; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; background: rgba(255,255,255,.32); box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+.doc-editor-edit-pane { grid-column: 1; grid-row: 1; min-width: 0; min-height: 62rem; display: flex; flex-direction: column; overflow: visible; visibility: hidden; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; background: rgba(255,255,255,.32); box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+.doc-editor-edit-pane.is-visible { visibility: visible; opacity: 1; pointer-events: auto; }
 .doc-markdown-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; padding: 1.2rem 1.6rem; border-bottom: 1px solid rgba(38,48,46,.1); background: rgba(255,255,255,.32); }
 .doc-markdown-toolbar button { width: 3.2rem; height: 3rem; display: grid; place-items: center; border-radius: .8rem; color: rgba(38,48,46,.6); background: transparent; }
 .doc-markdown-toolbar button:hover { color: #26302e; background: rgba(255,255,255,.72); }
@@ -172,7 +176,8 @@
 .doc-code-line:hover { background: #161b22; }
 .doc-code-line-number { padding-right: 1.4rem; color: #949494; text-align: right; user-select: none; }
 .doc-code-line-content { padding-right: 2rem; white-space: pre; word-spacing: normal; letter-spacing: 0; tab-size: 2; }
-.doc-markdown-preview { grid-column: 1; grid-row: 1; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+.doc-markdown-preview { grid-column: 1; grid-row: 1; visibility: hidden; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+.doc-markdown-preview.is-visible { visibility: visible; opacity: 1; pointer-events: auto; }
 .doc-editor-workspace.is-edit { grid-template-columns: minmax(0, 1fr); }
 .doc-new-page { width: min(100%, 92rem); margin: 0 auto; padding: 1.8rem 2.2rem 3rem; border: 1px solid rgba(255,255,255,.78); border-radius: 2rem; background: rgba(255,255,255,.58); box-shadow: 0 2rem 5rem rgba(55,63,61,.12); }
 .doc-new-topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 2.4rem; }

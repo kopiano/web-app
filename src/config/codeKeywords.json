@@ -8,6 +8,7 @@
     "cargo",
     "docker compose",
     "npm",
-    "pnpm"
+    "pnpm",
+    "make"
   ]
 }

@@ -391,6 +391,7 @@ export default function DocEditor() {
   const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const displayTitle = remoteTitle || document.title;
   const isRemoteDocument = Boolean(currentUser && id && !documents.some((item) => item.id === id));
+  const previewContent = useMemo(() => renderMarkdown(markdown), [markdown]);
 
   const saveDocument = useCallback(() => {
     const contentToSave = markdown;
@@ -758,8 +759,7 @@ export default function DocEditor() {
         </nav>
       </aside>
       <div className={`doc-editor-workspace is-${mode}`}>
-        {mode === 'edit' && (
-          <div className="doc-editor-edit-pane">
+        <div className={`doc-editor-edit-pane${mode === 'edit' ? ' is-visible' : ''}`} aria-hidden={mode !== 'edit'}>
             <div className="doc-markdown-toolbar" aria-label={t('docs.markdownFormatting')}>
               <button type="button" onClick={() => insertMarkdown('**', '**', 'bold')} aria-label={t('docs.bold')}><Bold size={16} /></button>
               <button type="button" onClick={() => insertMarkdown('*', '*', 'italic')} aria-label={t('docs.italic')}><Italic size={16} /></button>
@@ -774,11 +774,8 @@ export default function DocEditor() {
               <button type="button" onClick={() => insertMarkdown('[', '](https://)', 'link text')} aria-label={t('docs.link')}><Link2 size={16} /></button>
             </div>
             <textarea ref={editorRef} className="doc-markdown-editor" value={markdown} onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }} onKeyDown={handleEditorKeyDown} spellCheck={false} aria-label={`${t('docs.markdownEditor')} ${displayTitle}`} />
-          </div>
-        )}
-        {mode === 'preview' && (
-          <article ref={previewRef} className="doc-markdown-preview">{renderMarkdown(markdown)}</article>
-        )}
+        </div>
+        <article ref={previewRef} className={`doc-markdown-preview${mode === 'preview' ? ' is-visible' : ''}`} aria-hidden={mode !== 'preview'}>{previewContent}</article>
       </div>
       {infoOpen && (
         <main className="doc-create-overlay">
