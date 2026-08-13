@@ -29,7 +29,7 @@ export default function Docs() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isLibraryView = searchParams.get('view') === 'library';
+  const isLibraryView = searchParams.get('view') !== 'list';
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All documents');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -159,8 +159,8 @@ export default function Docs() {
         ) : filteredDocuments.length ? (
           <div key={viewMode} className={`docs-results is-${viewMode}`}>
             {filteredDocuments.map((document) => (
-            <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?from=library' : ''}`)}>
-                <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?from=library' : ''}`)}>
+            <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?view=library&from=library' : '?view=list'}`)}>
+                <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?view=library&from=library' : '?view=list'}`)}>
                   <img src={resolveDocumentAsset(document.image, coverVersion)} alt="" />
                 </button>
                 <div className="doc-card-body">
@@ -170,7 +170,7 @@ export default function Docs() {
                     <span className="doc-date"><Clock3 size={9} aria-hidden="true" /><time>{document.date}</time></span>
                   </div>
                   <p>{document.content}</p>
-                  <button type="button" className="doc-read-button" onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?from=library' : ''}`)}>{t('docs.readDocument')} <span aria-hidden="true">↗</span></button>
+                  <button type="button" className="doc-read-button" onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?view=library&from=library' : '?view=list'}`)}>{t('docs.readDocument')} <span aria-hidden="true">↗</span></button>
                 </div>
               </article>
             ))}
@@ -191,7 +191,7 @@ export default function Docs() {
           <Library size={17} strokeWidth={2} />
           <span>Library</span>
         </button>
-        <button type="button" className={!isLibraryView ? 'is-active' : ''} onClick={() => setSearchParams({})} aria-current={!isLibraryView ? 'page' : undefined} aria-label="List">
+        <button type="button" className={!isLibraryView ? 'is-active' : ''} onClick={() => setSearchParams({ view: 'list' })} aria-current={!isLibraryView ? 'page' : undefined} aria-label="List">
           <ListVideo size={17} strokeWidth={2} />
           <span>List</span>
         </button>
