@@ -82,8 +82,8 @@
 .doc-outline-label { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .doc-outline a.level-1 .doc-outline-level { color: #70458a; }
 .doc-outline a.level-3 .doc-outline-level { color: #7c9d91; }
-.doc-editor-edit-pane { grid-column: 1; grid-row: 1; min-width: 0; min-height: 62rem; display: flex; flex-direction: column; overflow: visible; visibility: hidden; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; background: rgba(255,255,255,.32); box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
-.doc-editor-edit-pane.is-visible { visibility: visible; opacity: 1; pointer-events: auto; }
+.doc-editor-edit-pane { grid-column: 1; grid-row: 1; min-width: 0; min-height: 62rem; display: flex; flex-direction: column; overflow: visible; visibility: hidden; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; background: rgba(255,255,255,.32); box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); transition: opacity .2s ease, visibility 0s linear .2s; }
+.doc-editor-edit-pane.is-visible { visibility: visible; opacity: 1; pointer-events: auto; transition: opacity .2s ease, visibility 0s linear 0s; }
 .doc-markdown-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; padding: 1.2rem 1.6rem; border-bottom: 1px solid rgba(38,48,46,.1); background: rgba(255,255,255,.32); }
 .doc-markdown-toolbar button { width: 3.2rem; height: 3rem; display: grid; place-items: center; border-radius: .8rem; color: rgba(38,48,46,.6); background: transparent; }
 .doc-markdown-toolbar button:hover { color: #26302e; background: rgba(255,255,255,.72); }
@@ -176,8 +176,8 @@
 .doc-code-line:hover { background: #161b22; }
 .doc-code-line-number { padding-right: 1.4rem; color: #949494; text-align: right; user-select: none; }
 .doc-code-line-content { padding-right: 2rem; white-space: pre; word-spacing: normal; letter-spacing: 0; tab-size: 2; }
-.doc-markdown-preview { grid-column: 1; grid-row: 1; visibility: hidden; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
-.doc-markdown-preview.is-visible { visibility: visible; opacity: 1; pointer-events: auto; }
+.doc-markdown-preview { grid-column: 1; grid-row: 1; visibility: hidden; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); transition: opacity .2s ease, visibility 0s linear .2s; }
+.doc-markdown-preview.is-visible { visibility: visible; opacity: 1; pointer-events: auto; transition: opacity .2s ease, visibility 0s linear 0s; }
 .doc-editor-workspace.is-edit { grid-template-columns: minmax(0, 1fr); }
 .doc-new-page { width: min(100%, 92rem); margin: 0 auto; padding: 1.8rem 2.2rem 3rem; border: 1px solid rgba(255,255,255,.78); border-radius: 2rem; background: rgba(255,255,255,.58); box-shadow: 0 2rem 5rem rgba(55,63,61,.12); }
 .doc-new-topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 2.4rem; }
