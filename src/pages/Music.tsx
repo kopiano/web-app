@@ -28,8 +28,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
-import bg0 from '@/assets/images/bg-0.webp';
-import playlistDiscArt from '@/assets/images/bg-8.webp';
+import bg0 from '@/assets/images/bg-0-card.webp';
+import playlistDiscArt from '@/assets/images/bg-2-card.webp';
 import {
   deleteMusicTrack,
   getMusicLibrary,

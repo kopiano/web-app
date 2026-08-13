@@ -1,5 +1,3 @@
-import systemNotificationAvatar from '@/assets/images/z-logo.png';
-
 const DEFAULT_API_URL = 'http://localhost:8100/api/';
 
 const SYSTEM_NOTIFICATION_NAMES = new Set([

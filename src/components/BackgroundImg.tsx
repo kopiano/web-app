@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import '@/styles/backgroundImg.scss';
-import bg1 from '@/assets/images/bg-1.webp';
-import bg2 from '@/assets/images/bg-2.webp';
-import bg3 from '@/assets/images/bg-3.webp';
-import bg4 from '@/assets/images/bg-4.webp';
-import bg5 from '@/assets/images/bg-5.webp';
-import bg0 from '@/assets/images/bg-0.webp';
+import bg1 from '@/assets/images/bg-1-card.webp';
+import bg2 from '@/assets/images/bg-2-card.webp';
+import bg3 from '@/assets/images/bg-3-card.webp';
+import bg4 from '@/assets/images/bg-4-card.webp';
+import bg5 from '@/assets/images/bg-5-card.webp';
+import bg0 from '@/assets/images/bg-0-card.webp';
 
 const BACKGROUNDS = [bg0, bg1, bg2, bg3, bg4, bg5];
 const BACKGROUND_INTERVAL_MS = 8_000;

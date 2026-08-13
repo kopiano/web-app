@@ -6,12 +6,12 @@ import { useTranslation } from 'react-i18next';
 import type { RootState } from '@/store/store';
 import { listDocuments, listPublicDocuments, resolveDocumentAsset, type RemoteDocument } from '@/api/docs';
 import NewDocEditor from './NewDocEditor';
-import bg0 from '@/assets/images/bg-0.webp';
-import bg1 from '@/assets/images/bg-1.webp';
-import bg2 from '@/assets/images/bg-2.webp';
-import bg3 from '@/assets/images/bg-3.webp';
-import bg4 from '@/assets/images/bg-4.webp';
-import bg5 from '@/assets/images/bg-5.webp';
+import bg0 from '@/assets/images/bg-0-card.webp';
+import bg1 from '@/assets/images/bg-1-card.webp';
+import bg2 from '@/assets/images/bg-2-card.webp';
+import bg3 from '@/assets/images/bg-3-card.webp';
+import bg4 from '@/assets/images/bg-4-card.webp';
+import bg5 from '@/assets/images/bg-5-card.webp';
 import '@/styles/docs.scss';
 
 type ViewMode = 'grid' | 'timeline';
@@ -174,7 +174,7 @@ export default function Docs() {
             {filteredDocuments.map((document) => (
             <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?view=library&from=library' : '?view=list'}`)}>
                 <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?view=library&from=library' : '?view=list'}`)}>
-                  <img src={resolveDocumentAsset(document.image, documentCoverVersion)} alt="" />
+                  <img src={resolveDocumentAsset(document.image, documentCoverVersion)} alt="" loading="lazy" decoding="async" />
                 </button>
                 <div className="doc-card-body">
                   <h2>{document.title}</h2>
