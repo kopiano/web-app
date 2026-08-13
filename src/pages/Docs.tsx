@@ -16,6 +16,9 @@ import '@/styles/docs.scss';
 
 type ViewMode = 'grid' | 'timeline';
 
+const documentListCache = new Map<string, RemoteDocument[]>();
+const documentCoverVersion = Date.now();
+
 export const documents = [
   { id: 'quiet-system', title: 'A quiet system for brighter days', category: 'Design', date: 'Aug 08, 2026', image: bg0, accent: 'violet', content: 'Notes on shaping interfaces that feel calm, clear, and quietly alive.' },
   { id: 'next-horizon', title: 'Building for the next horizon', category: 'Product', date: 'Aug 02, 2026', image: bg1, accent: 'blue', content: 'A field guide to turning a strong idea into a useful, enduring product.' },
@@ -35,10 +38,11 @@ export default function Docs() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const searchRef = useRef<HTMLInputElement>(null);
   const currentUser = useSelector((state: RootState) => state.auth.user);
-  const [remoteDocuments, setRemoteDocuments] = useState<RemoteDocument[]>([]);
-  const [remoteLoaded, setRemoteLoaded] = useState(false);
+  const cacheKey = `${isLibraryView ? 'library' : 'list'}:${currentUser?.id ?? 'guest'}`;
+  const cachedDocuments = documentListCache.get(cacheKey);
+  const [remoteDocuments, setRemoteDocuments] = useState<RemoteDocument[]>(cachedDocuments ?? []);
+  const [remoteLoaded, setRemoteLoaded] = useState(Boolean(cachedDocuments));
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [coverVersion, setCoverVersion] = useState(() => Date.now());
 
   useEffect(() => {
     let cancelled = false;
@@ -47,14 +51,23 @@ export default function Docs() {
       setRemoteLoaded(true);
       return () => { cancelled = true; };
     }
-    setRemoteLoaded(false);
-    setCoverVersion(Date.now());
+    const cached = documentListCache.get(cacheKey);
+    if (cached) {
+      setRemoteDocuments(cached);
+      setRemoteLoaded(true);
+    } else {
+      setRemoteLoaded(false);
+    }
     (isLibraryView ? listPublicDocuments() : listDocuments())
-      .then((items) => { if (!cancelled) setRemoteDocuments(items); })
+      .then((items) => {
+        if (cancelled) return;
+        documentListCache.set(cacheKey, items);
+        setRemoteDocuments(items);
+      })
       .catch(() => { if (!cancelled) setRemoteDocuments([]); })
       .finally(() => { if (!cancelled) setRemoteLoaded(true); });
     return () => { cancelled = true; };
-  }, [currentUser?.id, isLibraryView]);
+  }, [cacheKey, currentUser?.id, isLibraryView]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -161,7 +174,7 @@ export default function Docs() {
             {filteredDocuments.map((document) => (
             <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?view=library&from=library' : '?view=list'}`)}>
                 <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?view=library&from=library' : '?view=list'}`)}>
-                  <img src={resolveDocumentAsset(document.image, coverVersion)} alt="" />
+                  <img src={resolveDocumentAsset(document.image, documentCoverVersion)} alt="" />
                 </button>
                 <div className="doc-card-body">
                   <h2>{document.title}</h2>
