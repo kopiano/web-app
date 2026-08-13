@@ -183,6 +183,7 @@
 
 .docs-results.is-timeline { display: flex; flex-direction: column; gap: 1.6rem; padding-left: 2.8rem; border-left: 1px solid rgba(255, 255, 255, .78); }
 .docs-results.is-timeline .doc-card { display: grid; grid-template-columns: 24rem minmax(0, 1fr); position: relative; }
+.docs-results.is-timeline .doc-card-body { height: 100%; box-sizing: border-box; }
 .docs-results.is-timeline .doc-card::before { content: ''; position: absolute; left: -3.4rem; top: 2.4rem; width: 1.2rem; height: 1.2rem; border: .3rem solid rgba(255, 255, 255, .9); border-radius: 50%; background: #a888c0; }
 .docs-results.is-timeline .doc-card-image { height: 100%; aspect-ratio: auto; min-height: 15rem; }
 .docs-results.is-timeline .doc-card p { min-height: 0; max-width: 58rem; }
