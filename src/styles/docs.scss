@@ -191,7 +191,7 @@
 .docs-empty { min-height: 24rem; display: grid; place-items: center; align-content: center; gap: .8rem; color: var(--docs-muted); }
 .docs-loading-icon { color: #6d557f; animation: docs-loading-spin .9s linear infinite; }
 @keyframes docs-loading-spin { to { transform: rotate(360deg); } }
-.docs-create-button { position: fixed; right: 2.4rem; bottom: 8.8rem; z-index: 81; display: grid;
+.docs-create-button { position: fixed; right: 2.4rem; bottom: 3.6rem; z-index: 81; display: grid;
   width: 4rem; height: 4rem;
   place-items: center;
   border: 1px solid rgba(95, 95, 95, 0.8); border-radius: 50%; color: #fff;
