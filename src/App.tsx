@@ -7,13 +7,6 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom';
-import Overview from '@/pages/Overview';
-import Chat from '@/pages/Chat';
-import Music from '@/pages/Music';
-import Video from '@/pages/VideoConnected';
-import Docs from '@/pages/Docs';
-import DocEditor from '@/pages/DocEditor';
-import NewDocEditor from '@/pages/NewDocEditor';
 import Header from '@/pages/Header';
 import BackgroundImg from '@/components/BackgroundImg';
 import MiniMusicPlayer from '@/components/MiniMusicPlayer';
@@ -21,7 +14,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { MusicPlaybackProvider } from '@/context/MusicPlaybackContext';
 import "@/App.scss";
 import "@/styles/oauth.scss";
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Provider, useDispatch } from 'react-redux';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +22,18 @@ import { store } from '@/store/store';
 import { queryClient } from '@/lib/queryClient';
 import { clearUser, fetchCurrentUser } from '@/store/authSlice';
 import { authStorage, clearAuthReturnTo, getAuthReturnTo } from '@/lib/auth';
+
+const Overview = lazy(() => import('@/pages/Overview'));
+const Chat = lazy(() => import('@/pages/Chat'));
+const Music = lazy(() => import('@/pages/Music'));
+const Video = lazy(() => import('@/pages/VideoConnected'));
+const Docs = lazy(() => import('@/pages/Docs'));
+const DocEditor = lazy(() => import('@/pages/DocEditor'));
+const NewDocEditor = lazy(() => import('@/pages/NewDocEditor'));
+
+function RouteLoading() {
+  return <div className="route-loading" role="status" aria-live="polite" />;
+}
 
 function withAuthError(returnTo: string) {
   const url = new URL(returnTo, window.location.origin);
@@ -184,12 +189,14 @@ const Layout = () => {
         <BackgroundImg />
         <div className="app-content">
           <Header />
-        {shouldMountMusic && (
-          <div className={`persistent-music-page${isMusicRoute ? '' : ' is-hidden'}`}>
-            <Music isActive={isMusicRoute} />
-          </div>
-        )}
-        {!isMusicRoute && <Outlet />}
+        <Suspense fallback={<RouteLoading />}>
+          {shouldMountMusic && (
+            <div className={`persistent-music-page${isMusicRoute ? '' : ' is-hidden'}`}>
+              <Music isActive={isMusicRoute} />
+            </div>
+          )}
+          {!isMusicRoute && <Outlet />}
+        </Suspense>
           {!isMusicRoute && <MiniMusicPlayer />}
         </div>
       </MusicPlaybackProvider>

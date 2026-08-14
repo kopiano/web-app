@@ -7,9 +7,8 @@
 /index.html
   Cache-Control: no-cache, no-store, must-revalidate
 
-# Keep immutable caching limited to fingerprinted media and font files.
-# Applying it to every asset can permanently cache an HTML fallback for a
-# missing JavaScript file.
+# Vite fingerprints build assets, so they can be cached safely across deploys.
+# HTML remains uncached and always points at the current asset filenames.
 /assets/*.webp
   Cache-Control: public, max-age=31536000, immutable
 
@@ -20,7 +19,7 @@
   Cache-Control: public, max-age=31536000, immutable
 
 /assets/*.js
-  Cache-Control: no-cache, no-store, must-revalidate
+  Cache-Control: public, max-age=31536000, immutable
 
 /assets/*.css
-  Cache-Control: no-cache, no-store, must-revalidate
+  Cache-Control: public, max-age=31536000, immutable
