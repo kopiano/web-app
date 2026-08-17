@@ -1622,8 +1622,11 @@ function VideoWatch({
             {video.status === 'ready' && (video.raw.originFileUrl || video.src) ? (
               <HlsVideo
                 key={video.id}
-                src={video.raw.originFileUrl || video.src}
-                fallbackSrc={video.raw.originFileUrl ? video.src : undefined}
+                // HLS is the streaming source and should be attempted first.
+                // The original file is only a fallback for browsers/CDNs that
+                // cannot load the generated playlist.
+                src={video.src || video.raw.originFileUrl}
+                fallbackSrc={video.src && video.raw.originFileUrl ? video.raw.originFileUrl : undefined}
                 poster={video.poster}
                 playbackId={video.id}
                 active

@@ -15,9 +15,12 @@ const VIDEO_STARTUP_FALLBACK_MS = 3_000;
 const VIDEO_NETWORK_RETRY_LIMIT = 3;
 const VIDEO_MEDIA_RETRY_LIMIT = 2;
 const VIDEO_QUALITY_RECOVERY_MS = 20_000;
-const VIDEO_LOW_BUFFER_SECONDS = 5;
-const VIDEO_CRITICAL_BUFFER_SECONDS = 2;
+const VIDEO_BUFFER_TARGET_SECONDS = 60;
+const VIDEO_BUFFER_RESUME_SECONDS = 20;
+const VIDEO_LOW_BUFFER_SECONDS = 24;
+const VIDEO_CRITICAL_BUFFER_SECONDS = 8;
 const VIDEO_STALL_DETECTION_MS = 3_000;
+const VIDEO_LOAD_REQUEST_THROTTLE_MS = 1_000;
 
 interface NavigatorWithUserAgentData extends Navigator {
   userAgentData?: {
@@ -345,12 +348,28 @@ export default function HlsVideo({
     let lastStalledRecoveryAt = 0;
     let handleHlsLoadedMetadata: (() => void) | null = null;
     let recoverStalledBuffer: (() => void) | null = null;
+    let stopHlsWhenPaused: (() => void) | null = null;
+    let resumeHlsWhenPlaying: (() => void) | null = null;
     let markStarted: (() => void) | null = null;
     let qualityRecoveryTimer: number | undefined;
     let bufferWatchdogTimer: number | undefined;
     let lastQualityDowngradeAt = 0;
     let lastObservedPlaybackTime = -1;
     let lastPlaybackProgressAt = performance.now();
+    let lastLoadRequestAt = 0;
+    const shouldLoadHls = () => (
+      !disposed
+      && !video.paused
+      && !video.ended
+      && Boolean(hls)
+    );
+    const startHlsLoad = () => {
+      if (!shouldLoadHls() || !hls) return;
+      const now = performance.now();
+      if (now - lastLoadRequestAt < VIDEO_LOAD_REQUEST_THROTTLE_MS) return;
+      lastLoadRequestAt = now;
+      hls.startLoad(Math.max(0, video.currentTime));
+    };
     const clearRetryTimer = () => {
       if (retryTimer !== undefined) {
         window.clearTimeout(retryTimer);
@@ -384,7 +403,10 @@ export default function HlsVideo({
     const getBufferedSeconds = () => {
       if (!Number.isFinite(video.currentTime)) return 0;
       for (let index = 0; index < video.buffered.length; index += 1) {
-        if (video.currentTime >= video.buffered.start(index) && video.currentTime <= video.buffered.end(index)) {
+        if (
+          video.currentTime + 0.25 >= video.buffered.start(index)
+          && video.currentTime <= video.buffered.end(index)
+        ) {
           return Math.max(0, video.buffered.end(index) - video.currentTime);
         }
       }
@@ -425,14 +447,20 @@ export default function HlsVideo({
       ) {
         downgradeQuality();
       }
+      // Keep downloading ahead of playback. hls.js still requests fragments
+      // sequentially, but it resumes early instead of waiting for the buffer
+      // to become nearly empty.
+      if (bufferedSeconds < VIDEO_BUFFER_RESUME_SECONDS) {
+        startHlsLoad();
+      }
       if (bufferedSeconds <= VIDEO_CRITICAL_BUFFER_SECONDS) {
-        hls.startLoad(Math.max(0, video.currentTime));
+        startHlsLoad();
       }
       if (
         now - lastPlaybackProgressAt >= VIDEO_STALL_DETECTION_MS
         && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA
       ) {
-        hls.startLoad(Math.max(0, video.currentTime));
+        startHlsLoad();
         void requestPlayback(video, true);
         lastPlaybackProgressAt = now;
       }
@@ -495,8 +523,10 @@ export default function HlsVideo({
         retryNativePlayback(true);
         return;
       }
-      hls?.startLoad();
-      startPlayback();
+      if (shouldLoadHls()) {
+        startHlsLoad();
+        startPlayback();
+      }
     };
     window.addEventListener('online', handleOnline);
 
@@ -513,17 +543,19 @@ export default function HlsVideo({
       hls = new Hls({
         autoStartLoad: true,
         enableWorker: true,
+        progressive: true,
         startPosition: savedPlaybackPosition,
         // Keep enough VOD data to absorb normal jitter without allowing one
         // player to consume the connection and memory needed by other views.
         lowLatencyMode: false,
         startFragPrefetch: true,
-        // Let hls.js select quality from measured bandwidth.
-        startLevel: -1,
+        // Start with the smallest rendition so the first TS arrives quickly.
+        // ABR can increase quality after the buffer runway is established.
+        startLevel: 0,
         // Leave headroom for network jitter and require stronger evidence
         // before moving back to a higher rendition after a downgrade.
-        abrBandWidthFactor: 0.7,
-        abrBandWidthUpFactor: 0.5,
+        abrBandWidthFactor: 0.85,
+        abrBandWidthUpFactor: 0.65,
         abrEwmaFastVoD: 3,
         abrEwmaSlowVoD: 9,
         // Start playback as soon as the first playable fragment is buffered.
@@ -536,22 +568,25 @@ export default function HlsVideo({
         // maxMaxBufferLength: 24,
         // Keep a larger forward buffer so short network drops do not stop
         // playback. hls.js expresses this in seconds rather than fragment count.
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        maxBufferSize: 80 * 1024 * 1024,
+        maxBufferLength: VIDEO_BUFFER_TARGET_SECONDS,
+        maxMaxBufferLength: VIDEO_BUFFER_TARGET_SECONDS,
+        maxBufferSize: 128 * 1024 * 1024,
         backBufferLength: 8,
         maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 2,
-        fragLoadingTimeOut: 10_000,
+        // TS fragments can be several megabytes on a high bitrate source.
+        // Avoid aborting a healthy transfer before the server/CDN ramps up.
+        fragLoadingTimeOut: 20_000,
         fragLoadingMaxRetry: 4,
-        fragLoadingRetryDelay: 250,
-        fragLoadingMaxRetryTimeout: 8_000,
+        fragLoadingRetryDelay: 150,
+        fragLoadingMaxRetryTimeout: 12_000,
         manifestLoadingMaxRetry: 2,
         manifestLoadingRetryDelay: 250,
         manifestLoadingMaxRetryTimeout: 4000,
       });
       hls.loadSource(source);
       hls.attachMedia(video);
+      startHlsLoad();
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         networkRetryCount = 0;
         mediaRetryCount = 0;
@@ -587,7 +622,7 @@ export default function HlsVideo({
         }, VIDEO_STARTUP_FALLBACK_MS);
       }
       recoverStalledBuffer = () => {
-        if (disposed || !hls || video.ended) return;
+        if (!shouldLoadHls()) return;
         downgradeQuality();
         const now = performance.now();
         if (now - lastStalledRecoveryAt < 1_500) return;
@@ -595,13 +630,22 @@ export default function HlsVideo({
         clearStalledRecoveryTimer();
         stalledRecoveryTimer = window.setTimeout(() => {
           stalledRecoveryTimer = undefined;
-          if (disposed || !hls || video.ended) return;
-          hls.startLoad(Math.max(0, video.currentTime));
-          if (video.paused && autoPlayRef.current) {
-            void requestPlayback(video, true);
-          }
+          if (!shouldLoadHls() || !hls) return;
+          startHlsLoad();
+          void requestPlayback(video, true);
         }, 250);
       };
+      stopHlsWhenPaused = () => {
+        clearRetryTimer();
+        clearStalledRecoveryTimer();
+        if (hls) hls.stopLoad();
+      };
+      resumeHlsWhenPlaying = () => {
+        if (!shouldLoadHls() || !hls) return;
+        startHlsLoad();
+      };
+      video.addEventListener('pause', stopHlsWhenPaused);
+      video.addEventListener('play', resumeHlsWhenPlaying);
       video.addEventListener('waiting', recoverStalledBuffer);
       video.addEventListener('stalled', recoverStalledBuffer);
       bufferWatchdogTimer = window.setInterval(monitorBuffer, 1_000);
@@ -629,7 +673,7 @@ export default function HlsVideo({
             return;
           }
           retryTimer = window.setTimeout(() => {
-            if (!disposed && hls) hls.startLoad();
+            startHlsLoad();
           }, delay);
         } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
           if (fallbackSrc && mediaRetryCount >= 1 && switchToFallback()) return;
@@ -681,6 +725,8 @@ export default function HlsVideo({
         video.removeEventListener('waiting', recoverStalledBuffer);
         video.removeEventListener('stalled', recoverStalledBuffer);
       }
+      if (stopHlsWhenPaused) video.removeEventListener('pause', stopHlsWhenPaused);
+      if (resumeHlsWhenPlaying) video.removeEventListener('play', resumeHlsWhenPlaying);
       if (markStarted) video.removeEventListener('playing', markStarted);
       window.removeEventListener('online', handleOnline);
       hls?.destroy();
