@@ -755,10 +755,7 @@ function VideoWatchPage({
 
   return (
     <div className="video-watch-page">
-      <button type="button" className="video-watch-back" onClick={onBack}>
-        <ArrowLeft size={18} />
-        Back
-      </button>
+      <button type="button" className="video-watch-back" onClick={onBack}><ArrowLeft size={18} />Back</button>
 
       <div className="video-watch-layout">
         <div className="video-watch-main">
