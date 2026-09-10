@@ -15,12 +15,17 @@ const VIDEO_STARTUP_FALLBACK_MS = 3_000;
 const VIDEO_NETWORK_RETRY_LIMIT = 3;
 const VIDEO_MEDIA_RETRY_LIMIT = 2;
 const VIDEO_QUALITY_RECOVERY_MS = 20_000;
-const VIDEO_BUFFER_TARGET_SECONDS = 60;
-const VIDEO_BUFFER_RESUME_SECONDS = 20;
-const VIDEO_LOW_BUFFER_SECONDS = 24;
-const VIDEO_CRITICAL_BUFFER_SECONDS = 8;
+// Keep a useful runway without making each visible player retain a large
+// amount of decoded media in memory.
+// Build a substantially larger runway for high-bitrate VOD playback. This
+// prevents normal playback from quickly catching up with segment downloads.
+const VIDEO_BUFFER_TARGET_SECONDS = 90;
+const VIDEO_BUFFER_RESUME_SECONDS = 45;
+const VIDEO_LOW_BUFFER_SECONDS = 60;
+const VIDEO_CRITICAL_BUFFER_SECONDS = 15;
 const VIDEO_STALL_DETECTION_MS = 3_000;
 const VIDEO_LOAD_REQUEST_THROTTLE_MS = 1_000;
+const VIDEO_SEGMENT_CACHE_MAX_AGE_SECONDS = 86_400;
 
 interface NavigatorWithUserAgentData extends Navigator {
   userAgentData?: {
@@ -544,34 +549,54 @@ export default function HlsVideo({
         autoStartLoad: true,
         enableWorker: true,
         progressive: true,
+        // progressive mode uses FetchLoader. Keep manifests fresh while
+        // allowing immutable media segments to be served from browser/CDN
+        // cache when the user replays or seeks within the same video.
+        fetchSetup: (context, initParams) => {
+          const isManifest = /\.m3u8(?:[?#]|$)/i.test(context.url);
+          const headers = new Headers(initParams.headers);
+          headers.set(
+            'Cache-Control',
+            isManifest
+              ? 'no-cache'
+              : `max-age=${VIDEO_SEGMENT_CACHE_MAX_AGE_SECONDS}`,
+          );
+          return new Request(context.url, {
+            ...initParams,
+            cache: isManifest ? 'no-cache' : 'force-cache',
+            headers,
+          });
+        },
         startPosition: savedPlaybackPosition,
         // Keep enough VOD data to absorb normal jitter without allowing one
         // player to consume the connection and memory needed by other views.
         lowLatencyMode: false,
         startFragPrefetch: true,
-        // Start with the smallest rendition so the first TS arrives quickly.
-        // ABR can increase quality after the buffer runway is established.
-        startLevel: 0,
+        // Let ABR choose the initial rendition from the measured connection.
+        // Forcing the lowest level makes startup look quick but can create
+        // unnecessary quality switches and extra buffering on fast networks.
+        startLevel: -1,
         // Leave headroom for network jitter and require stronger evidence
         // before moving back to a higher rendition after a downgrade.
-        abrBandWidthFactor: 0.85,
-        abrBandWidthUpFactor: 0.65,
+        // Leave more bandwidth headroom so the player can keep filling the
+        // forward buffer instead of repeatedly matching playback speed.
+        abrBandWidthFactor: 0.7,
+        abrBandWidthUpFactor: 0.5,
         abrEwmaFastVoD: 3,
         abrEwmaSlowVoD: 9,
         // Start playback as soon as the first playable fragment is buffered.
         // The player can continue filling its VOD buffer in the background.
         maxStarvationDelay: 1,
         maxLoadingDelay: 2,
-        capLevelToPlayerSize: false,
-        // 缓冲控制
-        // maxBufferLength: 12,
-        // maxMaxBufferLength: 24,
-        // Keep a larger forward buffer so short network drops do not stop
-        // playback. hls.js expresses this in seconds rather than fragment count.
+        // Avoid downloading renditions that cannot be displayed by the
+        // current card/player dimensions.
+        capLevelToPlayerSize: true,
+        // Keep a moderate forward buffer so short network drops do not stop
+        // playback without retaining excessive media for every card.
         maxBufferLength: VIDEO_BUFFER_TARGET_SECONDS,
-        maxMaxBufferLength: VIDEO_BUFFER_TARGET_SECONDS,
-        maxBufferSize: 128 * 1024 * 1024,
-        backBufferLength: 8,
+        maxMaxBufferLength: VIDEO_BUFFER_TARGET_SECONDS + 30,
+        maxBufferSize: 256 * 1024 * 1024,
+        backBufferLength: 5,
         maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 2,
         // TS fragments can be several megabytes on a high bitrate source.
