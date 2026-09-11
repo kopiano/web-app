@@ -94,6 +94,7 @@ interface HlsVideoProps {
   controls?: boolean;
   toggleOnSurfaceClick?: boolean;
   onVideoElement?: (video: HTMLVideoElement | null) => void;
+  onEnded?: () => void;
   playbackId?: string;
   errorLabel?: string;
   loadingLabel?: string;
@@ -114,6 +115,7 @@ export default function HlsVideo({
   controls = active,
   toggleOnSurfaceClick = false,
   onVideoElement,
+  onEnded,
   playbackId,
   errorLabel = 'Unable to play this video.',
   loadingLabel = 'Loading video',
@@ -977,6 +979,7 @@ export default function HlsVideo({
         preload={autoPlay ? 'auto' : 'metadata'}
         poster={poster}
         className={className}
+        onEnded={onEnded}
       />
       {onActivate && (!active || !isPlaying) && (
         <button

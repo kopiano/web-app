@@ -1359,6 +1359,7 @@ function VideoWatch({
   const [deleteError, setDeleteError] = useState('');
   const controlsTimerRef = useRef<number | undefined>(undefined);
   const volumeControlTimerRef = useRef<number | undefined>(undefined);
+  const endedVideoRef = useRef<string | null>(null);
   const revealControls = useCallback(() => {
     setControlsVisible(true);
     if (controlsTimerRef.current !== undefined) {
@@ -1401,6 +1402,7 @@ function VideoWatch({
     setReplyTarget(null);
     setViewIncrementVisible(false);
     setSingleLoop(false);
+    endedVideoRef.current = null;
   }, [video.id]);
 
   useEffect(() => {
@@ -1486,37 +1488,44 @@ function VideoWatch({
     };
   }, [media, video.raw.duration]);
 
+  const handleEnded = useCallback(() => {
+    if (!media || endedVideoRef.current === video.id) return;
+    endedVideoRef.current = video.id;
+
+    if (singleLoop) {
+      endedVideoRef.current = null;
+      media.currentTime = 0;
+      playMedia(media, () => setIsPlaying(false));
+      return;
+    }
+
+    // Playlist responses may omit the playable URL; the detail query loads it after selection.
+    const playableVideos = playlist.filter((item) => item.status === 'ready');
+    if (!playableVideos.length) {
+      endedVideoRef.current = null;
+      return;
+    }
+
+    const currentIndex = playableVideos.findIndex((item) => item.id === video.id);
+    const nextIndex = currentIndex >= 0
+      ? (currentIndex + 1) % playableVideos.length
+      : 0;
+    const nextVideo = playableVideos[nextIndex];
+
+    if (nextVideo.id === video.id) {
+      endedVideoRef.current = null;
+      media.currentTime = 0;
+      playMedia(media, () => setIsPlaying(false));
+    } else {
+      onSelect(nextVideo);
+    }
+  }, [media, onSelect, playlist, singleLoop, video.id]);
+
   useEffect(() => {
     if (!media) return;
-
-    const handleEnded = () => {
-      if (singleLoop) {
-        media.currentTime = 0;
-        playMedia(media, () => setIsPlaying(false));
-        return;
-      }
-
-      // Playlist responses may omit the playable URL; the detail query loads it after selection.
-      const playableVideos = playlist.filter((item) => item.status === 'ready');
-      if (!playableVideos.length) return;
-
-      const currentIndex = playableVideos.findIndex((item) => item.id === video.id);
-      const nextIndex = currentIndex >= 0
-        ? (currentIndex + 1) % playableVideos.length
-        : 0;
-      const nextVideo = playableVideos[nextIndex];
-
-      if (nextVideo.id === video.id) {
-        media.currentTime = 0;
-        playMedia(media, () => setIsPlaying(false));
-      } else {
-        onSelect(nextVideo);
-      }
-    };
-
     media.addEventListener('ended', handleEnded);
     return () => media.removeEventListener('ended', handleEnded);
-  }, [media, onSelect, playlist, singleLoop, video.id]);
+  }, [handleEnded, media]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1634,6 +1643,7 @@ function VideoWatch({
                 controls={false}
                 toggleOnSurfaceClick
                 onVideoElement={setMedia}
+                onEnded={handleEnded}
                 errorLabel={t('video.player.error')}
                 loadingLabel={t('video.player.loading')}
                 onViewQualified={() => {
