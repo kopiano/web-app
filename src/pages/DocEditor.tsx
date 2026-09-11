@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import type { RootState } from '@/store/store';
 import { deleteDocument, getDocument, resolveDocumentAsset, updateDocument, updateDocumentInfo } from '@/api/docs';
+import { resolveAssetUrl } from '@/lib/avatar';
 import { documents } from './Docs';
 import customCodeKeywords from '@/config/codeKeywords.json';
 import '@/styles/doc-editor.scss';
@@ -89,9 +90,10 @@ function renderInlineMarkdown(text: string) {
   return text.split(/(!\[[^\]]*\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g).map((part, index) => {
     const image = part.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
     if (image) {
+      const imageSrc = resolveAssetUrl(image[2].trim());
       return (
         <figure className="doc-markdown-image" key={`${index}-${part}`}>
-          <img src={image[2]} alt={image[1]} loading="lazy" />
+          <img src={imageSrc} alt={image[1]} loading="lazy" />
           {image[1] && <figcaption>{image[1]}</figcaption>}
         </figure>
       );
