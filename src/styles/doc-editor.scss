@@ -51,7 +51,7 @@
   --doc-mode-padding: .4rem;
   position: relative; display: grid; grid-template-columns: repeat(2, minmax(8rem, 1fr)); gap: var(--doc-mode-gap); padding: var(--doc-mode-padding); border: 1px solid rgba(255,255,255,.72);
   border-radius: 3rem; background: rgba(255,255,255,.4); backdrop-filter: blur(1.5rem); }
-.doc-editor-modes button { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: .7rem; padding: .75rem 1.3rem; border-radius: 1rem; color: rgba(38,48,46,.56); background: transparent; font: inherit; font-size: 1.25rem; transition: color .42s ease; }
+.doc-editor-modes button { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: .7rem; padding: .85rem 1.3rem; border-radius: 1rem; color: rgba(38,48,46,.56); background: transparent; font: inherit; font-size: 1.25rem; transition: color .42s ease; }
 .doc-editor-modes button:disabled { color: rgba(38,48,46,.28); cursor: not-allowed; opacity: .55; }
 .doc-editor-modes button:disabled:hover { color: rgba(38,48,46,.28); background: transparent; }
 .doc-editor-modes button:hover, .doc-editor-modes button.is-active { color: #26302e; }
