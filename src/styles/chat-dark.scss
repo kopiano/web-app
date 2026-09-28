@@ -105,3 +105,8 @@
   background: rgba(32, 32, 32, 0.32);
   border-color: rgba(255, 255, 255, 0.12);
 }
+
+
+[data-theme='dark'] .msg.received {
+  background: rgba(255, 255, 255, 0.16);
+}
