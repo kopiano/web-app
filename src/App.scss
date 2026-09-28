@@ -2,6 +2,9 @@
 @use '@/styles/fonts.scss';
 @use '@/styles/backgroundImg.scss';
 @use '@/styles/overview.scss';
+@use '@/styles/header-dark.scss';
+@use '@/styles/overview-dark.scss';
+@use '@/styles/chat-dark.scss';
 
 .persistent-music-page.is-hidden {
   display: none;

@@ -1,0 +1,41 @@
+[data-theme='dark'] .home {
+  background: rgba(32, 32, 32, 0.32);
+}
+
+[data-theme='dark'] .home .content-name,
+[data-theme='dark'] .home .content p,
+[data-theme='dark'] .content-btn span {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+[data-theme='dark'] .content .content-btn {
+  border-color: rgba(255, 190, 132, 0.78);
+  background: rgba(32, 32, 32, 0.32);
+}
+
+[data-theme='dark'] .content-btn::before {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme='dark'] .social li:not(:last-child) img,
+[data-theme='dark'] .social svg {
+  filter: invert(1) brightness(0.9);
+}
+
+[data-theme='dark'] .social .icon-line {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+[data-theme='dark'] .social:hover .icon-line {
+  background: rgba(255, 255, 255, 0.48);
+}
+
+[data-theme='dark'] .tooltip-text {
+  color: rgba(255, 255, 255, 0.92);
+  background-color: rgba(32, 32, 32, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+[data-theme='dark'] .tooltip-text::after {
+  border-top-color: rgba(32, 32, 32, 0.32);
+}

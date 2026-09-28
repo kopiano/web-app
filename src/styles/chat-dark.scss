@@ -1,0 +1,107 @@
+[data-theme='dark'] .chat,
+[data-theme='dark'] .chat-page {
+  background: rgba(32, 32, 32, 0.32);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+[data-theme='dark'] .chat-nav,
+[data-theme='dark'] .chat-panel,
+[data-theme='dark'] .contacts-panel,
+[data-theme='dark'] .messages-panel,
+[data-theme='dark'] .moments-feed {
+  background: rgba(32, 32, 32, 0.32);
+}
+
+[data-theme='dark'] .panel-divider,
+[data-theme='dark'] .contact-divider {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme='dark'] .contact-group-label,
+[data-theme='dark'] .contact-time,
+[data-theme='dark'] .messages-header-status,
+[data-theme='dark'] .msg-time {
+  color: rgba(255, 255, 255, 0.52);
+}
+
+[data-theme='dark'] .chat-nav-btn,
+[data-theme='dark'] .contact-name,
+[data-theme='dark'] .messages-header-name,
+[data-theme='dark'] .msg-text,
+[data-theme='dark'] .msg-empty,
+[data-theme='dark'] .moment-post-input,
+[data-theme='dark'] .moment-upload-title,
+[data-theme='dark'] .card-name,
+[data-theme='dark'] .card-text,
+[data-theme='dark'] .comment-text,
+[data-theme='dark'] .action-label,
+[data-theme='dark'] .input-tool-btn,
+[data-theme='dark'] .moment-tool-btn {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+[data-theme='dark'] .contact-preview,
+[data-theme='dark'] .moment-post-input::placeholder,
+[data-theme='dark'] .comment-input::placeholder,
+[data-theme='dark'] .card-time,
+[data-theme='dark'] .group-share-member-label {
+  color: rgba(255, 255, 255, 0.56);
+}
+
+[data-theme='dark'] .character-selector,
+[data-theme='dark'] .model-training-trigger,
+[data-theme='dark'] .group-share-button,
+[data-theme='dark'] .card-action-btn,
+[data-theme='dark'] .comment-input,
+[data-theme='dark'] .create-group-field {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+[data-theme='dark'] .character-selector svg,
+[data-theme='dark'] .model-training-trigger svg,
+[data-theme='dark'] .input-tool-btn svg,
+[data-theme='dark'] .moment-tool-btn svg,
+[data-theme='dark'] .card-action-btn svg {
+  color: currentColor;
+  stroke: currentColor;
+}
+
+[data-theme='dark'] .contact-item:hover,
+[data-theme='dark'] .contact-item.active,
+[data-theme='dark'] .chat-nav-btn:hover,
+[data-theme='dark'] .chat-nav-btn.active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme='dark'] .msg-input-bar {
+  background: rgba(32, 32, 32, 0.32);
+}
+
+[data-theme='dark'] .msg-input-inner {
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-theme='dark'] .msg-text-input,
+[data-theme='dark'] .msg-text-input::placeholder {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+[data-theme='dark'] .msg-text-input::placeholder {
+  color: rgba(255, 255, 255, 0.48);
+}
+
+[data-theme='dark'] .msg {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme='dark'] .msg.sent {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+[data-theme='dark'] .moment-post,
+[data-theme='dark'] .moment-card {
+  background: rgba(32, 32, 32, 0.32);
+  border-color: rgba(255, 255, 255, 0.12);
+}
