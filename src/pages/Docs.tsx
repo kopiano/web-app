@@ -13,6 +13,7 @@ import bg3 from '@/assets/images/bg-3-card.webp';
 import bg4 from '@/assets/images/bg-4-card.webp';
 import bg5 from '@/assets/images/bg-5-card.webp';
 import '@/styles/docs.scss';
+import '@/styles/docs-dark.scss';
 
 type ViewMode = 'grid' | 'timeline';
 

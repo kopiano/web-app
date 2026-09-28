@@ -10,6 +10,7 @@ import { resolveAssetUrl } from '@/lib/avatar';
 import { documents } from './Docs';
 import customCodeKeywords from '@/config/codeKeywords.json';
 import '@/styles/doc-editor.scss';
+import '@/styles/docs-dark.scss';
 
 type EditorMode = 'preview' | 'edit';
 

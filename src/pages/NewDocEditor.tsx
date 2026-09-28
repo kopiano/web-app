@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { createDocument } from '@/api/docs';
 import '@/styles/doc-editor.scss';
+import '@/styles/docs-dark.scss';
 
 export default function NewDocEditor({ onClose }: { onClose?: () => void }) {
   const { t } = useTranslation();
