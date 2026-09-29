@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { ImagePlus, Minus, Plus, ShoppingBag, X } from 'lucide-react';
+import { ChevronDown, ImagePlus, Minus, Plus, ShoppingBag, X } from 'lucide-react';
 import request from '@/api/request';
 import { resolveAssetUrl } from '@/lib/avatar';
 import '@/styles/store.scss';
@@ -47,55 +47,12 @@ const TEMPERATURES: Temperature[] = ['iced', 'hot', 'room'];
 const SWEETNESS: Sweetness[] = ['standard', 'less', 'extra', 'none'];
 const SIZE_EXTRA: Record<Size, number> = { small: 0, medium: 2, large: 4 };
 const CART_KEY = 'kopiano_store_cart';
-const IMAGE_TARGET_BYTES = 110 * 1024;
-type StoredProduct = { id: string; name: string; category: Product['category']; price_cents: number; sales: number; image_url: string };
+type StoredProduct = { id: string; name: string; category: Product['category']; price: number; sales: number; image_url: string };
 const fromStoredProduct = (item: StoredProduct): Product => ({
   id: item.id, name: item.name, zh: item.name, category: item.category,
-  price: item.price_cents / 100, sales: String(item.sales),
+  price: item.price / 100, sales: String(item.sales),
   image: resolveAssetUrl(item.image_url), color: '#e4e9e2',
 });
-
-function encodeWebp(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
-  return new Promise((resolve, reject) => canvas.toBlob(blob => {
-    if (!blob || blob.type !== 'image/webp') reject(new Error('WebP encoding is unavailable'));
-    else resolve(blob);
-  }, 'image/webp', quality));
-}
-
-async function prepareProductImage(file: File): Promise<Blob> {
-  if (!file.type.startsWith('image/')) throw new Error('Choose an image file');
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  try {
-    if (!bitmap.width || !bitmap.height) throw new Error('Invalid image');
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Image processing is unavailable');
-    const maxDimension = Math.max(bitmap.width, bitmap.height);
-    let dimension = Math.min(1600, maxDimension);
-    let best: Blob | null = null;
-    for (let step = 0; step < 8; step += 1) {
-      const scale = dimension / maxDimension;
-      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'high';
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      for (const quality of [0.94, 0.88, 0.82, 0.76]) {
-        const blob = await encodeWebp(canvas, quality);
-        if (!best || blob.size < best.size) best = blob;
-        if (blob.size <= IMAGE_TARGET_BYTES) {
-          return blob;
-        }
-      }
-      if (dimension <= 560) break;
-      dimension = Math.max(560, Math.round(dimension * 0.8));
-    }
-    throw new Error(`Image remains ${Math.ceil((best?.size || 0) / 1024)} KB at readable quality. Choose a simpler image.`);
-  } finally {
-    bitmap.close();
-  }
-}
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -118,9 +75,9 @@ const copy = {
     quantity: 'Quantity', add: 'Add to cart', done: 'Ready', cart: 'Your cart',
     empty: 'Your cart is empty.', total: 'Total', added: 'Added to cart',
     close: 'Close', remove: 'Remove item', items: 'items',
-    newProduct: 'New product', upload: 'Product photo', uploadHint: 'Upload an image · WebP, about 100 KB',
+    newProduct: 'New product', upload: 'Product photo', uploadHint: 'Any image format · converted to WebP by the server',
     name: 'Product name', namePlaceholder: 'e.g. Cappuccino', category: 'Category',
-    productPrice: 'Price (¥)', productSales: 'Sales', saveProduct: 'Add product',
+    productPrice: 'Price (¥)', productSales: 'Sales', saveProduct: 'Add product', publishing: 'Publishing...',
     processing: 'Preparing image...', requiredImage: 'Choose a product photo first.',
     saveFailed: 'Could not save the product. Please try again.',
     loadFailed: 'Products could not be loaded. Refresh to try again.',
@@ -136,9 +93,9 @@ const copy = {
     quantity: '数量', add: '加入购物车', done: '选好了', cart: '购物车',
     empty: '购物车还是空的。', total: '合计', added: '已加入购物车',
     close: '关闭', remove: '移除商品', items: '件商品',
-    newProduct: '新增商品', upload: '商品图片', uploadHint: '上传图片 · WebP，约 100 KB',
+    newProduct: '新增商品', upload: '商品图片', uploadHint: '支持任意图片格式 · 后端统一转换为 WebP',
     name: '商品名称', namePlaceholder: '例如：卡布奇诺', category: '分类',
-    productPrice: '价格 (¥)', productSales: '销量', saveProduct: '新增商品',
+    productPrice: '价格 (¥)', productSales: '销量', saveProduct: '新增商品', publishing: '正在发布中...',
     processing: '正在处理图片...', requiredImage: '请先上传商品图片。',
     saveFailed: '商品保存失败，请重试。',
     loadFailed: '商品加载失败，请刷新页面重试。',
@@ -172,6 +129,7 @@ export default function Store() {
   const [customProducts, setCustomProducts] = useState<Product[]>([]);
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState<Exclude<Category, 'all'>>('coffee');
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const [newPrice, setNewPrice] = useState('');
   const [newSales, setNewSales] = useState('0');
   const [newImage, setNewImage] = useState('');
@@ -190,7 +148,8 @@ export default function Store() {
   const [notice, setNotice] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
-  const products = useMemo(() => [...PRODUCTS, ...customProducts], [customProducts]);
+  const products = customProducts;
+  void PRODUCTS;
   const visible = useMemo(() => products.filter(product => category === 'all' || product.category === category), [category, products]);
   const count = cart.reduce((sum, item) => sum + item.quantity, 0);
   const total = cart.reduce((sum, item) => {
@@ -208,13 +167,31 @@ export default function Store() {
   }, []);
 
   useEffect(() => {
+    if (!categoryMenuOpen) return;
+    const closeMenu = (event: MouseEvent) => {
+      if (!(event.target as Element).closest('.store-category-select')) {
+        setCategoryMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', closeMenu);
+    return () => document.removeEventListener('mousedown', closeMenu);
+  }, [categoryMenuOpen]);
+
+  useEffect(() => {
     let active = true;
     request.get<StoredProduct[]>('/store/products').then(response => {
       if (active) {
-        setCustomProducts(response.data.map(fromStoredProduct));
+        const payload = Array.isArray(response.data) ? response.data : [];
+        setCustomProducts(payload.filter(item =>
+          item && typeof item.id === 'string' && typeof item.name === 'string'
+          && (item.category === 'coffee' || item.category === 'tea' || item.category === 'bakery')
+          && Number.isFinite(item.price) && Number.isFinite(item.sales)
+          && typeof item.image_url === 'string'
+        ).map(fromStoredProduct));
         setLoadError(false);
       }
-    }).catch(() => {
+    }).catch(error => {
+      console.error('[Store] failed to load products', error);
       if (active) setLoadError(true);
     });
     return () => { active = false; };
@@ -263,6 +240,18 @@ export default function Store() {
     }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 220);
   }
 
+  function adjustCreateNumber(field: 'price' | 'sales', direction: -1 | 1) {
+    if (field === 'price') {
+      const current = Number(newPrice) || 0;
+      const next = Math.min(99999, Math.max(0.01, Math.round((current + direction * 0.1) * 100) / 100));
+      setNewPrice(next.toFixed(2));
+      return;
+    }
+    const current = Number(newSales) || 0;
+    const next = Math.min(99999999, Math.max(0, Math.round(current + direction)));
+    setNewSales(String(next));
+  }
+
   function openCreate() {
     returnFocusRef.current = document.activeElement as HTMLElement;
     setNewName('');
@@ -282,7 +271,7 @@ export default function Store() {
     setImageBusy(true);
     setCreateError('');
     try {
-      const result = await prepareProductImage(file);
+      const result = file;
       if (request !== imageRequestRef.current) return;
       setNewImage(await blobToDataUrl(result));
       setImageBlob(result);
@@ -307,13 +296,13 @@ export default function Store() {
     const form = new FormData();
     form.set('name', newName.trim());
     form.set('category', newCategory);
-    form.set('price_cents', String(Math.round(Number(newPrice) * 100)));
+    form.set('price', String(Math.round(Number(newPrice) * 100)));
     form.set('sales', newSales);
-    form.set('image', imageBlob, 'product.webp');
+    form.set('image', imageBlob, imageBlob instanceof File ? imageBlob.name : 'product-image');
     setSaving(true);
     try {
       const response = await request.post<StoredProduct>('/store/products', form);
-      setCustomProducts(current => [fromStoredProduct(response.data), ...current]);
+      setCustomProducts(current => [...current, fromStoredProduct(response.data)]);
       setCategory('all');
       closeDialog();
     } catch {
@@ -431,26 +420,66 @@ export default function Store() {
                   <input type="text" value={newName} onChange={event => setNewName(event.target.value)}
                     placeholder={text.namePlaceholder} maxLength={80} required />
                 </label>
-                <label className="store-create-field">{text.category}
-                  <select value={newCategory} onChange={event => setNewCategory(event.target.value as Exclude<Category, 'all'>)}>
-                    {CATEGORIES.filter(item => item !== 'all').map(item => (
-                      <option value={item} key={item}>{text.categories[item]}</option>
-                    ))}
-                  </select>
-                </label>
+                <div className="store-create-field">
+                  <span>{text.category}</span>
+                  <div className={`store-category-select${categoryMenuOpen ? ' is-open' : ''}`}>
+                    <button className="store-category-trigger" type="button"
+                      aria-haspopup="listbox" aria-expanded={categoryMenuOpen}
+                      onClick={() => setCategoryMenuOpen(open => !open)}>
+                      <span>{text.categories[newCategory]}</span>
+                      <ChevronDown size={18} aria-hidden="true" />
+                    </button>
+                    {categoryMenuOpen && (
+                      <div className="store-category-menu" role="listbox" aria-label={text.category}>
+                        {CATEGORIES.filter(item => item !== 'all').map(item => (
+                          <button type="button" role="option" aria-selected={newCategory === item}
+                            className={newCategory === item ? 'is-selected' : ''} key={item}
+                            onClick={() => {
+                              setNewCategory(item as Exclude<Category, 'all'>);
+                              setCategoryMenuOpen(false);
+                            }}>
+                            {text.categories[item]}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <div className="store-create-fields">
-                  <label className="store-create-field">{text.productPrice}
-                    <input type="number" min="0.01" max="99999" step="0.01" inputMode="decimal"
-                      value={newPrice} onChange={event => setNewPrice(event.target.value)} required />
-                  </label>
-                  <label className="store-create-field">{text.productSales}
-                    <input type="number" min="0" max="99999999" step="1" inputMode="numeric"
-                      value={newSales} onChange={event => setNewSales(event.target.value)} required />
-                  </label>
+                  <div className="store-create-field">
+                    <span>{text.productPrice}</span>
+                    <div className="store-create-stepper">
+                      <button type="button" onClick={() => adjustCreateNumber('price', -1)}
+                        disabled={!newPrice || Number(newPrice) <= 0.01} aria-label={`${text.productPrice} -`}>
+                        <Minus size={16} />
+                      </button>
+                      <input type="number" min="0.01" max="99999" step="0.01" inputMode="decimal"
+                        value={newPrice} onChange={event => setNewPrice(event.target.value)} required />
+                      <button type="button" onClick={() => adjustCreateNumber('price', 1)}
+                        disabled={Number(newPrice) >= 99999} aria-label={`${text.productPrice} +`}>
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="store-create-field">
+                    <span>{text.productSales}</span>
+                    <div className="store-create-stepper">
+                      <button type="button" onClick={() => adjustCreateNumber('sales', -1)}
+                        disabled={Number(newSales) <= 0} aria-label={`${text.productSales} -`}>
+                        <Minus size={16} />
+                      </button>
+                      <input type="number" min="0" max="99999999" step="1" inputMode="numeric"
+                        value={newSales} onChange={event => setNewSales(event.target.value)} required />
+                      <button type="button" onClick={() => adjustCreateNumber('sales', 1)}
+                        disabled={Number(newSales) >= 99999999} aria-label={`${text.productSales} +`}>
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 {createError && <p className="store-create-error" role="alert">{createError}</p>}
                 <button className="store-add" type="submit" disabled={imageBusy || saving}>
-                  <Plus size={18} />{imageBusy ? text.processing : saving ? '...' : text.saveProduct}
+                  <Plus size={18} />{imageBusy ? text.processing : saving ? text.publishing : text.saveProduct}
                 </button>
               </form>
             )}
