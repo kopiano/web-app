@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ImagePlus, Minus, Plus, ShoppingBag, X } from 'lucide-react';
+import { Check, ChevronDown, ImagePlus, Minus, Plus, ShoppingBag, X } from 'lucide-react';
 import request from '@/api/request';
 import { resolveAssetUrl } from '@/lib/avatar';
 import '@/styles/store.scss';
@@ -146,6 +146,7 @@ export default function Store() {
   const [sweetness, setSweetness] = useState<Sweetness>('standard');
   const [quantity, setQuantity] = useState(1);
   const [notice, setNotice] = useState(false);
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const products = customProducts;
@@ -164,6 +165,7 @@ export default function Store() {
 
   useEffect(() => () => {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -334,6 +336,11 @@ export default function Store() {
         : [...current, { key, productId: selected.id, size, temperature, sweetness, quantity }];
     });
     setNotice(true);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => {
+      setNotice(false);
+      noticeTimerRef.current = null;
+    }, 3600);
   }
 
   function changeCartQuantity(key: string, delta: number) {
@@ -573,6 +580,15 @@ export default function Store() {
               </div>
             )}
           </div>
+          {notice && selected && !cartOpen && (
+            <div className="store-cart-notice" role="status" aria-live="polite">
+              <span className="store-cart-notice-icon" aria-hidden="true"><Check size={17} strokeWidth={2.6} /></span>
+              <span className="store-cart-notice-copy">
+                <strong>{zh ? selected.zh : selected.name}</strong>
+                <span>{text.added}</span>
+              </span>
+            </div>
+          )}
         </div>, document.body,
       )}
     </main>
