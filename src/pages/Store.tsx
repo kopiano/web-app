@@ -188,6 +188,8 @@ export default function Store() {
           && Number.isFinite(item.price) && Number.isFinite(item.sales)
           && typeof item.image_url === 'string'
         ).map(fromStoredProduct));
+        const validProductIds = new Set(payload.map(item => item?.id).filter((id): id is string => typeof id === 'string'));
+        setCart(current => current.filter(item => validProductIds.has(item.productId)));
         setLoadError(false);
       }
     }).catch(error => {
