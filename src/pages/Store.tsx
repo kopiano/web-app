@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { useSelector } from 'react-redux';
 import { Check, ChevronDown, ImagePlus, Minus, Plus, ShoppingBag, X } from 'lucide-react';
 import request from '@/api/request';
 import { resolveAssetUrl } from '@/lib/avatar';
 import '@/styles/store.scss';
 import '@/styles/store-dark.scss';
+import type { RootState } from '@/store/store';
 
 type Category = 'all' | 'coffee' | 'tea' | 'bakery';
 type Size = 'small' | 'medium' | 'large';
@@ -28,6 +30,7 @@ type CartItem = {
   temperature: Temperature;
   sweetness: Sweetness;
   quantity: number;
+  serverId?: string;
 };
 
 const photo = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=85`;
@@ -48,6 +51,7 @@ const SWEETNESS: Sweetness[] = ['standard', 'less', 'extra', 'none'];
 const SIZE_EXTRA: Record<Size, number> = { small: 0, medium: 2, large: 4 };
 const CART_KEY = 'kopiano_store_cart';
 type StoredProduct = { id: string; name: string; category: Product['category']; price: number; sales: number; image_url: string };
+type StoredCartItem = { id: string; product_id: string; size: Size; temperature: Temperature; sweetness: Sweetness; quantity: number };
 const fromStoredProduct = (item: StoredProduct): Product => ({
   id: item.id, name: item.name, zh: item.name, category: item.category,
   price: item.price / 100, sales: String(item.sales),
@@ -60,6 +64,28 @@ function blobToDataUrl(blob: Blob): Promise<string> {
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(new Error('Could not read the image'));
     reader.readAsDataURL(blob);
+  });
+}
+
+function storeImageProps(priority: boolean) {
+  return {
+    loading: priority ? 'eager' as const : 'lazy' as const,
+    decoding: 'async' as const,
+    ...(priority ? { fetchPriority: 'high' as const } : {}),
+  };
+}
+
+const warmedStoreImages = new Set<string>();
+
+function warmStoreImageCache(images: string[]) {
+  images.filter(Boolean).forEach(src => {
+    if (warmedStoreImages.has(src)) return;
+    warmedStoreImages.add(src);
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = src;
+    const decoded = image.decode?.();
+    if (decoded) void decoded.catch(() => undefined);
   });
 }
 
@@ -117,6 +143,7 @@ function readCart(): CartItem[] {
 }
 
 export default function Store() {
+  const currentUser = useSelector((state: RootState) => state.auth.user);
   const { i18n } = useTranslation();
   const zh = (i18n.resolvedLanguage || i18n.language).startsWith('zh');
   const text = zh ? copy.zh : copy.en;
@@ -160,8 +187,8 @@ export default function Store() {
   const price = selected ? (selected.price + SIZE_EXTRA[size]) * quantity : 0;
 
   useEffect(() => {
-    localStorage.setItem(CART_KEY, JSON.stringify(cart));
-  }, [cart]);
+    if (!currentUser) localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  }, [cart, currentUser]);
 
   useEffect(() => () => {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
@@ -184,12 +211,14 @@ export default function Store() {
     request.get<StoredProduct[]>('/store/products').then(response => {
       if (active) {
         const payload = Array.isArray(response.data) ? response.data : [];
-        setCustomProducts(payload.filter(item =>
+        const loadedProducts = payload.filter(item =>
           item && typeof item.id === 'string' && typeof item.name === 'string'
           && (item.category === 'coffee' || item.category === 'tea' || item.category === 'bakery')
           && Number.isFinite(item.price) && Number.isFinite(item.sales)
           && typeof item.image_url === 'string'
-        ).map(fromStoredProduct));
+        ).map(fromStoredProduct);
+        setCustomProducts(loadedProducts);
+        window.setTimeout(() => warmStoreImageCache(loadedProducts.map(item => item.image)), 0);
         const validProductIds = new Set(payload.map(item => item?.id).filter((id): id is string => typeof id === 'string'));
         setCart(current => current.filter(item => validProductIds.has(item.productId)));
         setLoadError(false);
@@ -200,6 +229,30 @@ export default function Store() {
     });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!currentUser) {
+      setCart(readCart());
+      return () => { active = false; };
+    }
+    setCart([]);
+    request.get<StoredCartItem[]>('/store/cart').then(response => {
+      if (!active) return;
+      setCart((response.data || []).map(item => ({
+        key: item.id,
+        serverId: item.id,
+        productId: item.product_id,
+        size: item.size,
+        temperature: item.temperature,
+        sweetness: item.sweetness,
+        quantity: item.quantity,
+      })));
+    }).catch(error => {
+      console.error('[Store] failed to load cart', error);
+    });
+    return () => { active = false; };
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (!selected && !cartOpen && !createOpen) return;
@@ -306,7 +359,9 @@ export default function Store() {
     setSaving(true);
     try {
       const response = await request.post<StoredProduct>('/store/products', form);
-      setCustomProducts(current => [...current, fromStoredProduct(response.data)]);
+      const product = fromStoredProduct(response.data);
+      setCustomProducts(current => [...current, product]);
+      warmStoreImageCache([product.image]);
       setCategory('all');
       closeDialog();
     } catch {
@@ -326,15 +381,33 @@ export default function Store() {
     setSelected(product);
   }
 
-  function addToCart() {
+  async function addToCart() {
     if (!selected) return;
-    const key = [selected.id, size, temperature, sweetness].join(':');
-    setCart(current => {
-      const existing = current.find(item => item.key === key);
-      return existing
-        ? current.map(item => item.key === key ? { ...item, quantity: item.quantity + quantity } : item)
-        : [...current, { key, productId: selected.id, size, temperature, sweetness, quantity }];
-    });
+    if (currentUser) {
+      try {
+        const response = await request.post<StoredCartItem>('/store/cart/items', {
+          product_id: selected.id, size, temperature, sweetness, quantity,
+        });
+        const item = response.data;
+        setCart(current => {
+          const next = { key: item.id, serverId: item.id, productId: item.product_id, size: item.size, temperature: item.temperature, sweetness: item.sweetness, quantity: item.quantity };
+          return current.some(entry => entry.serverId === item.id)
+            ? current.map(entry => entry.serverId === item.id ? next : entry)
+            : [...current, next];
+        });
+      } catch (error) {
+        console.error('[Store] failed to update cart', error);
+        return;
+      }
+    } else {
+      const key = [selected.id, size, temperature, sweetness].join(':');
+      setCart(current => {
+        const existing = current.find(item => item.key === key);
+        return existing
+          ? current.map(item => item.key === key ? { ...item, quantity: Math.min(99, item.quantity + quantity) } : item)
+          : [...current, { key, productId: selected.id, size, temperature, sweetness, quantity }];
+      });
+    }
     setNotice(true);
     if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
     noticeTimerRef.current = setTimeout(() => {
@@ -343,9 +416,19 @@ export default function Store() {
     }, 3600);
   }
 
-  function changeCartQuantity(key: string, delta: number) {
-    setCart(current => current.map(item =>
-      item.key === key ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item));
+  async function changeCartQuantity(key: string, delta: number) {
+    const item = cart.find(entry => entry.key === key);
+    if (!item) return;
+    const nextQuantity = Math.max(1, Math.min(99, item.quantity + delta));
+    if (currentUser && item.serverId) {
+      try {
+        await request.patch(`/store/cart/items/${item.serverId}`, { quantity: nextQuantity });
+      } catch (error) {
+        console.error('[Store] failed to update cart quantity', error);
+        return;
+      }
+    }
+    setCart(current => current.map(entry => entry.key === key ? { ...entry, quantity: nextQuantity } : entry));
   }
 
   return (
@@ -383,12 +466,12 @@ export default function Store() {
         </div>
         {loadError && <p className="store-create-error" role="alert">{text.loadFailed}</p>}
         <div className="store-grid">
-          {visible.map(product => (
+          {visible.map((product, index) => (
             <button className="store-product" key={product.id} type="button"
               onClick={() => openProduct(product)}
               aria-label={`${zh ? product.zh : product.name}, ¥${product.price.toFixed(1)}`}>
               <span className="store-product-image" style={{ backgroundColor: product.color }}>
-                <img src={product.image} alt="" loading="lazy" />
+                <img src={product.image} alt="" {...storeImageProps(index < 4)} />
               </span>
               <span className="store-product-meta">
                 <span className="store-product-name">{zh ? product.zh : product.name}</span>
@@ -495,7 +578,7 @@ export default function Store() {
             {selected && !cartOpen && (
               <>
                 <div className="store-dialog-visual" style={{ backgroundColor: selected.color }}>
-                  <img src={selected.image} alt="" />
+                  <img src={selected.image} alt="" {...storeImageProps(true)} />
                 </div>
                 <div className="store-dialog-body">
                   <span className="store-dialog-category">{text.categories[selected.category]}</span>
