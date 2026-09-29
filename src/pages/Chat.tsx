@@ -1,5 +1,6 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import AutomaticVoicePlayback from '../components/AutomaticVoicePlayback';
 import { useDispatch, useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -42,6 +43,7 @@ import {
 } from '@/api/chat';
 import {
   acknowledgeVoiceTrainingJob,
+  canUseCharacterTtsDirectStream,
   characterTtsStreamUrl,
   createVoiceTrainingJob,
   generateCharacterTts,
@@ -174,6 +176,8 @@ function takeReadySpeechText(
   text: string,
   flush = false,
   maxCharacters = 28,
+  minimumCharacters = 6,
+  firstChunk = false,
 ): { chunks: string[]; remainder: string } {
   const chunks: string[] = [];
   let current = '';
@@ -181,7 +185,14 @@ function takeReadySpeechText(
     current += character;
     const currentLength = current.trim().length;
     const isBoundary = /[。！？!?；;，,：:\n]/u.test(character);
-    if ((isBoundary && currentLength >= 6) || currentLength >= maxCharacters) {
+    const isWordBoundary = /\s/u.test(character);
+    const isSentenceEnd = character === '.' && !/\d\.$/u.test(current);
+    const limit = firstChunk && chunks.length === 0 ? 16 : maxCharacters;
+    const minimum = firstChunk && chunks.length === 0 ? 4 : minimumCharacters;
+    // Do not split English words at an arbitrary character count.
+    const canSplit = isBoundary || isWordBoundary || isSentenceEnd || /\p{Script=Han}/u.test(character);
+    if (((isBoundary || isSentenceEnd) && currentLength >= minimum)
+      || (currentLength >= limit && canSplit)) {
       if (current.trim()) chunks.push(current.trim());
       current = '';
     }
@@ -2381,6 +2392,8 @@ function Chat() {
     let queuedTts = Promise.resolve();
     let ttsError: unknown = null;
     let firstSpeechStreamUrl = '';
+    let queuedSpeechChunks = 0;
+    let firstSpeechTimer: number | undefined;
     const audioSegments: string[] = [];
     const ttsInput = shouldGenerateVoice ? {
       character_id: characterId,
@@ -2399,7 +2412,7 @@ function Chat() {
     const generateSpeechChunk = async (text: string) => {
       if (!ttsInput) return;
       const segmentCountBeforeRequest = audioSegments.length;
-      if (import.meta.env.VITE_CHARACTER_TTS_WEBSOCKET !== 'false') {
+      if (canUseCharacterTtsDirectStream() && import.meta.env.VITE_CHARACTER_TTS_WEBSOCKET !== 'false') {
         try {
           await streamCharacterTts({ ...ttsInput, text }, {
             onSegment: segment => {
@@ -2428,11 +2441,22 @@ function Chat() {
     const queueSpeechText = (delta: string, flush = false) => {
       if (!ttsInput || ttsError) return;
       pendingSpeechText += delta;
-      const ready = takeReadySpeechText(pendingSpeechText, flush);
+      // A short first chunk lowers time to first audio; larger following chunks
+      // amortize per-request model overhead without concurrent GPU inference.
+      const ready = takeReadySpeechText(
+        pendingSpeechText,
+        flush,
+        120,
+        48,
+        queuedSpeechChunks === 0,
+      );
       pendingSpeechText = ready.remainder;
       ready.chunks.forEach(text => {
+        queuedSpeechChunks += 1;
+        window.clearTimeout(firstSpeechTimer);
         if (
           !firstSpeechStreamUrl
+          && canUseCharacterTtsDirectStream()
           && import.meta.env.VITE_CHARACTER_TTS_STREAMING !== 'false'
         ) {
           firstSpeechStreamUrl = characterTtsStreamUrl({ ...ttsInput, text });
@@ -2452,6 +2476,18 @@ function Chat() {
           }
         });
       });
+      // A slow LLM may pause before punctuation. Bound the first-chunk wait,
+      // but keep waiting for a word boundary in languages with spaces.
+      if (!flush && queuedSpeechChunks === 0 && firstSpeechTimer === undefined
+        && pendingSpeechText.trim().length >= 4
+        && (/\p{Script=Han}/u.test(pendingSpeechText) || /\s$/u.test(pendingSpeechText))) {
+        firstSpeechTimer = window.setTimeout(() => {
+          firstSpeechTimer = undefined;
+          if (/\p{Script=Han}/u.test(pendingSpeechText) || /[\s.!?;,:]$/u.test(pendingSpeechText)) {
+            queueSpeechText('', true);
+          }
+        }, 150);
+      }
     };
 
     voiceReplyInFlightRef.current = true;
@@ -2506,6 +2542,7 @@ function Chat() {
       });
       queueSpeechText('', true);
       if (!temporaryReplyCreated) {
+        queueSpeechText(result.text, true);
         temporaryReplyCreated = true;
         const createdAt = new Date();
         dispatch(appendConversationMessage({
@@ -2543,10 +2580,12 @@ function Chat() {
         temporaryId,
         message: {
           ...persistedReply,
+          clientMessageId,
           status: 'sent',
           audioStatus: shouldGenerateVoice ? 'generating' : undefined,
           audioStreamUrl: firstSpeechStreamUrl || undefined,
           audioSegments: shouldGenerateVoice ? [...audioSegments] : undefined,
+          audioAutoPlay: shouldGenerateVoice,
         },
       }));
       voiceMessageId = persisted.id;
@@ -2575,6 +2614,7 @@ function Chat() {
         'error',
       );
     } finally {
+      window.clearTimeout(firstSpeechTimer);
       voiceReplyInFlightRef.current = false;
       setVoiceReplyLoading(false);
     }
@@ -2943,6 +2983,12 @@ function Chat() {
         const audioContext = voiceAudioContextRef.current
           || new AudioContextConstructor();
         voiceAudioContextRef.current = audioContext;
+        // Prime the same output used by automatic replies during the send gesture.
+        const warmup = audioContext.createBufferSource();
+        warmup.buffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
+        warmup.connect(audioContext.destination);
+        warmup.onended = () => warmup.disconnect();
+        warmup.start();
         if (audioContext.state === 'suspended') {
           void audioContext.resume();
         }
@@ -3741,6 +3787,42 @@ function Chat() {
                           </div>
                           )}
                           {(msg.audioStatus || msg.audioStreamUrl || msg.audioSegments?.length || msg.audioUrl) && (
+                            msg.audioAutoPlay !== undefined ? (
+                              <AutomaticVoicePlayback
+                                streamUrl={msg.audioStreamUrl}
+                                segments={msg.audioSegments}
+                                enabled={msg.status !== 'failed'}
+                                autoPlay={msg.audioAutoPlay}
+                                complete={msg.audioStatus === 'ready' || msg.audioStatus === 'failed'}
+                                audioContext={voiceAudioContextRef.current}
+                                recoverStream={msg.audioStreamUrl ? async () => {
+                                  const params = new URL(msg.audioStreamUrl!).searchParams;
+                                  const generated = await generateCharacterTts({
+                                    character_id: params.get('character_id') || '',
+                                    model_id: params.get('model_id') || undefined,
+                                    text: params.get('text') || '',
+                                    language: params.get('language') === 'zh' ? 'zh' : 'en',
+                                    speed_factor: Number(params.get('speed_factor') || 1),
+                                  });
+                                  return generated.audio_url;
+                                } : undefined}
+                                onFinished={() => {
+                                  dispatch(patchConversationMessage({
+                                    conversationId: activeConversationId,
+                                    messageId: msg.id,
+                                    changes: { audioAutoPlay: false },
+                                  }));
+                                }}
+                                onError={() => {
+                                  dispatch(patchConversationMessage({
+                                    conversationId: activeConversationId,
+                                    messageId: msg.id,
+                                    changes: { audioStatus: 'failed', audioAutoPlay: false },
+                                  }));
+                                  notify(t('chat.ttsReplyFailed'), 'warning');
+                                }}
+                              />
+                            ) : (
                             <VoiceMessagePlayer
                               audioStreamUrl={msg.audioStreamUrl}
                               audioSegments={
@@ -3778,6 +3860,7 @@ function Chat() {
                               readyLabel={t('chat.characterVoiceReady')}
                               failedLabel={t('chat.characterVoiceFailed')}
                             />
+                            )
                           )}
                         </div>
                         <div className="msg-time">

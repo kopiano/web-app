@@ -160,6 +160,7 @@ export function generateCharacterTts(
   input: CharacterTtsInput,
 ): Promise<VoiceChatResult>;
 export function characterTtsStreamUrl(input: CharacterTtsInput): string;
+export function canUseCharacterTtsDirectStream(): boolean;
 export function characterTtsWebSocketUrl(): string;
 export interface CharacterTtsStreamSegment {
   index: number;

@@ -1,10 +1,35 @@
 import axios from 'axios'
+import { authStorage } from '../lib/auth'
 
 const voiceRequest = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8100/api/',
   timeout: 180000,
   withCredentials: true,
 })
+
+voiceRequest.interceptors.request.use(config => {
+  const token = authStorage.getToken()
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// Media elements and browser WebSockets cannot attach Authorization headers.
+// Token sessions use authenticated HTTP synthesis while the reply is streaming.
+export function canUseCharacterTtsDirectStream() {
+  return !authStorage.getToken()
+}
+
+function normalizeCharacterTtsInput(input) {
+  const text = String(input.text || '').trim()
+  // GPT-SoVITS' English frontend drops Chinese characters. UI locale is not
+  // the language of an LLM reply; infer it consistently for every transport.
+  const language = /\p{Script=Han}/u.test(text)
+    ? 'zh'
+    : /[a-z]/i.test(text) ? 'en' : input.language || 'zh'
+  return { ...input, text, language }
+}
 
 voiceRequest.interceptors.response.use(response => {
   const body = response.data
@@ -40,6 +65,7 @@ export async function streamLlmReply(input, onDelta) {
     headers: {
       Accept: 'text/event-stream',
       'Content-Type': 'application/json',
+      ...(authStorage.getToken() ? { Authorization: `Bearer ${authStorage.getToken()}` } : {}),
     },
     body: JSON.stringify(input),
   })
@@ -125,6 +151,8 @@ export function createVoiceTrainingJob({
     const xhr = new XMLHttpRequest()
     xhr.open('POST', requestURL)
     xhr.withCredentials = true
+    const token = authStorage.getToken()
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
     xhr.timeout = voiceRequest.defaults.timeout || 180000
     xhr.upload.onprogress = event => {
       onUploadProgress?.({
@@ -228,14 +256,14 @@ export function sendCharacterMessage(input) {
 }
 
 export function generateCharacterTts(input) {
-  return voiceRequest.post('/tts', input).then(response => response.data)
+  return voiceRequest.post('/tts', normalizeCharacterTtsInput(input)).then(response => response.data)
 }
 
 export function characterTtsStreamUrl(input) {
   const baseURL = String(voiceRequest.defaults.baseURL || window.location.origin)
     .replace(/\/?$/, '/')
   const url = new URL('tts/stream', baseURL)
-  Object.entries(input || {}).forEach(([key, value]) => {
+  Object.entries(normalizeCharacterTtsInput(input || {})).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.set(key, String(value))
     }
@@ -282,7 +310,7 @@ export function streamCharacterTts(input, callbacks = {}) {
     socket.binaryType = 'arraybuffer'
     socket.onopen = () => {
       armIdleTimer()
-      socket.send(JSON.stringify(input))
+      socket.send(JSON.stringify(normalizeCharacterTtsInput(input)))
     }
     socket.onmessage = event => {
       armIdleTimer()
