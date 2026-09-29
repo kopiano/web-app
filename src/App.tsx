@@ -27,6 +27,7 @@ const Overview = lazy(() => import('@/pages/Overview'));
 const Chat = lazy(() => import('@/pages/Chat'));
 const Music = lazy(() => import('@/pages/Music'));
 const Video = lazy(() => import('@/pages/VideoConnected'));
+const Store = lazy(() => import('@/pages/Store'));
 const Docs = lazy(() => import('@/pages/Docs'));
 const DocEditor = lazy(() => import('@/pages/DocEditor'));
 const NewDocEditor = lazy(() => import('@/pages/NewDocEditor'));
@@ -224,6 +225,7 @@ const router = createBrowserRouter([
       { path: '/chat', element: <Chat /> },
       { path: '/music', element: <></> },
       { path: '/video', element: <Video /> },
+      { path: '/store', element: <Store /> },
       { path: '/docs', element: <Docs /> },
       { path: '/docs/new', element: <NewDocEditor /> },
       { path: '/docs/:id', element: <DocEditor /> },

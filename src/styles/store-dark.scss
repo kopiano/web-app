@@ -1,0 +1,51 @@
+[data-theme='dark'] .store-page {
+  --store-ink: #eaf1eb;
+  --store-muted: #aab9ae;
+  --store-line: rgba(210,234,216,.18);
+  --store-accent: #9bd9bb;
+  background: rgba(32,32,32,.32);
+}
+
+[data-theme='dark'] .store-tabs {
+  background: rgba(32,32,32,.32);
+  border-color: rgba(255,255,255,.1);
+}
+
+[data-theme='dark'] .store-tabs::before {
+  background: rgba(32,32,32,.32);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), 0 3px 12px rgba(0,0,0,.15);
+}
+
+[data-theme='dark'] .store-tabs button { color: #b3c3b7; }
+[data-theme='dark'] .store-tabs button.is-active { color: white; }
+[data-theme='dark'] .store-cart-trigger { background: rgba(32,32,32,.32); }
+[data-theme='dark'] .store-cart-trigger strong { background: #9bd9bb; color: #193729; }
+[data-theme='dark'] .store-create-trigger { background: rgba(32,32,32,.32); }
+[data-theme='dark'] .store-dialog {
+  background: rgba(32,32,32,.32);
+  color: var(--store-ink);
+  backdrop-filter: blur(24px);
+}
+[data-theme='dark'] .store-dialog-body,
+[data-theme='dark'] .store-dialog-footer { background: rgba(32,32,32,.32); }
+[data-theme='dark'] .store-dialog-category { color: #d7a987; }
+
+[data-theme='dark'] .store-dialog-close,
+[data-theme='dark'] .store-option-row button,
+[data-theme='dark'] .store-stepper,
+[data-theme='dark'] .store-done,
+[data-theme='dark'] .store-create-field input,
+[data-theme='dark'] .store-create-field select,
+[data-theme='dark'] .store-create-upload {
+  background: rgba(32,32,32,.32);
+  color: var(--store-ink);
+  border-color: var(--store-line);
+}
+
+[data-theme='dark'] .store-option-row button.is-selected {
+  border-color: var(--store-accent);
+  color: var(--store-accent);
+}
+
+[data-theme='dark'] .store-stepper button { color: var(--store-ink); }
+[data-theme='dark'] .store-cart-trigger:hover { background: rgba(32,32,32,.32); }
