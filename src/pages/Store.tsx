@@ -33,7 +33,7 @@ type CartItem = {
   serverId?: string;
 };
 
-const photo = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=85`;
+const photo = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=480&q=78&fm=webp`;
 const PRODUCTS: Product[] = [
   { id: 'cappuccino', name: 'Cappuccino', zh: '卡布奇诺', category: 'coffee', price: 11.9, sales: '120+', image: photo('photo-1570968915860-54d5c301fa9f'), color: '#e6d4c2' },
   { id: 'latte', name: 'Caffè Latte', zh: '拿铁咖啡', category: 'coffee', price: 13.9, sales: '300+', image: photo('photo-1461023058943-07fcbe16d735'), color: '#d4c3ad' },
@@ -70,23 +70,15 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 function storeImageProps(priority: boolean) {
   return {
     loading: priority ? 'eager' as const : 'lazy' as const,
-    decoding: 'async' as const,
-    ...(priority ? { fetchPriority: 'high' as const } : {}),
+    decoding: priority ? 'sync' as const : 'async' as const,
+    fetchPriority: priority ? 'high' as const : 'low' as const,
   };
 }
 
-const warmedStoreImages = new Set<string>();
-
-function warmStoreImageCache(images: string[]) {
-  images.filter(Boolean).forEach(src => {
-    if (warmedStoreImages.has(src)) return;
-    warmedStoreImages.add(src);
-    const image = new Image();
-    image.decoding = 'async';
-    image.src = src;
-    const decoded = image.decode?.();
-    if (decoded) void decoded.catch(() => undefined);
-  });
+function storeImageSrcSet(src: string) {
+  if (!src.includes('images.unsplash.com/')) return undefined;
+  const base = src.replace(/[?&]w=\d+/, '');
+  return [320, 480, 720].map(width => `${base}&w=${width}`).join(', ');
 }
 
 const copy = {
@@ -140,6 +132,57 @@ function readCart(): CartItem[] {
   } catch {
     return [];
   }
+}
+
+function StoreProductCard({
+  product,
+  name,
+  salesLabel,
+  onOpen,
+  priority,
+}: {
+  product: Product;
+  name: string;
+  salesLabel: string;
+  onOpen: (product: Product) => void;
+  priority: boolean;
+}) {
+  const imageRef = useRef<HTMLImageElement>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    const image = imageRef.current;
+    if (image?.complete && image.naturalWidth > 0) setImageLoaded(true);
+  }, [product.image]);
+
+  return (
+    <button className="store-product" type="button"
+      onClick={() => onOpen(product)}
+      aria-label={`${name}, ¥${product.price.toFixed(1)}`}>
+      <span className="store-product-image" style={{ backgroundColor: product.color }}>
+        <img
+          ref={imageRef}
+          src={product.image}
+          srcSet={storeImageSrcSet(product.image)}
+          sizes="(max-width: 650px) 50vw, (max-width: 900px) 50vw, 240px"
+          alt=""
+          {...storeImageProps(priority)}
+          className={`${imageLoaded ? 'is-loaded' : ''}${imageFailed ? ' is-failed' : ''}`.trim()}
+          onLoad={() => setImageLoaded(true)}
+          onError={() => {
+            setImageFailed(true);
+            setImageLoaded(true);
+          }}
+        />
+      </span>
+      <span className="store-product-meta">
+        <span className="store-product-name">{name}</span>
+        <span className="store-product-sales">{salesLabel} {product.sales}</span>
+      </span>
+      <span className="store-product-price"><small>¥</small>{product.price.toFixed(1)}</span>
+    </button>
+  );
 }
 
 export default function Store() {
@@ -218,7 +261,6 @@ export default function Store() {
           && typeof item.image_url === 'string'
         ).map(fromStoredProduct);
         setCustomProducts(loadedProducts);
-        window.setTimeout(() => warmStoreImageCache(loadedProducts.map(item => item.image)), 0);
         const validProductIds = new Set(payload.map(item => item?.id).filter((id): id is string => typeof id === 'string'));
         setCart(current => current.filter(item => validProductIds.has(item.productId)));
         setLoadError(false);
@@ -361,7 +403,6 @@ export default function Store() {
       const response = await request.post<StoredProduct>('/store/products', form);
       const product = fromStoredProduct(response.data);
       setCustomProducts(current => [...current, product]);
-      warmStoreImageCache([product.image]);
       setCategory('all');
       closeDialog();
     } catch {
@@ -467,18 +508,14 @@ export default function Store() {
         {loadError && <p className="store-create-error" role="alert">{text.loadFailed}</p>}
         <div className="store-grid">
           {visible.map((product, index) => (
-            <button className="store-product" key={product.id} type="button"
-              onClick={() => openProduct(product)}
-              aria-label={`${zh ? product.zh : product.name}, ¥${product.price.toFixed(1)}`}>
-              <span className="store-product-image" style={{ backgroundColor: product.color }}>
-                <img src={product.image} alt="" {...storeImageProps(index < 4)} />
-              </span>
-              <span className="store-product-meta">
-                <span className="store-product-name">{zh ? product.zh : product.name}</span>
-                <span className="store-product-sales">{text.sales} {product.sales}</span>
-              </span>
-              <span className="store-product-price"><small>¥</small>{product.price.toFixed(1)}</span>
-            </button>
+            <StoreProductCard
+              key={product.id}
+              product={product}
+              name={zh ? product.zh : product.name}
+              salesLabel={text.sales}
+              onOpen={openProduct}
+              priority={index < 4}
+            />
           ))}
         </div>
       </div>
