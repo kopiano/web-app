@@ -3369,7 +3369,6 @@ export default function VideoConnected() {
       queryClient.invalidateQueries({ queryKey: ['video', 'collection'] }),
       queryClient.invalidateQueries({ queryKey: ['video', 'watch-playlist'] }),
     ]);
-    notify(t('video.settings.updated'), 'success');
   }, [dispatch, notify, queryClient, t, updateCachedVideo]);
 
   const createCollection = useCallback(async () => {

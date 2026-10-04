@@ -130,9 +130,6 @@ export default function Header() {
       dispatch(clearUser());
       dispatch(clearContacts());
       setProfileOpen(false);
-      const message = `${currentUser?.name || '用户'} 已退出登录`;
-      setNotifications((items) => [{ message, time: new Date() }, ...items].slice(0, 8));
-      setToast({ message, type: 'warning' });
     }
   };
 
@@ -361,9 +358,6 @@ export default function Header() {
           onClose={() => setProfileModalOpen(false)}
           onSaved={() => {
             setProfileModalOpen(false);
-            window.dispatchEvent(new CustomEvent('app:notification', {
-              detail: { message: 'Profile updated', type: 'success' },
-            }));
           }}
         />,
         authPortal

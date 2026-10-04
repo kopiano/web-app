@@ -67,9 +67,6 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
     try {
       if (mode === 'signup') {
         await register({ name: trimmedUsername, email: trimmedEmail, password });
-        window.dispatchEvent(new CustomEvent('app:notification', {
-          detail: { message: `${trimmedUsername} 注册成功`, type: 'success' },
-        }));
         setMode('login');
         setUsername(trimmedUsername);
         setEmail('');
@@ -90,9 +87,6 @@ export default function AuthModal({ onClose, initialMode = 'login' }: AuthModalP
         } else {
           await dispatch(fetchCurrentUser()).unwrap();
         }
-        window.dispatchEvent(new CustomEvent('app:notification', {
-          detail: { message: `${trimmedUsername} 登录成功`, type: 'success' },
-        }));
       }
       onClose();
       navigate(consumeAuthReturnTo(), { replace: true });

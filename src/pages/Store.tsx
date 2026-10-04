@@ -217,6 +217,7 @@ export default function Store() {
   const [quantity, setQuantity] = useState(1);
   const [notice, setNotice] = useState(false);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addingToCartRef = useRef(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const products = customProducts;
@@ -423,7 +424,13 @@ export default function Store() {
   }
 
   async function addToCart() {
-    if (!selected) return;
+    if (!selected || addingToCartRef.current) return;
+    addingToCartRef.current = true;
+    if (noticeTimerRef.current) {
+      clearTimeout(noticeTimerRef.current);
+      noticeTimerRef.current = null;
+    }
+    setNotice(true);
     if (currentUser) {
       try {
         const response = await request.post<StoredCartItem>('/store/cart/items', {
@@ -438,6 +445,8 @@ export default function Store() {
         });
       } catch (error) {
         console.error('[Store] failed to update cart', error);
+        setNotice(false);
+        addingToCartRef.current = false;
         return;
       }
     } else {
@@ -455,6 +464,7 @@ export default function Store() {
       setNotice(false);
       noticeTimerRef.current = null;
     }, 3600);
+    addingToCartRef.current = false;
   }
 
   async function changeCartQuantity(key: string, delta: number) {
