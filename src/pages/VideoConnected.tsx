@@ -1744,9 +1744,11 @@ function VideoWatch({
                         onClick={() => setSingleLoop((enabled) => !enabled)}
                       >
                         <span className="video-watch-loop-icon" aria-hidden="true">
-                          <RefreshCw size={18} strokeWidth={1.9} />
+                          <RefreshCw size={24} strokeWidth={1.9} />
                           {singleLoop && <span className="video-watch-loop-icon-number">1</span>}
                         </span>
+                        <span className="video-watch-loop-label">Loop video</span>
+                        <span className="video-watch-loop-state" aria-hidden="true">{singleLoop ? 'On' : 'Off'}</span>
                       </button>
                     </div>
                   </div>
