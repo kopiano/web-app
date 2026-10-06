@@ -2022,7 +2022,7 @@
   cursor: pointer;
   background: linear-gradient(
     to right,
-    #6be1f0 0 var(--video-progress),
+    color(display-p3 0.3324 0.7715 0.9728) 0 var(--video-progress),
     #8e8e8e var(--video-progress) var(--video-buffered),
     #424242 var(--video-buffered) 100%
   );
