@@ -1614,7 +1614,7 @@ function VideoWatch({
   return (
     <div className="video-watch-page">
       <button type="button" className="video-watch-back" onClick={onBack}>
-        <ArrowLeft size={18} />
+        <svg data-t="1791370764208" width="14" height="14" className="back-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" data-p-id="66937" aria-hidden="true"><path d="M379.616 515.648L705.44 841.472c20 20 20 52.416 0 72.416s-52.416 20-72.416 0L270.976 551.84c-20-20-20-52.416 0-72.416l362.048-362.048c20-20 52.416-20 72.416 0s20 52.416 0 72.416L379.616 515.616z" data-p-id="66938" fill="#fff"></path></svg>
         {t('video.back')}
       </button>
       <div className="video-watch-layout">
