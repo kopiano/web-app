@@ -2086,6 +2086,28 @@
   backdrop-filter: blur(10px);
 }
 
+.video-watch-playback-icon {
+  width: 60%;
+  height: 60%;
+  background: currentColor;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.video-watch-playback-icon--play {
+  -webkit-mask-image: url('../assets/icons/play.svg');
+  mask-image: url('../assets/icons/play.svg');
+}
+
+.video-watch-playback-icon--pause {
+  -webkit-mask-image: url('../assets/icons/pause.svg');
+  mask-image: url('../assets/icons/pause.svg');
+}
+
 .video-watch-control-row button:hover {
 
   // color: #1d2420;

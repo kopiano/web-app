@@ -40,7 +40,6 @@ import {
   LoaderCircle,
   MessageCircle,
   MoreHorizontal,
-  Pause,
   Play,
   RefreshCw,
   Search,
@@ -1686,7 +1685,10 @@ function VideoWatch({
                 />
                 <div className="video-watch-control-row">
                   <button type="button" aria-label={isPlaying ? t('video.player.pause') : t('video.player.play')} onClick={togglePlayback}>
-                    {isPlaying ? <Pause size={19} fill="currentColor" /> : <Play size={19} fill="currentColor" />}
+                    <span
+                      className={`video-watch-playback-icon ${isPlaying ? 'video-watch-playback-icon--pause' : 'video-watch-playback-icon--play'}`}
+                      aria-hidden="true"
+                    />
                   </button>
                   <span className="video-watch-time">
                     {formatPlaybackTime(currentTime)} <i>/</i> {formatPlaybackTime(duration)}
