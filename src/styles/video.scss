@@ -751,12 +751,11 @@
 }
 
 .video-home-recommendation {
-  // margin: 2rem 0;
   color: #25302a;
   font-size: 30px;
   font-weight: 500;
   letter-spacing: 0.3px;
-  // text-transform: uppercase;
+  font-family: 'Quicksand', sans-serif;
 }
 
 .video-section-heading {
@@ -1540,13 +1539,25 @@
 .video-dock::before {
   content: '';
   position: absolute;
-  z-index: -1;
-  inset: 0.65rem;
-  width: calc((100% - 1.3rem - 0.7rem) / 3);
+  z-index: 1;
+  top: 4px;
+  bottom: 4px;
+  left: 6px;
+  width: calc((100% - 20px) / 3);
   border-radius: 2.5rem;
   background: #1d2420;
   box-shadow: 0 0.8rem 2rem rgba(29, 36, 32, 0.18);
-  opacity: 0;
+  pointer-events: none;
+  transition: transform .42s cubic-bezier(.25, .8, .25, 1);
+  will-change: transform;
+}
+
+.video-dock[data-view='library']::before {
+  transform: translateX(calc(100% + 4px));
+}
+
+.video-dock[data-view='playlist']::before {
+  transform: translateX(calc(200% + 8px));
 }
 
 .video-dock button {
@@ -1577,8 +1588,8 @@
   width: 92px;
   height: 36px;
   color: #fff;
-  background: #1d2420;
-  box-shadow: 0 0.8rem 2rem rgba(29, 36, 32, 0.16);
+  background: transparent;
+  box-shadow: none;
 }
 
 .video-player-backdrop {
@@ -2182,17 +2193,10 @@
   place-items: center;
 }
 
-.video-watch-loop-icon > svg,
-.video-watch-loop-icon-number {
-  grid-area: 1 / 1;
-}
-
-.video-watch-loop-icon-number {
-  color: currentColor;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  transform: translateY(0.5px);
+.video-watch-loop-icon > svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
 }
 
 .video-watch-settings.is-open .video-watch-loop-menu {

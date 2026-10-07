@@ -157,10 +157,8 @@
 
 [data-theme='dark'] .video-dock button.is-active {
   color: rgba(255, 255, 255, 0.98);
-  background: rgba(255, 255, 255, 0.16);
-  box-shadow:
-    0 0.8rem 2rem rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  background: transparent;
+  box-shadow: none;
 }
 
 [data-theme='dark'] .video-create-collection-button,
