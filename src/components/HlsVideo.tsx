@@ -371,7 +371,7 @@ export default function HlsVideo({
       && Boolean(hls)
     );
     const startHlsLoad = () => {
-      if (!shouldLoadHls() || !hls) return;
+      if (!shouldLoadHls() || !hls || hls.loadingEnabled) return;
       const now = performance.now();
       if (now - lastLoadRequestAt < VIDEO_LOAD_REQUEST_THROTTLE_MS) return;
       lastLoadRequestAt = now;
@@ -420,7 +420,7 @@ export default function HlsVideo({
       return 0;
     };
     const downgradeQuality = () => {
-      if (!hls || hls.levels.length < 2) return;
+      if (!hasStartedPlayback || !hls || hls.levels.length < 2) return;
       const currentLevel = hls.currentLevel >= 0
         ? hls.currentLevel
         : hls.nextAutoLevel >= 0
