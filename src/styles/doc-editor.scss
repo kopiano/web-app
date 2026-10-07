@@ -120,7 +120,7 @@
 .doc-markdown-table tr:last-child td { border-bottom: 0; }
 .doc-markdown-table tbody tr:nth-child(even) { background: rgba(255,255,255,.34); }
 .doc-markdown-preview blockquote { max-width: 72rem; margin: 2.8rem 0; padding: 1.8rem 2.2rem; border-left: 3px solid #aa8cba; border-radius: 0 1rem 1rem 0; color: rgba(38,48,46,.74); background: rgba(255,255,255,.56); font-family: inherit; font-size: 1.7rem; line-height: 1.7; }
-.doc-code-block { overflow: hidden; margin: 1.8rem 0; border: 1px solid #30363d; border-radius: 2rem; background: #0d1117; box-shadow: 0 1.4rem 3rem rgba(13,17,23,.24); }
+.doc-code-block { overflow: hidden; margin: 1.8rem 0; border: 1px solid #30363d; border-radius: 2rem; background: #0d1117; box-shadow: 0 1.4rem 3rem rgba(13,17,23,.24); font-family: "Quicksand", sans-serif;}
 .doc-code-tabs { margin: 1.8rem 0; }
 .doc-code-tabs .doc-code-block { margin: 0; }
 .doc-code-header .doc-code-tab-list { display: flex; flex: 1; gap: .25rem; min-width: 0; overflow-x: auto; margin: 0 1rem 0 0; scrollbar-width: thin; }
@@ -181,7 +181,7 @@
 .doc-code-line { display: grid; grid-template-columns: 4.8rem minmax(max-content, 1fr); min-width: max-content; }
 .doc-code-line:hover { background: #161b22; }
 .doc-code-line-number { padding-right: 1.4rem; color: #949494; text-align: right; user-select: none; }
-.doc-code-line-content { padding-right: 2rem; white-space: pre; word-spacing: normal; letter-spacing: 0; tab-size: 2; }
+.doc-code-line-content { padding-right: 2rem; white-space: pre; word-spacing: normal; letter-spacing: 0; tab-size: 2;}
 .doc-markdown-preview { grid-column: 1; grid-row: 1; visibility: hidden; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); transition: opacity .2s ease, visibility 0s linear .2s; }
 .doc-markdown-preview.is-visible { visibility: visible; opacity: 1; pointer-events: auto; transition: opacity .2s ease, visibility 0s linear 0s; }
 .doc-editor-workspace.is-edit { grid-template-columns: minmax(0, 1fr); }
