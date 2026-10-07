@@ -11,7 +11,7 @@ function Overview() {
           <span>C</span>oulson <span>Z</span>ero
         </div>
         <p>front-end developer</p>
-        <NavLink to="http://www.coulsonzero.shop/docs" className="content-btn" target="_blank">
+        <NavLink to="http://kopiano.cc/video" className="content-btn">
           <span>Get Started</span>
           <div className="arrow">
             <div className="bar"></div>
