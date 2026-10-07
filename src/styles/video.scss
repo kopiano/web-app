@@ -110,7 +110,8 @@
 
 .video-page-header h1 {
   margin: 0;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  // font-family: Inter, ui-sans-serif, system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  font-family: 'Quicksand', sans-serif;
   font-size: clamp(3rem, 3.8vw, 4.4rem);
   font-weight: 500;
   line-height: 1;
@@ -2090,7 +2091,8 @@
   font-size: 1.4rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  // font-family: Inter, ui-sans-serif, system-ui, -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  font-family: 'Quicksand', sans-serif;
 }
 
 .video-watch-time i {
@@ -2290,6 +2292,7 @@
   letter-spacing: 1.2px;
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
+  font-family: 'Quicksand', sans-serif;
 }
 
 .video-watch-details {
