@@ -14,12 +14,14 @@ const VIDEO_VIEW_QUALIFICATION_MS = 3_000;
 const VIDEO_STARTUP_FALLBACK_MS = 3_000;
 const VIDEO_NETWORK_RETRY_LIMIT = 3;
 const VIDEO_MEDIA_RETRY_LIMIT = 2;
+const VIDEO_QUALITY_RECOVERY_MS = 20_000;
 // Keep a useful runway without making each visible player retain a large
 // amount of decoded media in memory.
 // Build a substantially larger runway for high-bitrate VOD playback. This
 // prevents normal playback from quickly catching up with segment downloads.
 const VIDEO_BUFFER_TARGET_SECONDS = 90;
 const VIDEO_BUFFER_RESUME_SECONDS = 45;
+const VIDEO_LOW_BUFFER_SECONDS = 60;
 const VIDEO_CRITICAL_BUFFER_SECONDS = 15;
 const VIDEO_STALL_DETECTION_MS = 3_000;
 const VIDEO_LOAD_REQUEST_THROTTLE_MS = 1_000;
@@ -356,7 +358,9 @@ export default function HlsVideo({
     let stopHlsWhenPaused: (() => void) | null = null;
     let resumeHlsWhenPlaying: (() => void) | null = null;
     let markStarted: (() => void) | null = null;
+    let qualityRecoveryTimer: number | undefined;
     let bufferWatchdogTimer: number | undefined;
+    let lastQualityDowngradeAt = 0;
     let lastObservedPlaybackTime = -1;
     let lastPlaybackProgressAt = performance.now();
     let lastLoadRequestAt = 0;
@@ -391,6 +395,12 @@ export default function HlsVideo({
         startupFallbackTimer = undefined;
       }
     };
+    const clearQualityRecoveryTimer = () => {
+      if (qualityRecoveryTimer !== undefined) {
+        window.clearTimeout(qualityRecoveryTimer);
+        qualityRecoveryTimer = undefined;
+      }
+    };
     const clearBufferWatchdogTimer = () => {
       if (bufferWatchdogTimer !== undefined) {
         window.clearInterval(bufferWatchdogTimer);
@@ -409,6 +419,27 @@ export default function HlsVideo({
       }
       return 0;
     };
+    const downgradeQuality = () => {
+      if (!hls || hls.levels.length < 2) return;
+      const currentLevel = hls.currentLevel >= 0
+        ? hls.currentLevel
+        : hls.nextAutoLevel >= 0
+          ? hls.nextAutoLevel
+          : hls.levels.length - 1;
+      if (currentLevel <= 0) return;
+      const now = performance.now();
+      if (now - lastQualityDowngradeAt < 2_000) return;
+      lastQualityDowngradeAt = now;
+      hls.nextAutoLevel = currentLevel - 1;
+      hls.currentLevel = currentLevel - 1;
+      clearQualityRecoveryTimer();
+      qualityRecoveryTimer = window.setTimeout(() => {
+        qualityRecoveryTimer = undefined;
+        if (!disposed && hls && !video.paused && getBufferedSeconds() >= VIDEO_LOW_BUFFER_SECONDS) {
+          hls.currentLevel = -1;
+        }
+      }, VIDEO_QUALITY_RECOVERY_MS);
+    };
     const monitorBuffer = () => {
       if (disposed || !hls || video.paused || video.ended) return;
       const bufferedSeconds = getBufferedSeconds();
@@ -416,6 +447,12 @@ export default function HlsVideo({
       if (video.currentTime !== lastObservedPlaybackTime) {
         lastObservedPlaybackTime = video.currentTime;
         lastPlaybackProgressAt = now;
+      }
+      if (
+        bufferedSeconds <= VIDEO_LOW_BUFFER_SECONDS
+        || video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA
+      ) {
+        downgradeQuality();
       }
       // Keep downloading ahead of playback. hls.js still requests fragments
       // sequentially, but it resumes early instead of waiting for the buffer
@@ -537,15 +574,25 @@ export default function HlsVideo({
         // player to consume the connection and memory needed by other views.
         lowLatencyMode: false,
         startFragPrefetch: true,
-        // The highest rendition is selected after the manifest is parsed.
+        // Let ABR choose the initial rendition from the measured connection.
+        // Forcing the lowest level makes startup look quick but can create
+        // unnecessary quality switches and extra buffering on fast networks.
         startLevel: -1,
+        // Leave headroom for network jitter and require stronger evidence
+        // before moving back to a higher rendition after a downgrade.
+        // Leave more bandwidth headroom so the player can keep filling the
+        // forward buffer instead of repeatedly matching playback speed.
+        abrBandWidthFactor: 0.7,
+        abrBandWidthUpFactor: 0.5,
+        abrEwmaFastVoD: 3,
+        abrEwmaSlowVoD: 9,
         // Start playback as soon as the first playable fragment is buffered.
         // The player can continue filling its VOD buffer in the background.
         maxStarvationDelay: 1,
         maxLoadingDelay: 2,
-        // Do not cap quality based on the current player dimensions.
-        // The selected rendition should remain at the highest available level.
-        capLevelToPlayerSize: false,
+        // Avoid downloading renditions that cannot be displayed by the
+        // current card/player dimensions.
+        capLevelToPlayerSize: true,
         // Keep a moderate forward buffer so short network drops do not stop
         // playback without retaining excessive media for every card.
         maxBufferLength: VIDEO_BUFFER_TARGET_SECONDS,
@@ -570,18 +617,8 @@ export default function HlsVideo({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         networkRetryCount = 0;
         mediaRetryCount = 0;
-        if (hls && hls.levels.length > 0) {
-          const highestLevel = hls.levels.length - 1;
-          hls.nextAutoLevel = highestLevel;
-          hls.currentLevel = highestLevel;
-        }
         playbackReadyRef.current = true;
         startPlayback();
-      });
-      hls.on(Hls.Events.LEVEL_SWITCHING, (_event, data) => {
-        if (hls && hls.levels.length > 0 && data.level !== hls.levels.length - 1) {
-          hls.currentLevel = hls.levels.length - 1;
-        }
       });
       hls.on(Hls.Events.FRAG_LOADED, () => {
         startupHasProgress = true;
@@ -613,6 +650,7 @@ export default function HlsVideo({
       }
       recoverStalledBuffer = () => {
         if (!shouldLoadHls()) return;
+        downgradeQuality();
         const now = performance.now();
         if (now - lastStalledRecoveryAt < 1_500) return;
         lastStalledRecoveryAt = now;
@@ -699,6 +737,7 @@ export default function HlsVideo({
       clearRetryTimer();
       clearStartupFallbackTimer();
       clearStalledRecoveryTimer();
+      clearQualityRecoveryTimer();
       clearBufferWatchdogTimer();
       if (nativeHlsAttached) {
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
