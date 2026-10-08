@@ -243,11 +243,19 @@
 }
 
 [data-theme='dark'] .video-tile:hover,
-[data-theme='dark'] .video-collection-card:hover,
 [data-theme='dark'] .video-watch-queue-list > button:hover,
 [data-theme='dark'] .video-watch-queue-list > button.is-current,
 [data-theme='dark'] .video-comment:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+// 封面画在 background-image 上，必须用 background-image 叠加高亮层，
+// 否则简写 background 会把 --collection-art 一起重置掉
+[data-theme='dark'] .video-collection-card:hover {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)),
+    linear-gradient(180deg, rgba(14, 18, 16, 0.08), rgba(14, 18, 16, 0.82)),
+    var(--collection-art);
 }
 
 [data-theme='dark'] .video-featured,
