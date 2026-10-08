@@ -1352,6 +1352,7 @@ function VideoWatch({
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [viewIncrementVisible, setViewIncrementVisible] = useState(false);
+  const [likeAnimationVideo, setLikeAnimationVideo] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsPanel, setSettingsPanel] = useState<VideoSettingsPanel>('detail');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -1799,11 +1800,23 @@ function VideoWatch({
               <div className="video-watch-actions">
                 <button
                   type="button"
-                  className={`is-like${video.liked ? ' is-liked' : ''}`}
+                  className={`is-like${video.liked ? ' is-liked' : ''}${likeAnimationVideo === video.id ? ' is-like-animating' : ''}`}
                   aria-pressed={video.liked}
-                  onClick={() => onReact('like', !video.liked)}
+                  aria-label={video.liked ? 'Unlike video' : 'Like video'}
+                  onClick={() => {
+                    setLikeAnimationVideo(video.liked ? null : video.id);
+                    onReact('like', !video.liked);
+                  }}
                 >
-                  <ThumbsUp size={18} fill={video.liked ? 'currentColor' : 'none'} />
+                  <span
+                    className="video-like-icon"
+                    aria-hidden="true"
+                    onAnimationEnd={(event) => {
+                      if (event.animationName === 'video-like-bounce') setLikeAnimationVideo(null);
+                    }}
+                  >
+                    <ThumbsUp size={18} fill={video.liked ? 'currentColor' : 'none'} />
+                  </span>
                   <span>{new Intl.NumberFormat(undefined, { notation: 'compact' }).format(video.likeCount)}</span>
                 </button>
                 <button
