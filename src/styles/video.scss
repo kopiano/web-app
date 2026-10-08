@@ -1657,6 +1657,38 @@
   box-shadow: none;
 }
 
+// Keep the liquid inside the sliding indicator, underneath the button content.
+.video-page .video-dock.video-tab-navbar::before {
+  background-color: #173e46;
+  background-image:
+    url('../assets/images/video-dock-wave.svg'),
+    url('../assets/images/video-dock-wave.svg'),
+    linear-gradient(180deg, #24515a, #14353e);
+  background-size: 96px 32px, 128px 38px, 100% 100%;
+  background-position: 0 100%, 32px 100%, 0 0;
+  background-repeat: repeat-x, repeat-x, no-repeat;
+  box-shadow:
+    inset 0 1px 0 rgba(213, 255, 250, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.16),
+    0 2px 6px rgba(0, 0, 0, 0.14);
+  animation: video-dock-liquid-flow 5s linear infinite;
+}
+
+@keyframes video-dock-liquid-flow {
+  from {
+    background-position: 0 100%, 32px 100%, 0 0;
+  }
+  to {
+    background-position: 96px 100%, -96px 100%, 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-page .video-dock.video-tab-navbar::before {
+    animation: none;
+  }
+}
+
 .video-player-backdrop {
   position: fixed;
   z-index: 2000;
