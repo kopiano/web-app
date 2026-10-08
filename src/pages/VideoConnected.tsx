@@ -29,7 +29,6 @@ import {
   Clock3,
   Expand,
   Film,
-  FolderPlus,
   ListFilter,
   LockKeyhole,
   Globe2,
@@ -99,6 +98,7 @@ import { setVideoDetails, setVideoViewCount } from '@/store/videoViewSlice';
 import type { AppDispatch, RootState } from '@/store/store';
 import '@/styles/video.scss';
 import '@/styles/video_ipad.scss';
+
 
 type VideoView = 'home' | 'library' | 'favorites' | 'playlist' | 'watch';
 type UploadStep = 'upload' | 'publish';
@@ -1616,7 +1616,15 @@ function VideoWatch({
 
   return (
     <div className="video-watch-page">
-      <VideoActionButton className="video-watch-back" onClick={onBack}>
+      <VideoActionButton
+        className="video-watch-back"
+        icon={(
+          <svg viewBox="0 0 1024 1024" focusable="false" aria-hidden="true">
+            <path d="M379.616 515.648L705.44 841.472c20 20 20 52.416 0 72.416s-52.416 20-72.416 0L270.976 551.84c-20-20-20-52.416 0-72.416l362.048-362.048c20-20 52.416-20 72.416 0s20 52.416 0 72.416L379.616 515.616z" fill="currentColor" />
+          </svg>
+        )}
+        onClick={onBack}
+      >
         {t('video.back')}
       </VideoActionButton>
       <div className="video-watch-layout">
@@ -4030,7 +4038,12 @@ export default function VideoConnected() {
                   <VideoActionButton
                     className="video-create-collection-button"
                     aria-label={t('video.library.createCollection')}
-                    icon={<FolderPlus size={18} aria-hidden="true" />}
+                    icon={(
+                      <svg viewBox="0 0 1024 1024" focusable="false" aria-hidden="true">
+                        <path d="M837.339429 348.647619v206.019048h58.660571V284.355048c0-12.434286-7.216762-23.771429-18.505143-29.013334L525.482667 91.599238a31.98781 31.98781 0 0 0-26.989715 0L146.529524 255.341714c-11.288381 5.241905-18.505143 16.579048-18.505143 29.013334v455.289904c0 12.458667 7.216762 23.771429 18.505143 29.013334l352.01219 163.742476c8.533333 3.974095 18.432 3.974095 26.989715 0l15.847619-7.387429V487.984762l295.984762-139.312762zM205.409524 292.644571L512 150.016l306.590476 142.628571L512 436.906667 205.409524 292.644571z m277.26019 567.686096L186.684952 722.651429V348.647619l295.984762 139.288381v372.394667z" />
+                        <path d="M760.003048 825.173333V597.333333h58.660571v227.84l77.921524-77.921523 41.496381 41.49638-148.748191 148.72381-148.723809-148.72381 41.447619-41.49638 77.945905 77.921523z" />
+                      </svg>
+                    )}
                     onClick={() => {
                       if (!currentUser) {
                         notify(t('video.authRequired'), 'error');
@@ -4071,7 +4084,9 @@ export default function VideoConnected() {
                 />
                 <VideoActionButton
                   className="video-upload-trigger"
-                  icon={<Upload size={17} aria-hidden="true" />}
+                  icon={(
+                    <svg t="1791474717898" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="31306" width="200" height="200"><path d="M483.2 553.6l-51.2 38.4c-6.4 6.4-25.6 6.4-32-6.4-12.8-12.8-6.4-25.6 6.4-32l96-70.4c6.4-6.4 19.2-6.4 32 0l96 70.4c0 6.4 6.4 19.2-6.4 32-6.4 6.4-12.8 12.8-19.2 12.8-6.4 0-12.8 0-12.8-6.4l-57.6-39.872v298.816c0 14.528-6.4 29.056-25.6 29.056-12.8 0-25.6-14.528-25.6-29.056V553.6z m-204.8 256h-19.2c-115.2 0-204.8-102.4-204.8-224 0-128 96-230.4 211.2-224 38.4-128 147.2-217.6 268.8-217.6 134.4 0 249.6 102.4 281.6 249.6 89.6 19.2 153.6 102.4 153.6 204.8 0 115.2-83.2 211.2-185.6 211.2-32 0-96 0-166.4-57.6-12.8-12.8-12.8-32 0-38.4 12.8-12.8 25.6-12.8 38.4 0 51.2 51.2 96 44.8 121.6 44.8h6.4c76.8 0 134.4-70.4 134.4-160 0-83.2-57.6-153.6-128-160-12.8 0-19.2-12.8-25.6-19.2-19.2-128-115.2-224-230.4-224-102.4 0-198.4 83.2-224 198.4 0 12.8-12.8 19.2-32 19.2h-25.6c-83.2 0-147.2 76.8-147.2 172.8 0 96 64 172.8 147.2 172.8h12.8c25.6 0 57.6 0 102.4-44.8 12.8-12.8 25.6-12.8 38.4 0 12.8 12.8 12.8 25.6 0 38.4-51.2 51.2-96 57.6-128 57.6z" fill="#515151" p-id="31307"></path></svg>
+                  )}
                   onClick={openUpload}
                 >
                   {t('video.upload.action')}
