@@ -1405,6 +1405,20 @@ function VideoWatch({
   }, [video.id]);
 
   useEffect(() => {
+    if (!media) return;
+
+    const clearEndedEventLock = () => {
+      endedVideoRef.current = null;
+    };
+
+    // The player receives the ended event through both the component prop
+    // and the native listener below. Keep the lock until playback actually
+    // resumes so the duplicate event cannot restart the video twice.
+    media.addEventListener('playing', clearEndedEventLock);
+    return () => media.removeEventListener('playing', clearEndedEventLock);
+  }, [media]);
+
+  useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
     const update = () => setPlayerHeight(stage.getBoundingClientRect().height);
@@ -1492,7 +1506,6 @@ function VideoWatch({
     endedVideoRef.current = video.id;
 
     if (singleLoop) {
-      endedVideoRef.current = null;
       media.currentTime = 0;
       playMedia(media, () => setIsPlaying(false));
       return;
@@ -1501,7 +1514,6 @@ function VideoWatch({
     // Playlist responses may omit the playable URL; the detail query loads it after selection.
     const playableVideos = playlist.filter((item) => item.status === 'ready');
     if (!playableVideos.length) {
-      endedVideoRef.current = null;
       return;
     }
 
@@ -1512,7 +1524,6 @@ function VideoWatch({
     const nextVideo = playableVideos[nextIndex];
 
     if (nextVideo.id === video.id) {
-      endedVideoRef.current = null;
       media.currentTime = 0;
       playMedia(media, () => setIsPlaying(false));
     } else {
