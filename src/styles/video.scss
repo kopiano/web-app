@@ -10,6 +10,8 @@
   color: var(--video-ink);
   background: radial-gradient(1200px 800px at 8% -10%, oklch(85% .12 300/.6), transparent 60%), radial-gradient(1000px 700px at 100% 10%, oklch(88% .1 220/.55), transparent 60%), radial-gradient(900px 800px at 50% 110%, oklch(90% .09 30/.55), transparent 60%), linear-gradient(180deg, oklch(98.5% .006 260), oklch(97% .01 280));
   isolation: isolate;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .video-page::before {
@@ -1538,9 +1540,11 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   justify-content: center;
   gap: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.426);
+  // border: 1px solid rgba(255, 255, 255, 0.426);
   border-radius: 3.2rem;
   box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.426),
+    0 0.4rem 1rem rgba(38, 48, 42, 0.1),
     0 1.8rem 5rem rgba(38, 48, 42, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
   transform: translateX(-50%);
