@@ -1,0 +1,40 @@
+.video-tab-navbar > button[data-tab-navbar-button] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  height: 32px;
+  border: 0;
+  border-radius: 2rem;
+  font-family: inherit;
+  font-size: 1.16rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0;
+  white-space: nowrap;
+  transition: color 180ms ease;
+
+  > span {
+    font: inherit;
+    letter-spacing: inherit;
+  }
+
+  > svg {
+    flex-shrink: 0;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--video-accent);
+    outline-offset: -2px;
+  }
+}
+
+.video-tab-navbar.video-category-nav.is-dock-style::before {
+  height: 32px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-tab-navbar > button[data-tab-navbar-button] {
+    transition: none;
+  }
+}

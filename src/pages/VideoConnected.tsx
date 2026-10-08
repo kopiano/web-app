@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
+import TabNavbar from '../components/tabNavbar';
 import { useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -539,24 +540,13 @@ function CategoryNav({
     })),
   ];
   return (
-    <div
+    <TabNavbar
       className={`video-category-nav${className ? ` ${className}` : ''}`}
-      role="tablist"
-      aria-label={ariaLabel}
-    >
-      {options.map((category) => (
-        <button
-          key={category.slug}
-          type="button"
-          role="tab"
-          aria-selected={active === category.slug}
-          className={active === category.slug ? 'is-active' : ''}
-          onClick={() => onChange(category.slug)}
-        >
-          {category.label}
-        </button>
-      ))}
-    </div>
+      active={active}
+      ariaLabel={ariaLabel}
+      onChange={onChange}
+      options={options.map(({ slug, label }) => ({ value: slug, label }))}
+    />
   );
 }
 
@@ -4078,7 +4068,7 @@ export default function VideoConnected() {
                     next.delete('page');
                     setSearchParams(next);
                   }}
-                  className="is-playlist"
+                  className="is-playlist is-dock-style"
                 />
                 <button type="button" className="video-upload-trigger" onClick={openUpload}>
                   <Upload size={17} />
@@ -4096,7 +4086,7 @@ export default function VideoConnected() {
                 ariaLabel={t('video.categories.label')}
                 includeAll={!selectedCollection?.categorySlug}
                 onChange={setActiveCategory}
-                className="is-playlist"
+                className="is-playlist is-dock-style"
               />
             )}
 
@@ -4353,27 +4343,18 @@ export default function VideoConnected() {
             )}
           </div>
 
-          <nav
+          <TabNavbar
             className="video-dock"
-            data-view={activeView === 'favorites' ? 'library' : activeView}
-            aria-label={t('video.navigation')}
-          >
-            {([
-              { view: 'home' as const, label: t('video.nav.home'), icon: Home },
-              { view: 'library' as const, label: t('video.nav.library'), icon: Library },
-              { view: 'playlist' as const, label: t('video.nav.playlist'), icon: ListVideo },
-            ]).map(({ view, label, icon: Icon }) => (
-              <button
-                type="button"
-                key={view}
-                className={activeView === view || (view === 'library' && activeView === 'favorites') ? 'is-active' : ''}
-                onClick={() => navigateTo(view)}
-              >
-                <Icon size={17} strokeWidth={2} />
-                <span>{label}</span>
-              </button>
-            ))}
-          </nav>
+            active={activeView === 'favorites' ? 'library' : activeView}
+            ariaLabel={t('video.navigation')}
+            navigation
+            onChange={navigateTo}
+            options={[
+              { value: 'home', label: t('video.nav.home'), icon: <Home size={17} strokeWidth={2} /> },
+              { value: 'library', label: t('video.nav.library'), icon: <Library size={17} strokeWidth={2} /> },
+              { value: 'playlist', label: t('video.nav.playlist'), icon: <ListVideo size={17} strokeWidth={2} /> },
+            ]}
+          />
 
           {uploadOpen && (
             <UploadDialog
