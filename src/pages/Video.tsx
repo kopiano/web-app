@@ -34,6 +34,7 @@ import {
   X,
 } from 'lucide-react';
 import HlsVideo from '@/components/HlsVideo';
+import VideoActionButton from '@/components/VideoActionButton';
 import { deleteVideo } from '@/api/video';
 import { defaultAvatarDataUrl, resolveAvatarUrl } from '@/lib/avatar';
 import type { RootState } from '@/store/store';
@@ -755,7 +756,7 @@ function VideoWatchPage({
 
   return (
     <div className="video-watch-page">
-      <button type="button" className="video-watch-back" onClick={onBack}><ArrowLeft size={18} />Back</button>
+      <VideoActionButton className="video-watch-back" onClick={onBack}>Back</VideoActionButton>
 
       <div className="video-watch-layout">
         <div className="video-watch-main">
@@ -1819,10 +1820,13 @@ function Video() {
               onChange={changeCategory}
               className="is-playlist"
             />
-            <button type="button" className="video-upload-trigger" onClick={openUploadDialog}>
-              <Upload size={17} />
-              <span>Upload video</span>
-            </button>
+            <VideoActionButton
+              className="video-upload-trigger"
+              icon={<Upload size={17} aria-hidden="true" />}
+              onClick={openUploadDialog}
+            >
+              Upload video
+            </VideoActionButton>
           </div>
         )}
 

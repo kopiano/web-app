@@ -56,6 +56,7 @@ import {
 } from 'lucide-react';
 import HlsVideo from '@/components/HlsVideo';
 import ProUpgradeDialog from '@/components/ProUpgradeDialog';
+import VideoActionButton from '@/components/VideoActionButton';
 import {
   createVideoComment,
   createVideoCollection,
@@ -1615,10 +1616,9 @@ function VideoWatch({
 
   return (
     <div className="video-watch-page">
-      <button type="button" className="video-watch-back" onClick={onBack}>
-        <svg data-t="1791370764208" width="14" height="14" className="back-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" data-p-id="66937" aria-hidden="true"><path d="M379.616 515.648L705.44 841.472c20 20 20 52.416 0 72.416s-52.416 20-72.416 0L270.976 551.84c-20-20-20-52.416 0-72.416l362.048-362.048c20-20 52.416-20 72.416 0s20 52.416 0 72.416L379.616 515.616z" data-p-id="66938" fill="#fff"></path></svg>
+      <VideoActionButton className="video-watch-back" onClick={onBack}>
         {t('video.back')}
-      </button>
+      </VideoActionButton>
       <div className="video-watch-layout">
         <div className="video-watch-main">
           <div
@@ -4027,10 +4027,10 @@ export default function VideoConnected() {
                       </button>
                     )}
                   </label>
-                  <button
-                    type="button"
+                  <VideoActionButton
                     className="video-create-collection-button"
                     aria-label={t('video.library.createCollection')}
+                    icon={<FolderPlus size={18} aria-hidden="true" />}
                     onClick={() => {
                       if (!currentUser) {
                         notify(t('video.authRequired'), 'error');
@@ -4044,9 +4044,8 @@ export default function VideoConnected() {
                       setCollectionDialogOpen(true);
                     }}
                   >
-                    <FolderPlus size={18} />
-                    <span>{t('video.library.createCollection')}</span>
-                  </button>
+                    {t('video.library.createCollection')}
+                  </VideoActionButton>
                 </div>
               )}
             </header>
@@ -4070,10 +4069,13 @@ export default function VideoConnected() {
                   }}
                   className="is-playlist is-dock-style"
                 />
-                <button type="button" className="video-upload-trigger" onClick={openUpload}>
-                  <Upload size={17} />
-                  <span>{t('video.upload.action')}</span>
-                </button>
+                <VideoActionButton
+                  className="video-upload-trigger"
+                  icon={<Upload size={17} aria-hidden="true" />}
+                  onClick={openUpload}
+                >
+                  {t('video.upload.action')}
+                </VideoActionButton>
               </div>
             )}
 
