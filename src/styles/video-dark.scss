@@ -290,3 +290,103 @@
   border: 4px solid rgba(23, 23, 23, 0.62);
   background: transparent;
 }
+
+[data-theme='dark'] .video-watch-details,
+[data-theme='dark'] .video-comments {
+  background: transparent;
+  box-shadow: none;
+  border-color: transparent;
+}
+
+[data-theme='dark'] .video-comments {
+  .video-comments-heading h2,
+  .video-comment-replying strong {
+    color: #eeeeef;
+  }
+
+  .video-comment p,
+  .video-comment-reply p {
+    color: #d1d1d6;
+  }
+
+  .video-comments-heading span,
+  .video-comment time,
+  .video-comment-reply time,
+  .video-comment-replying,
+  .video-comment-replying button,
+  .video-comment footer button,
+  .video-comments-heading > button {
+    color: #a1a1aa;
+  }
+
+  .video-comment,
+  .video-comment:hover {
+    background: transparent;
+  }
+
+  .video-comment-compose > div {
+    background: rgba(255, 255, 255, 0.045);
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+
+  .video-comment-compose > div:focus-within {
+    background: rgba(255, 255, 255, 0.065);
+    border-color: rgba(255, 134, 167, 0.55);
+  }
+
+  .video-comment-compose textarea,
+  .video-comment-compose-actions {
+    background: transparent !important;
+    box-shadow: none;
+  }
+
+  .video-comment-compose textarea::placeholder {
+    color: #92929c;
+  }
+
+  .video-comment-replies::before {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .video-comment footer button:hover,
+  .video-comment-replying button:hover,
+  .video-comments-heading > button:hover,
+  .video-comment-compose-actions > button:first-child:hover,
+  .video-comment-compose-actions > button:first-child.is-active {
+    color: #f4f4f5;
+    background: rgba(255, 255, 255, 0.09);
+  }
+
+  .video-comment footer button.is-liked {
+    color: var(--video-accent);
+  }
+
+  .video-comment-emoji-picker {
+    background: #27272a;
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+
+  .video-comment-emoji-picker button:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .video-comment-submit {
+    color: #fff;
+    background: #b94f70;
+  }
+
+  .video-comment-submit:not(:disabled):hover {
+    background: #ce5b7e;
+  }
+
+  .video-comment-submit:disabled {
+    color: #92929c;
+    background: rgba(255, 255, 255, 0.07);
+    opacity: 1;
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--video-accent);
+    outline-offset: 3px;
+  }
+}
