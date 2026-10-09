@@ -5099,6 +5099,134 @@
   }
 }
 
+// Video watch page text hierarchy overrides.
+// Kept in one block so the hand-written rules above stay untouched,
+// and placed before the responsive queries so those still win on small screens.
+.video-page {
+  // Title leads the page, author sits one step below it
+  .video-watch-details h1 {
+    margin: 14px 10px 22px;
+    color: var(--video-ink);
+    font-size: 1.9rem;
+    font-weight: 650;
+    line-height: 1.32;
+    letter-spacing: -0.012em;
+  }
+
+  .video-watch-author strong {
+    color: var(--video-ink);
+    font-size: 1.35rem;
+    font-weight: 650;
+    line-height: 1.25;
+  }
+
+  // Meta reads as the third tier, below title and author
+  .video-watch-author small,
+  .video-watch-view-count {
+    color: var(--video-muted);
+    font-size: 1.15rem;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+
+  .video-comments-heading h2 {
+    color: var(--video-ink);
+    font-size: 1.45rem;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+
+  .video-comment header strong {
+    color: var(--video-ink);
+    font-size: 1.25rem;
+    font-weight: 650;
+    line-height: 1.3;
+  }
+
+  .video-comment time {
+    color: var(--video-muted);
+    font-size: 1.05rem;
+    font-weight: 500;
+  }
+
+  .video-comment p {
+    color: var(--video-ink);
+    font-size: 1.18rem;
+    line-height: 1.62;
+  }
+
+  .video-watch-queue > header > div > span {
+    color: var(--video-muted);
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+
+  .video-watch-queue > header > strong {
+    color: var(--video-muted);
+    font-size: 1.12rem;
+    font-weight: 650;
+  }
+
+  .video-watch-queue-copy strong {
+    color: var(--video-ink);
+    font-size: 1.4rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .video-watch-queue-copy small,
+  .video-watch-queue-copy em {
+    color: var(--video-muted);
+    font-size: 1.1rem;
+    font-weight: 500;
+  }
+
+  .video-watch-queue-index {
+    color: var(--video-muted);
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  .video-watch-now {
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
+  // Player overlay: bright on video, so it needs its own scale
+  .video-watch-time {
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .video-watch-time i {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .video-watch-quality {
+    color: #fff;
+    font-size: 1.15rem;
+    font-weight: 650;
+    letter-spacing: 0.09em;
+  }
+
+  .video-watch-loop-label {
+    font-size: 1.22rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .video-watch-loop-state {
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+}
+
 @media (max-width: 1120px) {
   .video-featured {
     width: 100%;
