@@ -1508,6 +1508,98 @@
   }
 }
 
+.video-pager {
+  margin-top: 2.2rem;
+  padding-top: 1.8rem;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  border-top: 1px solid rgba(57, 69, 62, 0.1);
+}
+
+.video-pager-status {
+  min-width: 9.5rem;
+  padding: 0.85rem 1.6rem;
+  border-radius: 3rem;
+  color: var(--video-muted);
+  background: rgba(57, 69, 62, 0.06);
+  font-size: 1.05rem;
+  font-weight: 650;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.video-pager-button {
+  width: 4.2rem;
+  height: 4.2rem;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.94);
+  border-radius: 50%;
+  color: #59625d;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0.5rem 1.5rem rgba(45, 55, 49, 0.06);
+  cursor: pointer;
+  transition:
+    color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.video-pager-button:first-child {
+  justify-self: start;
+}
+
+.video-pager-button:last-child {
+  justify-self: end;
+}
+
+.video-pager-button:hover:not(:disabled),
+.video-pager-button:focus-visible:not(:disabled) {
+  color: #fff;
+  background: #1d2420;
+  box-shadow: 0 0.8rem 2rem rgba(29, 36, 32, 0.22);
+  transform: translateY(-0.15rem);
+}
+
+.video-pager-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 0.2rem 0.6rem rgba(45, 55, 49, 0.14);
+}
+
+.video-pager-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+@media (max-width: 520px) {
+  .video-pager {
+    gap: 0.5rem;
+  }
+
+  .video-pager-status {
+    min-width: 0;
+    padding: 0.85rem 1.1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-pager-button {
+    transition: none;
+  }
+
+  .video-pager-button:hover:not(:disabled),
+  .video-pager-button:focus-visible:not(:disabled),
+  .video-pager-button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 .video-empty {
   min-height: 25rem;
   display: grid;

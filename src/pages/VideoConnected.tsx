@@ -4335,25 +4335,33 @@ export default function VideoConnected() {
                   </div>
                 )}
                 {currentUser && (
-                  <nav className="video-pagination" aria-label={t('video.playlist.pagination')}>
-                    <span className="video-pagination-status">{t('video.playlist.page', { page: playlistPage })}</span>
-                    <div className="video-pagination-actions">
-                      <button type="button" disabled={playlistPage === 1} onClick={() => void changePlaylistPage(playlistPage - 1)}>
-                        <ChevronLeft size={18} />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={
-                          useMockData
-                            ? playlistPage >= mockPlaylistPageCount
-                            : playlistPage === (playlistQuery.data?.pages.length ?? 1)
-                              && !playlistQuery.hasNextPage
-                        }
-                        onClick={() => void changePlaylistPage(playlistPage + 1)}
-                      >
-                        <ChevronRight size={18} />
-                      </button>
-                    </div>
+                  <nav className="video-pager" aria-label={t('video.playlist.pagination')}>
+                    <button
+                      type="button"
+                      className="video-pager-button"
+                      aria-label={t('video.playlist.previous')}
+                      disabled={playlistPage === 1}
+                      onClick={() => void changePlaylistPage(playlistPage - 1)}
+                    >
+                      <ChevronLeft size={18} />
+                    </button>
+                    <span className="video-pager-status" aria-live="polite">
+                      {t('video.playlist.page', { page: playlistPage })}
+                    </span>
+                    <button
+                      type="button"
+                      className="video-pager-button"
+                      disabled={
+                        useMockData
+                          ? playlistPage >= mockPlaylistPageCount
+                          : playlistPage === (playlistQuery.data?.pages.length ?? 1)
+                            && !playlistQuery.hasNextPage
+                      }
+                      aria-label={t('video.playlist.next')}
+                      onClick={() => void changePlaylistPage(playlistPage + 1)}
+                    >
+                      <ChevronRight size={18} />
+                    </button>
                   </nav>
                 )}
               </section>

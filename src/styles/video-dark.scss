@@ -123,6 +123,23 @@
 [data-theme='dark'] .video-watch-actions button:hover,
 [data-theme='dark'] .video-comment-actions button:hover,
 [data-theme='dark'] .video-pagination-actions button:hover,
+[data-theme='dark'] .video-pager-button,
+[data-theme='dark'] .video-pager-status {
+  color: rgba(255, 255, 255, 0.72);
+}
+[data-theme='dark'] .video-pager-button {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+}
+[data-theme='dark'] .video-pager-status {
+  background: rgba(255, 255, 255, 0.07);
+}
+[data-theme='dark'] .video-pager-button:hover:not(:disabled),
+[data-theme='dark'] .video-pager-button:focus-visible:not(:disabled) {
+  color: #1d2420;
+  background: rgba(255, 255, 255, 0.94);
+}
 [data-theme='dark'] .video-dock button.is-active {
   color: rgba(255, 255, 255, 0.96);
   background: rgba(255, 255, 255, 0.12);
