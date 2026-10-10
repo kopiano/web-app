@@ -24,6 +24,8 @@ import {
   BarChart3,
   Camera,
   CheckCircle2,
+  Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -4412,7 +4414,14 @@ export default function VideoConnected() {
           )}
 
           {collectionDialogOpen && createPortal(
-            <div className="video-collection-dialog-overlay" role="presentation">
+            <div
+              className="video-collection-dialog-overlay"
+              role="presentation"
+              onPointerDown={(event) => {
+                const dropdown = event.currentTarget.querySelector<HTMLDetailsElement>('.video-collection-category');
+                if (dropdown && !dropdown.contains(event.target as Node)) dropdown.open = false;
+              }}
+            >
               <button
                 type="button"
                 className="video-collection-dialog-backdrop"
@@ -4436,9 +4445,7 @@ export default function VideoConnected() {
                 >
                   <X size={20} />
                 </button>
-                <p className="video-collection-dialog-eyebrow">{t('video.library.folder')}</p>
                 <h2 id="video-collection-dialog-title">{t('video.library.createCollectionTitle')}</h2>
-                <p className="video-collection-dialog-description">{t('video.library.createCollectionDescription')}</p>
 
                 <label className="video-collection-field">
                   <span>{t('video.library.collectionName')}</span>
@@ -4457,43 +4464,115 @@ export default function VideoConnected() {
                 </label>
 
                 <div className="video-collection-group">
-                  <fieldset className="video-collection-options">
+                  <fieldset className="video-collection-options" disabled={collectionBusy}>
                     <legend>{t('video.upload.visibility')}</legend>
-                    <div className="video-collection-visibility">
-                      {(['public', 'private'] as VideoVisibility[]).map((visibility) => (
-                        <button
-                          key={visibility}
-                          type="button"
-                          className={collectionVisibility === visibility ? 'is-active' : ''}
-                          aria-pressed={collectionVisibility === visibility}
-                          disabled={collectionBusy}
-                          onClick={() => setCollectionVisibility(visibility)}
-                        >
-                          {visibility === 'public' ? <Globe2 size={15} /> : <LockKeyhole size={15} />}
-                          {t(`video.upload.${visibility}`)}
-                        </button>
-                      ))}
-                    </div>
+                    <TabNavbar
+                      className="video-collection-visibility"
+                      active={collectionVisibility}
+                      ariaLabel={t('video.upload.visibility')}
+                      onChange={setCollectionVisibility}
+                      options={(['public', 'private'] as VideoVisibility[]).map((visibility) => ({
+                        value: visibility,
+                        label: t(`video.upload.${visibility}`),
+                        icon: visibility === 'public' ? <Globe2 size={15} /> : <LockKeyhole size={15} />,
+                      }))}
+                    />
                   </fieldset>
 
                   <fieldset className="video-collection-options">
                     <legend>{t('video.categories.label')}</legend>
-                    <label className="video-collection-category-select">
-                      <ListFilter size={16} aria-hidden="true" />
-                      <select
-                        value={collectionCategory}
-                        disabled={collectionBusy}
+                    <details
+                      className="video-collection-category"
+                      onToggle={(event) => {
+                        const dropdown = event.currentTarget;
+                        if (!dropdown.open) return;
+                        const dialog = dropdown.closest('.video-collection-dialog');
+                        const trigger = dropdown.querySelector('summary');
+                        if (!dialog || !trigger) return;
+                        const bounds = dialog.getBoundingClientRect();
+                        const anchor = trigger.getBoundingClientRect();
+                        const below = Math.max(0, Math.min(bounds.bottom, window.innerHeight) - anchor.bottom - 16);
+                        const above = Math.max(0, anchor.top - Math.max(bounds.top, 0) - 16);
+                        dropdown.dataset.side = below >= above ? 'bottom' : 'top';
+                        dropdown.style.setProperty('--collection-menu-height', `${Math.max(44, Math.max(below, above))}px`);
+                      }}
+                      onBlur={(event) => {
+                        // Some browsers omit relatedTarget when pointer focus moves to an option.
+                        // Outside pointer presses are handled by the overlay instead.
+                        if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) {
+                          event.currentTarget.open = false;
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        const dropdown = event.currentTarget;
+                        const options = Array.from(dropdown.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+                        const index = options.indexOf(event.target as HTMLButtonElement);
+                        if (!collectionBusy && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+                          event.preventDefault();
+                          dropdown.open = true;
+                          const next = event.key === 'Home' ? 0
+                            : event.key === 'End' ? options.length - 1
+                              : event.key === 'ArrowDown' ? (index + 1) % options.length
+                                : index < 0 ? options.length - 1 : (index - 1 + options.length) % options.length;
+                          options[next]?.focus();
+                        }
+                        if (event.key === 'Escape') {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          event.currentTarget.open = false;
+                          event.currentTarget.querySelector('summary')?.focus();
+                        }
+                      }}
+                    >
+                      <summary
+                        className="video-collection-category-select"
                         aria-label={t('video.categories.label')}
-                        onChange={(event) => setCollectionCategory(event.target.value)}
+                        aria-disabled={collectionBusy}
+                        onClick={(event) => {
+                          if (collectionBusy) event.preventDefault();
+                        }}
                       >
-                        <option value="all">{t('video.categories.all')}</option>
-                        {collectionCategories.map((category) => (
-                          <option key={category.slug} value={category.slug}>
-                            {language.startsWith('zh') ? category.nameZh : category.nameEn}
-                          </option>
+                        <ListFilter size={16} aria-hidden="true" />
+                        <span>
+                          {collectionCategory === 'all' ? t('video.categories.all') : collectionCategories
+                            .filter((category) => category.slug === collectionCategory)
+                            .map((category) => language.startsWith('zh') ? category.nameZh : category.nameEn)[0]}
+                        </span>
+                        <ChevronDown size={16} aria-hidden="true" />
+                      </summary>
+                      <div className="video-collection-category-menu">
+                        {[
+                          { value: 'all', label: t('video.categories.all') },
+                          ...collectionCategories.map((category) => ({
+                            value: category.slug,
+                            label: language.startsWith('zh') ? category.nameZh : category.nameEn,
+                          })),
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={collectionCategory === option.value ? 'is-active' : ''}
+                            aria-pressed={collectionCategory === option.value}
+                            disabled={collectionBusy}
+                            onPointerDown={(event) => {
+                              // Keep mouse focus on the trigger until click commits the selection.
+                              if (event.pointerType === 'mouse' && event.button === 0) event.preventDefault();
+                            }}
+                            onClick={(event) => {
+                              setCollectionCategory(option.value);
+                              const dropdown = event.currentTarget.closest('details');
+                              if (dropdown) {
+                                dropdown.open = false;
+                                dropdown.querySelector('summary')?.focus();
+                              }
+                            }}
+                          >
+                            <span>{option.label}</span>
+                            {collectionCategory === option.value && <Check size={16} aria-hidden="true" />}
+                          </button>
                         ))}
-                      </select>
-                    </label>
+                      </div>
+                    </details>
                   </fieldset>
 
                   <label className="video-collection-include">
@@ -4505,7 +4584,6 @@ export default function VideoConnected() {
                     />
                     <span>
                       <strong>{t('video.library.includeFavorites')}</strong>
-                      <small>{t('video.library.includeFavoritesDescription')}</small>
                     </span>
                     <span className="video-collection-switch" aria-hidden="true">
                       <span />
@@ -4515,14 +4593,6 @@ export default function VideoConnected() {
 
                 {collectionError && <p className="video-collection-error">{collectionError}</p>}
                 <div className="video-collection-dialog-actions">
-                  <button
-                    type="button"
-                    className="video-collection-cancel"
-                    disabled={collectionBusy}
-                    onClick={() => setCollectionDialogOpen(false)}
-                  >
-                    {t('video.library.cancelCollection')}
-                  </button>
                   <button
                     type="button"
                     className="video-collection-confirm"
