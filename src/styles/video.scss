@@ -3714,6 +3714,165 @@
   }
 }
 
+// Create-collection dialog: color, type scale and interaction states.
+//
+// Two notes on the rules above:
+// 1. Their rem values were authored against a 16px root, but html is 62.5%
+//    (1rem = 10px), so they render at roughly a third of the intended size.
+// 2. They mix a cool slate palette (#667085, rgba(15,23,42,...), #17191e)
+//    with the warm green-grays used everywhere else on the video page
+//    (#151817, #68706c, #1d2420). These rules settle on the warm scale and
+//    leave the green accent (#4f8a72, shared with the upload and settings
+//    dialogs) in place.
+//
+// The dialog is portaled to <body>, so it misses the focus ring set on
+// .video-page buttons, and App.scss removes the default outline from buttons.
+.video-collection-dialog button:focus-visible,
+.video-collection-dialog input:focus-visible,
+.video-collection-dialog select:focus-visible {
+  outline: 2px solid rgba(233, 95, 117, 0.72);
+  outline-offset: 3px;
+}
+
+// Surface: the cool blue-white floor and the slate-tinted shadow warm up
+// to match the green-grays around them.
+.video-collection-dialog {
+  color: #151817;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(247, 250, 248, 0.8));
+  box-shadow:
+    0 3rem 8rem -2rem rgba(20, 28, 24, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+.video-collection-dialog-backdrop {
+  background: rgba(20, 28, 24, 0.3);
+}
+
+.video-collection-dialog-close {
+  color: #68706c;
+  background: rgba(29, 36, 32, 0.06);
+}
+
+.video-collection-dialog-close:hover:not(:disabled) {
+  color: #151817;
+  background: rgba(29, 36, 32, 0.11);
+}
+
+.video-collection-dialog-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+.video-collection-dialog h2 {
+  color: #151817;
+}
+
+// Body copy drops from slate #667085 to the page's muted green-gray.
+.video-collection-dialog-description {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #68706c;
+}
+
+.video-collection-options legend {
+  color: #222924;
+  font-size: 13px;
+  font-weight: 680;
+}
+
+// A 0.46 border reads as a heavy outline; the page's own line weight is softer.
+.video-collection-field input {
+  color: #151817;
+  border-color: rgba(29, 36, 32, 0.24);
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+.video-collection-field > span {
+  font-size: 15px;
+}
+
+.video-collection-field input:focus {
+  border-color: rgba(29, 36, 32, 0.5);
+  box-shadow: 0 0 0 3px rgba(29, 36, 32, 0.09);
+}
+
+.video-collection-visibility button {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.video-collection-visibility button.is-active {
+  background: #1d2420;
+  box-shadow:
+    0 0.45rem 1rem rgba(29, 36, 32, 0.17),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.video-collection-category-select {
+  border-color: rgba(40, 48, 44, 0.16);
+}
+
+.video-collection-category-select select {
+  color: #27302a;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.video-collection-category-select:focus-within {
+  border-color: rgba(40, 48, 44, 0.3);
+  box-shadow: 0 0 0 3px rgba(29, 36, 32, 0.08);
+}
+
+.video-collection-include {
+  border-color: rgba(40, 48, 44, 0.12);
+}
+
+.video-collection-include strong {
+  color: #2f3632;
+  font-size: 14px;
+}
+
+.video-collection-include small {
+  color: #7a827d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.video-collection-error {
+  color: #c0453a;
+  font-size: 13px;
+}
+
+// Cancel was the last slate value (#333942); confirm already sits on the
+// page's dark green, so the pair now reads as one family.
+.video-collection-cancel {
+  color: #2a322d;
+  border-color: rgba(29, 36, 32, 0.12);
+}
+
+.video-collection-cancel,
+.video-collection-confirm {
+  font-size: 15px;
+  font-weight: 660;
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 600px) {
+  .video-collection-dialog-overlay {
+    padding: 0.6rem;
+  }
+
+  .video-collection-dialog {
+    padding: 2.6rem 1.6rem;
+    border-radius: 1.6rem;
+  }
+
+  .video-collection-dialog-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 .video-watch-description {
   margin-top: 2.1rem;
   padding: 1.6rem 1.8rem;

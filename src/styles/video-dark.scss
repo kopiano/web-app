@@ -253,11 +253,13 @@
 }
 
 [data-theme='dark'] .video-featured,
-[data-theme='dark'] .video-tile,
 [data-theme='dark'] .video-collection-card,
 [data-theme='dark'] .video-watch-queue-list > button,
 [data-theme='dark'] .video-comment,
 [data-theme='dark'] .video-comment-reply {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+[data-theme='dark'] .video-tile {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -453,4 +455,127 @@
     outline: 2px solid var(--video-accent);
     outline-offset: 3px;
   }
+}
+
+// The create-collection dialog is portaled to <body>, so it sits outside
+// .video-page. var(--video-ink) therefore resolves to nothing inside it,
+// and every colour it needs in dark mode has to be set explicitly.
+[data-theme='dark'] .video-collection-dialog {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+[data-theme='dark'] .video-collection-dialog-close {
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+[data-theme='dark'] .video-collection-dialog-close:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.13);
+}
+
+[data-theme='dark'] .video-collection-dialog-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+[data-theme='dark'] .video-collection-options legend {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  font-weight: 680;
+}
+
+// The base borders are near-black and vanish on the dark surface.
+[data-theme='dark'] .video-collection-field input,
+[data-theme='dark'] .video-collection-category-select,
+[data-theme='dark'] .video-collection-include {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+[data-theme='dark'] .video-collection-field input,
+[data-theme='dark'] .video-collection-field > span,
+[data-theme='dark'] .video-collection-category-select select {
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+[data-theme='dark'] .video-collection-field input:focus {
+  border-color: rgba(255, 255, 255, 0.34);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
+// The pill track and the include card are near-white in light mode,
+// which reads as a bright slab dropped onto the dark dialog.
+[data-theme='dark'] .video-collection-visibility {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+}
+
+[data-theme='dark'] .video-collection-visibility button {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+[data-theme='dark'] .video-collection-visibility button:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+// #1d2420 is invisible on a dark surface, so the active pill switches
+// to the accent tone the rest of the dark theme already uses.
+[data-theme='dark'] .video-collection-visibility button.is-active {
+  color: #fff;
+  background: #b94f70;
+  box-shadow: 0 0.45rem 1rem rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .video-collection-category-select {
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme='dark'] .video-collection-category-select:focus-within {
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .video-collection-category-select select {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+}
+
+[data-theme='dark'] .video-collection-include {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme='dark'] .video-collection-include strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 14px;
+}
+
+[data-theme='dark'] .video-collection-include small {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 12px;
+}
+
+[data-theme='dark'] .video-collection-error {
+  color: #ff9bab;
+  font-size: 13px;
+}
+
+[data-theme='dark'] .video-collection-cancel {
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+[data-theme='dark'] .video-collection-cancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+[data-theme='dark'] .video-collection-cancel,
+[data-theme='dark'] .video-collection-confirm {
+  font-size: 15px;
+  font-weight: 660;
 }
