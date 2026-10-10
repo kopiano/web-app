@@ -18,6 +18,27 @@
  font-family: "Comfortaa", sans-serif;
 }
 
+// The dialogs below are portaled to <body>, so they sit outside .video-page and
+// the descendant rule above never reaches them. Without this they fall back to
+// the body stack in App.scss, where Comfortaa is the last entry behind
+// Helvetica Neue, and render in the wrong typeface entirely.
+//
+// This has to be a descendant selector rather than font-family on the overlay
+// alone: form controls do not inherit font-family, so `input`/`select`/`textarea`
+// keep the UA default and render in Arial. (.video-page * solves the same
+// problem the same way.) The dialog buttons happen to set `font: inherit`
+// themselves, but the name input does not.
+.video-collection-dialog-overlay *,
+.video-upload-overlay *,
+.video-settings-overlay *,
+.video-delete-overlay *,
+.video-collection-dialog-overlay,
+.video-upload-overlay,
+.video-settings-overlay,
+.video-delete-overlay {
+  font-family: "Comfortaa", sans-serif;
+}
+
 .video-page::before {
   content: '';
   position: fixed;
@@ -3299,9 +3320,18 @@
   }
 }
 
+// Create-collection dialog.
+//
+// This dialog is portaled to <body>. Two consequences shape the rules below:
+// it needs its own font-family (see the overlay rule near .video-page) and its
+// own focus ring, since it escapes .video-page's buttons.
+//
+// Type is in px, matching .video-upload-fields. The project root is 62.5%
+// (1rem = 10px), so rem-based font sizes here would read at a fraction of the
+// intended size next to the px-based controls.
 .video-collection-dialog-overlay {
   position: fixed;
-  top: 5rem;
+  top: var(--app-header-height, 5rem);
   right: 0;
   bottom: 0;
   left: 0;
@@ -3317,7 +3347,7 @@
   width: 100%;
   height: 100%;
   border: 0;
-  background: rgba(15, 23, 42, 0.28);
+  background: rgba(20, 28, 24, 0.3);
   -webkit-backdrop-filter: blur(9px);
   backdrop-filter: blur(9px);
   cursor: default;
@@ -3331,14 +3361,24 @@
   overflow-y: auto;
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 2rem;
-  color: #17191e;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(246, 249, 251, 0.78));
+  color: #151817;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(247, 250, 248, 0.8));
   box-shadow:
-    0 3rem 8rem -2rem rgba(15, 23, 42, 0.28),
+    0 3rem 8rem -2rem rgba(20, 28, 24, 0.26),
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
   -webkit-backdrop-filter: blur(36px) saturate(145%);
   backdrop-filter: blur(36px) saturate(145%);
   animation: video-delete-dialog-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+// App.scss removes the default button outline, and the portal is outside
+// .video-page, so the ring has to be re-declared here. var(--video-accent) is
+// scoped to .video-page and does not resolve in the portal, hence the literal.
+.video-collection-dialog button:focus-visible,
+.video-collection-dialog input:focus-visible,
+.video-collection-dialog select:focus-visible {
+  outline: 2px solid rgba(233, 95, 117, 0.72);
+  outline-offset: 3px;
 }
 
 .video-collection-dialog-close {
@@ -3352,15 +3392,15 @@
   place-items: center;
   border: 0;
   border-radius: 50%;
-  color: #7c8491;
-  background: rgba(15, 23, 42, 0.055);
+  color: #68706c;
+  background: rgba(29, 36, 32, 0.06);
   cursor: pointer;
   transition: color 180ms ease, background 180ms ease, transform 180ms ease;
 }
 
 .video-collection-dialog-close:hover:not(:disabled) {
-  color: #252a32;
-  background: rgba(15, 23, 42, 0.1);
+  color: #151817;
+  background: rgba(29, 36, 32, 0.11);
   transform: rotate(5deg);
 }
 
@@ -3372,14 +3412,15 @@
 .video-collection-dialog-eyebrow {
   margin: 0;
   color: #4f8a72;
-  font-size: 0.84rem;
-  font-weight: 750;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .video-collection-dialog h2 {
   margin: 0.65rem 3.5rem 0 0;
+  color: #151817;
   font-size: clamp(2.15rem, 4vw, 3rem);
   font-weight: 680;
   line-height: 1.08;
@@ -3388,93 +3429,89 @@
 .video-collection-dialog-description {
   max-width: 40rem;
   margin: 1rem 0 1.9rem;
-  color: #667085;
-  font-size: 1.06rem;
+  color: #68706c;
+  font-size: 15px;
   line-height: 1.6;
 }
 
-.video-collection-field,
-.video-collection-options {
+// Name field: caption above the input, matching .video-upload-fields. The
+// earlier absolutely-positioned label forced a large left padding on the input
+// that clipped long values.
+.video-collection-field {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
-.video-collection-options legend {
-  color: #262b32;
-  font-size: 1rem;
-  font-weight: 690;
-  letter-spacing: 0.02em;
+.video-collection-field > span {
+  color: #3a4047;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .video-collection-field input {
   width: 100%;
   height: 4.3rem;
-  padding: 0 1.2rem 0 11.9rem;
-  border: 1px solid rgba(32, 32, 32, 0.46);
+  padding: 0 1.2rem;
+  border: 1px solid rgba(29, 36, 32, 0.24);
   border-radius: 1rem;
   outline: 0;
-  color: #232323;
+  color: #151817;
   background: rgba(255, 255, 255, 0.68);
-  // font: inherit;
   font-size: 15px;
-  letter-spacing: 0.7px;
   font-weight: 560;
+  letter-spacing: 0;
   transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
-.video-collection-field {
-  position: relative;
-}
-
-.video-collection-field > span {
-  position: absolute;
-  z-index: 1;
-  top: 50%;
-  left: 1.2rem;
-  display: inline-flex;
-  align-items: center;
-  max-width: 10rem;
-  overflow: hidden;
-  color: #59635d;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  pointer-events: none;
-  transform: translateY(-50%);
-}
-
+// No `outline: 0` here: it tied on specificity with the :focus-visible ring
+// above and, being later, cancelled the keyboard focus indicator on the input.
+// The ring supersedes the border change for keyboard users.
 .video-collection-field input:focus {
-  border-color: rgba(32, 32, 32, 0.46);
-  outline: 0;
+  border-color: rgba(29, 36, 32, 0.5);
   background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 0 0 0.2rem rgba(32, 36, 42, 0.06);
+  box-shadow: 0 0 0 3px rgba(29, 36, 32, 0.09);
 }
 
 .video-collection-field input::placeholder {
   color: rgba(79, 88, 83, 0.5);
 }
 
+// Options group: the visibility, category and include controls read as one
+// card with dividers rather than four floating elements.
+.video-collection-group {
+  margin-top: 1.6rem;
+  padding: 0.4rem 1.4rem;
+  display: grid;
+  border: 1px solid rgba(40, 48, 44, 0.12);
+  border-radius: 1.3rem;
+  background: rgba(255, 255, 255, 0.42);
+}
+
 .video-collection-options {
   min-width: 0;
-  margin: 1.45rem 0 0;
-  padding: 0;
+  margin: 0;
+  padding: 1.35rem 0;
   display: grid;
-  gap: 0.65rem;
+  gap: 0.75rem;
   border: 0;
+}
+
+// Divider between rows, drawn on each row's bottom edge. The top edge is
+// unusable here: a fieldset's <legend> occupies the top border area, so any
+// divider drawn there runs straight through the row's label. The bottom edge
+// is free of that. Specificity above the `border: 0` on the fieldset.
+.video-collection-options:not(:last-child),
+.video-collection-include:not(:last-child) {
+  border-bottom: 1px solid rgba(40, 48, 44, 0.1);
 }
 
 .video-collection-options legend {
   margin: 0;
   padding: 0;
-}
-
-.video-collection-visibility,
-.video-collection-categories {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  color: #222924;
+  font-size: 13px;
+  font-weight: 680;
+  letter-spacing: 0.02em;
 }
 
 .video-collection-visibility {
@@ -3506,16 +3543,20 @@
   color: #69736d;
   background: transparent;
   font: inherit;
-  font-size: 0.94rem;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 650;
   cursor: pointer;
   transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 
+// Green leads the dialog, so the selected segment uses the shared accent
+// rather than a near-black fill.
 .video-collection-visibility button.is-active {
   color: #fff;
-  background: #1d2420;
-  box-shadow: 0 0.45rem 1rem rgba(29, 36, 32, 0.17);
+  background: #4f8a72;
+  box-shadow:
+    0 0.45rem 1rem rgba(29, 36, 32, 0.17),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .video-collection-visibility button:disabled {
@@ -3529,7 +3570,7 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  border: 1px solid rgba(57, 65, 60, 0.16);
+  border: 1px solid rgba(40, 48, 44, 0.16);
   border-radius: 1rem;
   color: #5b665f;
   background: rgba(255, 255, 255, 0.56);
@@ -3544,26 +3585,23 @@
   color: #27302a;
   background: transparent;
   font: inherit;
-  font-size: 1rem;
-  font-weight: 650;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .video-collection-category-select:focus-within {
-  border-color: rgba(57, 65, 60, 0.28);
-  box-shadow: 0 0 0 0.2rem rgba(32, 36, 42, 0.05);
+  border-color: rgba(40, 48, 44, 0.3);
+  box-shadow: 0 0 0 3px rgba(29, 36, 32, 0.08);
 }
 
 .video-collection-include {
-  margin-top: 1.55rem;
-  padding: 1.15rem 1.2rem;
+  margin-top: 0;
+  padding: 1.35rem 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.7rem;
-  border: 1px solid rgba(57, 65, 60, 0.12);
-  border-radius: 1.15rem;
-  background: rgba(255, 255, 255, 0.42);
   cursor: pointer;
 }
 
@@ -3618,21 +3656,22 @@
 
 .video-collection-include strong {
   color: #2f3632;
-  font-size: 1rem;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 1.35;
 }
 
 .video-collection-include small {
   margin-top: 0.3rem;
   color: #7a827d;
-  font-size: 0.88rem;
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .video-collection-error {
   margin: 1rem 0 0;
-  color: #b42318;
-  font-size: 0.94rem;
+  color: #c0453a;
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -3653,23 +3692,25 @@
   gap: 0.5rem;
   border-radius: 3rem;
   font: inherit;
-  font-size: 1rem;
-  font-weight: 680;
+  font-size: 15px;
+  font-weight: 660;
+  letter-spacing: 0.01em;
   cursor: pointer;
   transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 
 .video-collection-cancel {
-  border: 1px solid rgba(29, 34, 42, 0.1);
-  color: #333942;
+  border: 1px solid rgba(29, 36, 32, 0.12);
+  color: #2a322d;
   background: rgba(255, 255, 255, 0.6);
 }
 
+// The CTA joins the dialog's green accent instead of a fourth, near-black tone.
 .video-collection-confirm {
-  border: 1px solid #1d2420;
+  border: 1px solid #4f8a72;
   color: #fff;
-  background: #1d2420;
-  box-shadow: 0 0.9rem 2rem rgba(29, 36, 32, 0.18);
+  background: #4f8a72;
+  box-shadow: 0 0.9rem 2rem rgba(79, 138, 114, 0.22);
 }
 
 .video-collection-cancel:hover:not(:disabled),
@@ -3681,9 +3722,17 @@
   background: rgba(255, 255, 255, 0.92);
 }
 
+// Only the background shifts on hover. Setting border-color here would
+// out-specify the dark theme's `border-color: transparent` on this button and
+// leave a green border on its pink fill.
 .video-collection-confirm:hover:not(:disabled) {
-  background: #2c3730;
-  box-shadow: 0 1.15rem 2.3rem rgba(29, 36, 32, 0.24);
+  background: #437a64;
+  box-shadow: 0 1.15rem 2.3rem rgba(79, 138, 114, 0.28);
+}
+
+.video-collection-cancel:active,
+.video-collection-confirm:active {
+  transform: scale(0.98);
 }
 
 .video-collection-cancel:disabled,
@@ -3694,6 +3743,32 @@
 
 .video-collection-confirm .is-spinning {
   animation: video-delete-spin 0.85s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-collection-dialog,
+  .video-collection-confirm .is-spinning {
+    animation: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .video-collection-dialog-overlay {
+    padding: 0.6rem;
+  }
+
+  .video-collection-dialog {
+    padding: 2.6rem 1.6rem;
+    border-radius: 1.6rem;
+  }
+
+  .video-collection-group {
+    padding: 0.4rem 1.1rem;
+  }
+
+  .video-collection-dialog-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 @keyframes video-delete-dialog-in {
@@ -3711,165 +3786,6 @@
 @keyframes video-delete-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-// Create-collection dialog: color, type scale and interaction states.
-//
-// Two notes on the rules above:
-// 1. Their rem values were authored against a 16px root, but html is 62.5%
-//    (1rem = 10px), so they render at roughly a third of the intended size.
-// 2. They mix a cool slate palette (#667085, rgba(15,23,42,...), #17191e)
-//    with the warm green-grays used everywhere else on the video page
-//    (#151817, #68706c, #1d2420). These rules settle on the warm scale and
-//    leave the green accent (#4f8a72, shared with the upload and settings
-//    dialogs) in place.
-//
-// The dialog is portaled to <body>, so it misses the focus ring set on
-// .video-page buttons, and App.scss removes the default outline from buttons.
-.video-collection-dialog button:focus-visible,
-.video-collection-dialog input:focus-visible,
-.video-collection-dialog select:focus-visible {
-  outline: 2px solid rgba(233, 95, 117, 0.72);
-  outline-offset: 3px;
-}
-
-// Surface: the cool blue-white floor and the slate-tinted shadow warm up
-// to match the green-grays around them.
-.video-collection-dialog {
-  color: #151817;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(247, 250, 248, 0.8));
-  box-shadow:
-    0 3rem 8rem -2rem rgba(20, 28, 24, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.96);
-}
-
-.video-collection-dialog-backdrop {
-  background: rgba(20, 28, 24, 0.3);
-}
-
-.video-collection-dialog-close {
-  color: #68706c;
-  background: rgba(29, 36, 32, 0.06);
-}
-
-.video-collection-dialog-close:hover:not(:disabled) {
-  color: #151817;
-  background: rgba(29, 36, 32, 0.11);
-}
-
-.video-collection-dialog-eyebrow {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-}
-
-.video-collection-dialog h2 {
-  color: #151817;
-}
-
-// Body copy drops from slate #667085 to the page's muted green-gray.
-.video-collection-dialog-description {
-  font-size: 15px;
-  line-height: 1.6;
-  color: #68706c;
-}
-
-.video-collection-options legend {
-  color: #222924;
-  font-size: 13px;
-  font-weight: 680;
-}
-
-// A 0.46 border reads as a heavy outline; the page's own line weight is softer.
-.video-collection-field input {
-  color: #151817;
-  border-color: rgba(29, 36, 32, 0.24);
-  font-size: 15px;
-  letter-spacing: 0;
-}
-
-.video-collection-field > span {
-  font-size: 15px;
-}
-
-.video-collection-field input:focus {
-  border-color: rgba(29, 36, 32, 0.5);
-  box-shadow: 0 0 0 3px rgba(29, 36, 32, 0.09);
-}
-
-.video-collection-visibility button {
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.video-collection-visibility button.is-active {
-  background: #1d2420;
-  box-shadow:
-    0 0.45rem 1rem rgba(29, 36, 32, 0.17),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
-}
-
-.video-collection-category-select {
-  border-color: rgba(40, 48, 44, 0.16);
-}
-
-.video-collection-category-select select {
-  color: #27302a;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.video-collection-category-select:focus-within {
-  border-color: rgba(40, 48, 44, 0.3);
-  box-shadow: 0 0 0 3px rgba(29, 36, 32, 0.08);
-}
-
-.video-collection-include {
-  border-color: rgba(40, 48, 44, 0.12);
-}
-
-.video-collection-include strong {
-  color: #2f3632;
-  font-size: 14px;
-}
-
-.video-collection-include small {
-  color: #7a827d;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.video-collection-error {
-  color: #c0453a;
-  font-size: 13px;
-}
-
-// Cancel was the last slate value (#333942); confirm already sits on the
-// page's dark green, so the pair now reads as one family.
-.video-collection-cancel {
-  color: #2a322d;
-  border-color: rgba(29, 36, 32, 0.12);
-}
-
-.video-collection-cancel,
-.video-collection-confirm {
-  font-size: 15px;
-  font-weight: 660;
-  letter-spacing: 0.01em;
-}
-
-@media (max-width: 600px) {
-  .video-collection-dialog-overlay {
-    padding: 0.6rem;
-  }
-
-  .video-collection-dialog {
-    padding: 2.6rem 1.6rem;
-    border-radius: 1.6rem;
-  }
-
-  .video-collection-dialog-actions {
-    grid-template-columns: 1fr;
   }
 }
 

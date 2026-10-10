@@ -485,22 +485,45 @@
   font-weight: 680;
 }
 
-// The base borders are near-black and vanish on the dark surface.
-[data-theme='dark'] .video-collection-field input,
-[data-theme='dark'] .video-collection-category-select,
-[data-theme='dark'] .video-collection-include {
-  border-color: rgba(255, 255, 255, 0.16);
+[data-theme='dark'] .video-collection-group {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme='dark'] .video-collection-options:not(:last-child),
+[data-theme='dark'] .video-collection-include:not(:last-child) {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
 [data-theme='dark'] .video-collection-field input,
-[data-theme='dark'] .video-collection-field > span,
-[data-theme='dark'] .video-collection-category-select select {
+[data-theme='dark'] .video-collection-category-select {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+// The label now sits above the field on a light slate, which would be
+// unreadable here, so it needs an explicit light value.
+[data-theme='dark'] .video-collection-field > span {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+// Matches the light scale exactly, or the two themes render different type.
+[data-theme='dark'] .video-collection-field input,
+[data-theme='dark'] .video-collection-field > span {
   font-size: 15px;
   letter-spacing: 0;
 }
 
+[data-theme='dark'] .video-collection-category-select select {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+// The light focus rule paints a near-white background. The dark override only
+// redefined the border and ring, so focused input kept that white fill with
+// white text on it. The background has to be restated here.
 [data-theme='dark'] .video-collection-field input:focus {
   border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.1);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
 }
 
@@ -530,6 +553,20 @@
   box-shadow: 0 0.45rem 1rem rgba(0, 0, 0, 0.3);
 }
 
+// The switch was the one control in this dialog with no dark override, so it
+// stayed light-mode green while the pill, eyebrow and CTA around it are all
+// pink. It follows the same dark accent now.
+[data-theme='dark'] .video-collection-include input:checked ~ .video-collection-switch {
+  background: #b94f70;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.3),
+    0 0.35rem 0.8rem rgba(185, 79, 112, 0.24);
+}
+
+[data-theme='dark'] .video-collection-include input:focus-visible ~ .video-collection-switch {
+  outline-color: rgba(255, 134, 167, 0.5);
+}
+
 [data-theme='dark'] .video-collection-category-select {
   color: rgba(255, 255, 255, 0.86);
   background: rgba(255, 255, 255, 0.06);
@@ -545,8 +582,10 @@
   font-weight: 600;
 }
 
+// The include row used to be its own card; it now sits inside
+// .video-collection-group, so its own fill would compound on the group's.
 [data-theme='dark'] .video-collection-include {
-  background: rgba(255, 255, 255, 0.05);
+  background: transparent;
 }
 
 [data-theme='dark'] .video-collection-include strong {

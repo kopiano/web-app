@@ -59,11 +59,16 @@
   src: url('@/assets/fonts/Quicksand-VariableFont_wght.ttf') format('truetype');
 }
 
+// Comfortaa.ttf is a variable font with a wght axis of 300-700. Declaring the
+// range (rather than a single 400) lets the browser interpolate real weights;
+// with only 400 registered, every heavier weight on the video page was being
+// synthesised by the browser instead of read from the font.
 @font-face {
   font-family: "Comfortaa";
   font-style: normal;
-  font-weight: 400;
+  font-weight: 300 700;
   font-display: swap;
-  src: url('@/assets/fonts/Comfortaa.ttf') format('truetype');
+  src: url('@/assets/fonts/Comfortaa.ttf') format('truetype-variations'),
+       url('@/assets/fonts/Comfortaa.ttf') format('truetype');
 }
 

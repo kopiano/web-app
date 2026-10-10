@@ -4456,60 +4456,62 @@ export default function VideoConnected() {
                   />
                 </label>
 
-                <fieldset className="video-collection-options">
-                  <legend>{t('video.upload.visibility')}</legend>
-                  <div className="video-collection-visibility">
-                    {(['public', 'private'] as VideoVisibility[]).map((visibility) => (
-                      <button
-                        key={visibility}
-                        type="button"
-                        className={collectionVisibility === visibility ? 'is-active' : ''}
-                        aria-pressed={collectionVisibility === visibility}
-                        disabled={collectionBusy}
-                        onClick={() => setCollectionVisibility(visibility)}
-                      >
-                        {visibility === 'public' ? <Globe2 size={15} /> : <LockKeyhole size={15} />}
-                        {t(`video.upload.${visibility}`)}
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-
-                <fieldset className="video-collection-options">
-                  <legend>{t('video.categories.label')}</legend>
-                  <label className="video-collection-category-select">
-                    <ListFilter size={16} aria-hidden="true" />
-                    <select
-                      value={collectionCategory}
-                      disabled={collectionBusy}
-                      aria-label={t('video.categories.label')}
-                      onChange={(event) => setCollectionCategory(event.target.value)}
-                    >
-                      <option value="all">{t('video.categories.all')}</option>
-                      {collectionCategories.map((category) => (
-                        <option key={category.slug} value={category.slug}>
-                          {language.startsWith('zh') ? category.nameZh : category.nameEn}
-                        </option>
+                <div className="video-collection-group">
+                  <fieldset className="video-collection-options">
+                    <legend>{t('video.upload.visibility')}</legend>
+                    <div className="video-collection-visibility">
+                      {(['public', 'private'] as VideoVisibility[]).map((visibility) => (
+                        <button
+                          key={visibility}
+                          type="button"
+                          className={collectionVisibility === visibility ? 'is-active' : ''}
+                          aria-pressed={collectionVisibility === visibility}
+                          disabled={collectionBusy}
+                          onClick={() => setCollectionVisibility(visibility)}
+                        >
+                          {visibility === 'public' ? <Globe2 size={15} /> : <LockKeyhole size={15} />}
+                          {t(`video.upload.${visibility}`)}
+                        </button>
                       ))}
-                    </select>
-                  </label>
-                </fieldset>
+                    </div>
+                  </fieldset>
 
-                <label className="video-collection-include">
-                  <input
-                    type="checkbox"
-                    checked={collectionIncludeFavorites}
-                    disabled={collectionBusy}
-                    onChange={(event) => setCollectionIncludeFavorites(event.target.checked)}
-                  />
-                  <span>
-                    <strong>{t('video.library.includeFavorites')}</strong>
-                    <small>{t('video.library.includeFavoritesDescription')}</small>
-                  </span>
-                  <span className="video-collection-switch" aria-hidden="true">
-                    <span />
-                  </span>
-                </label>
+                  <fieldset className="video-collection-options">
+                    <legend>{t('video.categories.label')}</legend>
+                    <label className="video-collection-category-select">
+                      <ListFilter size={16} aria-hidden="true" />
+                      <select
+                        value={collectionCategory}
+                        disabled={collectionBusy}
+                        aria-label={t('video.categories.label')}
+                        onChange={(event) => setCollectionCategory(event.target.value)}
+                      >
+                        <option value="all">{t('video.categories.all')}</option>
+                        {collectionCategories.map((category) => (
+                          <option key={category.slug} value={category.slug}>
+                            {language.startsWith('zh') ? category.nameZh : category.nameEn}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </fieldset>
+
+                  <label className="video-collection-include">
+                    <input
+                      type="checkbox"
+                      checked={collectionIncludeFavorites}
+                      disabled={collectionBusy}
+                      onChange={(event) => setCollectionIncludeFavorites(event.target.checked)}
+                    />
+                    <span>
+                      <strong>{t('video.library.includeFavorites')}</strong>
+                      <small>{t('video.library.includeFavoritesDescription')}</small>
+                    </span>
+                    <span className="video-collection-switch" aria-hidden="true">
+                      <span />
+                    </span>
+                  </label>
+                </div>
 
                 {collectionError && <p className="video-collection-error">{collectionError}</p>}
                 <div className="video-collection-dialog-actions">
