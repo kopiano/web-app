@@ -648,12 +648,12 @@
   --video-accent: #ff86a7;
   color-scheme: dark;
   color: var(--video-ink);
-  background: #232326;
+  background: rgba(82,82,82,0.6);
   border-color: #3c3c42;
   box-shadow: 0 3rem 8rem -2rem rgba(0, 0, 0, 0.65);
 
   .video-settings-sidebar {
-    background: #1e1e21;
+    background: rgba(32, 32, 32, 0.32);
     border-color: #36363c;
   }
 
