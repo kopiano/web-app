@@ -472,8 +472,14 @@
 
 // Match the Video Playlist dock without changing the existing category markup.
 .store-page .store-tabs {
+  position: fixed;
+  z-index: 80;
+  left: 50%;
+  bottom: calc(2.6rem + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
   width: min(394px, 100%);
   max-width: 100%;
+  max-width: calc(100% - 3.6rem);
   padding: 6px;
   gap: 4px;
   border: 1px solid rgba(255, 255, 255, .426);
@@ -529,6 +535,15 @@
 .store-page .store-tabs button:focus-visible {
   outline: 2px solid var(--store-accent);
   outline-offset: -2px;
+}
+
+@media (max-width: 650px) {
+  .store-page .store-tabs {
+    bottom: calc(1.8rem + env(safe-area-inset-bottom, 0px));
+  }
+  .store-page .store-create-trigger {
+    bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
