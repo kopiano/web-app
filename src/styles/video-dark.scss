@@ -343,6 +343,29 @@
   border-color: rgba(255, 255, 255, 0.18);
 }
 
+// The cover field draws its outline with box-shadow, not border, so the
+// border-color above never reached it: the light ring stayed a 1px
+// near-white line around an empty dark box. The camera glyph was light-mode
+// green (#2f6954) and read as a dark smudge.
+[data-theme='dark'] .video-settings-form .video-upload-cover-field {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+[data-theme='dark'] .video-settings-form .video-upload-cover-field:hover,
+[data-theme='dark'] .video-settings-form .video-upload-cover-field:focus-visible {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.34),
+    0 0.7rem 1.5rem rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .video-settings-form .video-upload-cover-empty {
+  color: rgba(255, 255, 255, 0.52);
+}
+
+[data-theme='dark'] .video-settings-form .video-upload-cover-empty svg {
+  color: rgba(255, 255, 255, 0.42);
+}
+
 [data-theme='dark'] .video-comments-heading > button {
   border: none;
   background: rgba(255, 255, 255, 0.08);
@@ -617,4 +640,163 @@
 [data-theme='dark'] .video-collection-confirm {
   font-size: 15px;
   font-weight: 660;
+}
+[data-theme='dark'] .video-settings-dialog[role='dialog'] {
+  // This dialog is portaled outside .video-page, so define its tokens locally.
+  --video-ink: #f4f4f5;
+  --video-muted: #a1a1aa;
+  --video-accent: #ff86a7;
+  color-scheme: dark;
+  color: var(--video-ink);
+  background: #232326;
+  border-color: #3c3c42;
+  box-shadow: 0 3rem 8rem -2rem rgba(0, 0, 0, 0.65);
+
+  .video-settings-sidebar {
+    background: #1e1e21;
+    border-color: #36363c;
+  }
+
+  .video-settings-sidebar nav button {
+    color: #b4b4be;
+  }
+
+  .video-settings-sidebar nav button:hover {
+    color: #f4f4f5;
+    background: #2c2c31;
+    border-color: #404047;
+  }
+
+  .video-settings-sidebar nav button.is-active {
+    color: #ffb2c8;
+    background: rgba(255, 134, 167, 0.1);
+    border-color: rgba(255, 134, 167, 0.22);
+  }
+
+  .video-settings-sidebar nav button.is-danger:hover,
+  .video-settings-sidebar nav button.is-danger.is-active {
+    color: #fda4af;
+    background: rgba(244, 63, 94, 0.1);
+    border-color: rgba(244, 63, 94, 0.24);
+  }
+
+  .video-settings-heading h3,
+  .video-settings-delete h3 {
+    color: #f4f4f5;
+  }
+
+  .video-settings-close {
+    color: #b4b4be;
+    background: #303035;
+  }
+
+  .video-settings-close:hover:not(:disabled) {
+    color: #fafafa;
+    background: #404047;
+  }
+
+  .video-settings-status-icon {
+    color: #ffb2c8;
+    background: rgba(255, 134, 167, 0.12);
+    box-shadow: none;
+  }
+
+  .video-upload-fields label > span,
+  .video-settings-visibility > span {
+    color: #d4d4d8;
+  }
+
+  .video-upload-fields small,
+  .video-settings-delete > p:not(.video-settings-eyebrow):not(.video-delete-error) {
+    color: #a1a1aa;
+  }
+
+  .video-upload-fields input {
+    color: #f4f4f5;
+    border-color: #45454d;
+    background: #2b2b30;
+    box-shadow: none;
+  }
+
+  .video-upload-fields input:focus {
+    border-color: #d87895;
+    background: #303035;
+    box-shadow: 0 0 0 3px rgba(255, 134, 167, 0.1);
+  }
+
+  .video-settings-form .video-upload-cover-field {
+    color: #a1a1aa;
+    background: #2b2b30;
+    border-color: #45454d;
+  }
+
+  .video-upload-visibility {
+    background: #19191c;
+    border-color: #45454d;
+    box-shadow: none;
+  }
+
+  .video-upload-visibility::before {
+    background: #45454d;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .video-upload-visibility button {
+    color: #a1a1aa;
+  }
+
+  .video-upload-visibility button.is-active {
+    color: #fafafa;
+  }
+
+  .video-settings-update {
+    color: #fff;
+    background: #b94f70;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .video-settings-update:hover:not(:disabled) {
+    background: #ce5b7e;
+    box-shadow: none;
+  }
+
+  .video-settings-saved {
+    color: #86d9ae;
+  }
+
+  .video-delete-icon {
+    color: #fda4af;
+    background: rgba(244, 63, 94, 0.12);
+    box-shadow: none;
+  }
+
+  .video-delete-cancel {
+    color: #e4e4e7;
+    background: #303035;
+    border-color: #45454d;
+  }
+
+  .video-delete-cancel:hover:not(:disabled) {
+    background: #404047;
+  }
+
+  .video-delete-confirm {
+    color: #fff;
+    background: #be304b;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .video-delete-confirm:hover:not(:disabled) {
+    background: #d33c57;
+    box-shadow: none;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  [role='button']:focus-visible {
+    outline: 2px solid var(--video-accent);
+    outline-offset: 3px;
+  }
 }
