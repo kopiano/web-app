@@ -27,21 +27,57 @@
 }
 .store-cart-trigger:hover { background: white; }
 
-.store-tabs { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: min(44rem, 100%);
+.store-tabs {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: min(44rem, 100%);
   padding: .5rem;
-  // border: 1px solid rgba(255,255,255,.85);
-  border-radius: 3rem;
-  background: rgba(255,255,255,.48); box-shadow: 0 10px 30px rgba(36,58,47,.06); backdrop-filter: blur(18px) saturate(150%); }
-.store-tabs::before { content: ''; position: absolute; top: .5rem; bottom: .5rem; left: .5rem; width: calc((100% - 1rem) / 4); border-radius: 2rem; background: rgba(255,255,255,.9); box-shadow: 0 3px 12px rgba(28,66,47,.1); pointer-events: none; transition: transform .3s cubic-bezier(.22,1,.36,1); }
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 1.25rem;
+  background: rgba(255,255,255,.48);
+  box-shadow: 0 10px 30px rgba(36,58,47,.06);
+  backdrop-filter: blur(18px) saturate(150%);
+}
+.store-tabs::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: .5rem;
+  bottom: .5rem;
+  left: .5rem;
+  width: calc((100% - 1rem) / 4);
+  border-radius: .9rem;
+  background: rgba(255,255,255,.9);
+  box-shadow: 0 3px 12px rgba(28,66,47,.1);
+  pointer-events: none;
+  transition: transform .3s cubic-bezier(.22,1,.36,1);
+}
 .store-tabs[data-category='coffee']::before { transform: translateX(100%); }
 .store-tabs[data-category='tea']::before { transform: translateX(200%); }
 .store-tabs[data-category='bakery']::before { transform: translateX(300%); }
-.store-tabs button { position: relative; min-width: 0; padding: 1.1rem .8rem; border-radius: 2rem; background: transparent; color: #66736b; font-size: 1.3rem; font-weight: 650; white-space: nowrap; transition: color .2s ease; }
+.store-tabs button {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 3.2rem;
+  padding: .8rem;
+  border: 0;
+  border-radius: .9rem;
+  background: transparent;
+  color: #66736b;
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 650;
+  white-space: nowrap;
+  transition: color .2s ease, background .2s ease;
+}
 .store-tabs button:hover { color: var(--store-ink); }
 .store-tabs button.is-active {
-  color: rgba(255, 255, 255, 0.98);
-  background: rgba(255, 255, 255, 0.16);
-  box-shadow: rgba(0, 0, 0, 0.2) 0px 0.8rem 2rem, rgba(255, 255, 255, 0.1) 0px 1px 0px inset;
+  color: var(--store-accent);
+  background: transparent;
+  box-shadow: none;
 }
 .store-section-line { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid var(--store-line); margin: 2rem 0 2.4rem; padding-bottom: 1.4rem; }
 .store-section-line h2 { font-size: 2.1rem; font-weight: 650; }
@@ -353,6 +389,45 @@
   color: var(--store-accent);
 }
 
+// Store navigation intentionally uses an editorial underline treatment rather
+// than the sliding capsule used by the video playlist category navigation.
+.store-tabs {
+  padding: 0;
+  gap: 1.8rem;
+  border: 0;
+  border-bottom: 1px solid var(--store-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.store-tabs::before {
+  display: none;
+}
+
+.store-tabs button,
+.store-tabs button.is-active {
+  min-height: 3.4rem;
+  padding: 0 .15rem;
+  border-radius: 0;
+  color: var(--store-muted);
+  background: transparent;
+  box-shadow: inset 0 -2px 0 transparent;
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+
+.store-tabs button:hover {
+  color: var(--store-ink);
+  background: transparent;
+}
+
+.store-tabs button.is-active {
+  color: var(--store-accent);
+  box-shadow: inset 0 -2px 0 var(--store-accent);
+}
+
 @media (max-width: 900px) {
   .store-page { padding: 11rem 2.4rem 12rem; }
   .store-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -364,8 +439,8 @@
   .store-heading p { font-size: 1.3rem; }
   .store-cart-trigger { padding: 0 1rem; }
   .store-cart-trigger span { display: none; }
-  .store-tabs { width: 100%; }
-  .store-tabs button { padding: 1rem .3rem; font-size: 1.2rem; }
+  .store-tabs { width: 100%; gap: .7rem; }
+  .store-tabs button { padding: 0 .25rem; font-size: 1rem; }
   .store-section-line { margin-top: 3.4rem; }
   .store-grid { gap: 2.6rem 1.2rem; }
   .store-product-image { aspect-ratio: .9; }
@@ -393,4 +468,69 @@
   .store-overlay .store-dialog, .store-overlay.is-closing .store-dialog { animation: none; }
   .store-dialog-close, .store-dialog-close svg { transition: none; }
   .store-create-upload, .store-create-field input, .store-create-field select { transition: none; }
+}
+
+// Match the Video Playlist dock without changing the existing category markup.
+.store-page .store-tabs {
+  width: min(394px, 100%);
+  max-width: 100%;
+  padding: 6px;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, .426);
+  border-radius: 3.2rem;
+  background: rgba(255, 255, 255, .25);
+  box-shadow: 0 1.8rem 5rem rgba(38, 48, 42, .18),
+    inset 0 1px 0 rgba(255, 255, 255, .96);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  filter: saturate(120%) brightness(1.15);
+}
+
+.store-page .store-tabs::before {
+  display: block;
+  z-index: 0;
+  top: 6px;
+  bottom: auto;
+  left: 6px;
+  width: calc((100% - 24px) / 4);
+  height: 36px;
+  border-radius: 2.5rem;
+  background: #303034;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12),
+    0 2px 6px rgba(0, 0, 0, .12);
+  transform: translateX(0);
+}
+
+.store-page .store-tabs[data-category='coffee']::before {
+  transform: translateX(calc(100% + 4px));
+}
+.store-page .store-tabs[data-category='tea']::before {
+  transform: translateX(calc(200% + 8px));
+}
+.store-page .store-tabs[data-category='bakery']::before {
+  transform: translateX(calc(300% + 12px));
+}
+
+.store-page .store-tabs button {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 1.5rem;
+  border-radius: 2rem;
+  color: #313131;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  transition: color 180ms ease;
+}
+.store-page .store-tabs button:hover { color: #1d2420; }
+.store-page .store-tabs button.is-active { color: #fff; }
+.store-page .store-tabs button:focus-visible {
+  outline: 2px solid var(--store-accent);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-page .store-tabs button { transition: none; }
 }
