@@ -95,12 +95,13 @@
 .docs-categories button {
   flex: 0 0 auto;
   padding: .9rem 1.4rem;
-  border: 1px solid rgba(255, 255, 255, .58);
+  border: 2px solid rgba(255, 255, 255, .58);
   border-radius: 999px;
-  color: rgba(38, 48, 46, .62);
+  // color: rgba(38, 48, 46, .62);
   background: rgba(255, 255, 255, .3);
   font: inherit;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
+  font-weight: 600;
 }
 .docs-category-count {
   display: inline-flex;

@@ -35,14 +35,15 @@
 }
 
 [data-theme='dark'] .docs-search-wrap,
-[data-theme='dark'] .docs-categories button,
 [data-theme='dark'] .docs-view-toggle,
 [data-theme='dark'] .doc-card,
 [data-theme='dark'] .doc-card-body,
 [data-theme='dark'] .docs-dock {
   border-color: var(--docs-dark-line);
   background: var(--docs-dark-glass);
-  box-shadow: 0 1.6rem 4rem rgba(0, 0, 0, .18);
+}
+[data-theme='dark'] .docs-categories button {
+  // box-shadow: 0 1.6rem 4rem rgba(0, 0, 0, .18);
 }
 
 [data-theme='dark'] .docs-search-wrap {
