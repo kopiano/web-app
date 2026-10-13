@@ -547,7 +547,7 @@
     "playlist": {
       "title": "Video playlist",
       "pagination": "Video playlist pages",
-      "page": "Page {{page}}",
+      "page": "Page {{page}} / {{pageCount}}{{more}}",
       "previous": "Previous",
       "next": "Next"
     },

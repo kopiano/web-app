@@ -2366,6 +2366,16 @@ export default function VideoConnected() {
     [effectiveMockItems, playlistFilterCategory],
   );
   const mockPlaylistPageCount = Math.max(1, Math.ceil(mockPlaylistItems.length / 8));
+  const loadedPlaylistPages = playlistQuery.data?.pages.length ?? 1;
+  const reportedPlaylistPageCount = playlistQuery.data?.pages.find(
+    (page) => typeof page.totalPages === 'number',
+  )?.totalPages ?? null;
+  const playlistPageCount = useMockData
+    ? mockPlaylistPageCount
+    : reportedPlaylistPageCount ?? loadedPlaylistPages + Number(playlistQuery.hasNextPage);
+  const playlistPageCountIsEstimate = !useMockData
+    && reportedPlaylistPageCount === null
+    && playlistQuery.hasNextPage;
   const playlistVideos = useMemo(() => {
     if (!currentUser) return [];
     const currentUserName = currentUser.name || currentUser.username || '';
@@ -4348,7 +4358,11 @@ export default function VideoConnected() {
                       <ChevronLeft size={18} />
                     </button>
                     <span className="video-pager-status" aria-live="polite">
-                      {t('video.playlist.page', { page: playlistPage })}
+                      {t('video.playlist.page', {
+                        page: playlistPage,
+                        pageCount: playlistPageCount,
+                        more: playlistPageCountIsEstimate ? '+' : '',
+                      })}
                     </span>
                     <button
                       type="button"

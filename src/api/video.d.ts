@@ -55,6 +55,7 @@ export interface VideoBannerItem {
 export interface VideoPage {
   items: VideoApiItem[];
   hasMore: boolean;
+  totalPages: number | null;
   nextBeforeCreatedAt: string | null;
   nextBeforeId: string | null;
 }

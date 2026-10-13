@@ -146,6 +146,9 @@ export function getVideos(params = {}) {
     return {
       items: page.items.map(normalizeVideo),
       hasMore: Boolean(page.has_more),
+      totalPages: Number.isInteger(Number(page.total_pages)) && Number(page.total_pages) > 0
+        ? Number(page.total_pages)
+        : null,
       nextBeforeCreatedAt: page.next_before_created_at || null,
       nextBeforeId: page.next_before_id || null,
     }
