@@ -84,7 +84,10 @@
 .store-section-line span { color: var(--store-muted); font-size: 1.2rem; font-variant-numeric: tabular-nums; }
 .store-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-flow: row; direction: ltr; gap: 3.2rem 2rem; }
 .store-product { min-width: 0; padding: 0; border-radius: 2rem; background: transparent; color: inherit; text-align: left; }
-.store-product-image { position: relative; display: block; aspect-ratio: 1.14; overflow: hidden; border-radius: 2rem; }
+.store-product-image { position: relative; display: block;
+  aspect-ratio: 1.14; overflow: hidden; border-radius: 2rem;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+}
 .store-product-image img {
   width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s ease;
   transform: scale(1.04); opacity: 0; transition: transform .35s ease, opacity .16s ease;
