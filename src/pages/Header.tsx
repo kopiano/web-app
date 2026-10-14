@@ -193,6 +193,7 @@ export default function Header() {
           <li><NavLink to="/music" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>{t('header.music')}</NavLink></li>
           <li><NavLink to={getVideoReturnTo()} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>{t('header.video')}</NavLink></li>
           <li><NavLink to="/store" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>{t('header.store')}</NavLink></li>
+          <li><NavLink to="/stocks" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>{t('header.stocks')}</NavLink></li>
           <li><NavLink to="/docs" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>{t('header.docs')}</NavLink></li>
         </ul>
 

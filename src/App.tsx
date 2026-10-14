@@ -31,6 +31,7 @@ const Store = lazy(() => import('@/pages/Store'));
 const Docs = lazy(() => import('@/pages/Docs'));
 const DocEditor = lazy(() => import('@/pages/DocEditor'));
 const NewDocEditor = lazy(() => import('@/pages/NewDocEditor'));
+const Stocks = lazy(() => import('@/pages/Stocks'));
 
 function RouteLoading() {
   return <div className="route-loading" role="status" aria-live="polite" />;
@@ -226,6 +227,7 @@ const router = createBrowserRouter([
       { path: '/music', element: <></> },
       { path: '/video', element: <Video /> },
       { path: '/store', element: <Store /> },
+      { path: '/stocks', element: <Stocks /> },
       { path: '/docs', element: <Docs /> },
       { path: '/docs/new', element: <NewDocEditor /> },
       { path: '/docs/:id', element: <DocEditor /> },
