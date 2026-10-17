@@ -226,12 +226,14 @@
 }
 .stocks-list-heading h2 { margin: 0; font-size: 1.35rem; font-weight: 700; }
 .stocks-list-heading span { color: var(--stock-muted); font-size: .9rem; }
-.stocks-list-actions { display: flex; align-items: center; gap: 1rem; }
+.stocks-list-actions { display: flex; align-items: center; gap: 1rem;
+  padding-bottom: 10px;
+}
 .stocks-market-filter {
   display: inline-flex;
   align-items: center;
   gap: .25rem;
-  padding: .2rem;
+  padding: .5rem;
   border: 1px solid var(--stock-line);
   border-radius: 999px;
   background: rgba(255, 255, 255, .3);
@@ -280,7 +282,7 @@
   align-items: center;
   gap: .55rem;
   min-height: 2.7rem;
-  padding: .35rem .65rem .35rem .45rem;
+  padding: 0.5rem 0.6rem;
   border: 1px solid var(--stock-line);
   border-radius: 999px;
   color: var(--stock-muted);
