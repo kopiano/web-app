@@ -1,0 +1,83 @@
+{
+    "ui": [
+        {
+            "name": "Lovable",
+            "url": "https://lovable.com",
+            "icon": "https://lovable.com/favicon.ico"
+        },
+        {
+            "name": "Google Fonts",
+            "url": "https://googlefonts.cn/english",
+            "icon": "https://googlefonts.cn/english/favicon.ico"
+        },
+        {
+            "name": "Font Awesome",
+            "url": "https://fontawesome.com",
+            "icon": "https://fontawesome.com/favicon.ico"
+        },
+        {
+            "name": "Dribbble",
+            "url": "https://dribbble.com",
+            "icon": "https://dribbble.com/favicon.ico"
+        },
+        {
+            "name": "xiaomi Su7",
+            "url": "https://gamemcu.com/su7",
+            "icon": "https://gamemcu.com/su7/favicon.ico"
+        },
+        {
+            "name": "MotionSites",
+            "url": "https://motionsites.ai",
+            "icon": "https://motionsites.ai/favicon.ico"
+        },
+        {
+            "name": "Iconfont",
+            "url": "https://www.iconfont.cn/",
+            "icon": "https://www.iconfont.cn/favicon.ico"
+        }
+    ],
+    "web": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com",
+            "icon": "https://github.com/favicon.ico"
+        },
+        {
+            "name": "React",
+            "url": "https://react.docschina.org",
+            "icon": "https://react.docschina.org/favicon.ico"
+        },
+        {
+            "name": "Vue",
+            "url": "https://cn.vuejs.org",
+            "icon": "https://cn.vuejs.org/favicon.ico"
+        }
+    ],
+    "USA": [
+        {
+            "name": "Google",
+            "url": "https://www.google.com",
+            "icon": "https://www.google.com/s2/favicons?domain_url=https://www.google.com&sz=128"
+        },
+        {
+            "name": "YouTube",
+            "url": "https://www.youtube.com",
+            "icon": "https://www.youtube.com/s/desktop/6f0e1c3d/img/favicon_32.png"
+        },
+        {
+            "name": "DeepL",
+            "url": "https://www.deepl.com/en/translator",
+            "icon": "https://www.deepl.com/favicon.ico"
+        },
+        {
+            "name": "ChatGPT",
+            "url": "https://chat.openai.com",
+            "icon": "https://chat.openai.com/favicon.ico"
+        },
+        {
+            "name": "Cloudflare",
+            "url": "https://dash.cloudflare.com",
+            "icon": "https://dash.cloudflare.com/favicon.ico"
+        }
+    ]
+}

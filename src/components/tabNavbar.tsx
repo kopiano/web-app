@@ -28,14 +28,26 @@ export default function TabNavbar<T extends string>({
       const selected = nav.querySelector<HTMLButtonElement>('.is-active');
       nav.style.setProperty('--category-indicator-opacity', selected ? '1' : '0');
       if (!selected) return;
-      nav.style.setProperty('--category-indicator-x', `${selected.offsetLeft}px`);
-      nav.style.setProperty('--category-indicator-width', `${selected.offsetWidth}px`);
+      const navBounds = nav.getBoundingClientRect();
+      const selectedBounds = selected.getBoundingClientRect();
+      nav.style.setProperty(
+        '--category-indicator-x',
+        `${selectedBounds.left - navBounds.left + nav.scrollLeft}px`,
+      );
+      nav.style.setProperty('--category-indicator-width', `${selectedBounds.width}px`);
     };
     updateIndicator();
     const observer = new ResizeObserver(updateIndicator);
     observer.observe(nav);
     nav.querySelectorAll('button').forEach((button) => observer.observe(button));
-    return () => observer.disconnect();
+    window.addEventListener('resize', updateIndicator);
+    window.addEventListener('scroll', updateIndicator, { passive: true });
+    document.fonts?.ready.then(updateIndicator);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateIndicator);
+      window.removeEventListener('scroll', updateIndicator);
+    };
   }, [active, options]);
 
   return (
