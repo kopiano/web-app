@@ -152,15 +152,19 @@
   color: var(--docs-dark-muted);
 }
 
-[data-theme='dark'] .docs-dock button:hover {
+[data-theme='dark'] .docs-dock button:hover:not(.is-active) {
   color: #fff;
   background: var(--docs-dark-hover);
 }
 
-[data-theme='dark'] .docs-dock button.is-active {
-  color: #fff;
+[data-theme='dark'] .docs-dock::before {
   background: rgba(255, 255, 255, .16);
   box-shadow: 0 .8rem 2rem rgba(0, 0, 0, .2);
+}
+
+[data-theme='dark'] .docs-dock button.is-active {
+  color: #fff;
+  background: transparent;
 }
 
 [data-theme='dark'] .doc-editor-header {

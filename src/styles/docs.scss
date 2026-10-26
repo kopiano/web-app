@@ -211,6 +211,7 @@
 .docs-dock {
   position: fixed;
   z-index: 80;
+  isolation: isolate;
   left: 50%;
   bottom: 2.6rem;
   width: 200px;
@@ -218,7 +219,7 @@
   height: 46px;
   padding: 4px 6px;
   display: grid;
-  grid-template-columns: repeat(2, 92px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   justify-content: center;
   gap: 4px;
   border: 1px solid rgba(255, 255, 255, .92);
@@ -229,14 +230,31 @@
   -webkit-backdrop-filter: blur(22px) saturate(165%);
   backdrop-filter: blur(22px) saturate(165%);
 }
+.docs-dock::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  top: 4px;
+  bottom: 4px;
+  left: 7px;
+  width: calc((100% - 16px) / 2);
+  border-radius: 2rem;
+  background: #1d2420;
+  box-shadow: 0 .8rem 2rem rgba(29, 36, 32, .16);
+  pointer-events: none;
+  transition: transform .42s cubic-bezier(.25, .8, .25, 1);
+}
+.docs-dock[data-view='list']::before {
+  transform: translateX(calc(100% + 4px));
+}
 .docs-dock button {
   position: relative;
   z-index: 2;
-  min-width: 92px;
-  width: 92px;
+  min-width: 0;
+  width: 100%;
   height: 36px;
   align-self: center;
-  justify-self: center;
+  justify-self: stretch;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -248,8 +266,16 @@
   font-size: 1.16rem;
   font-weight: 600;
 }
-.docs-dock button:hover { color: #1d2420; background: rgba(95, 95, 95, .11); }
-.docs-dock button.is-active { color: #fff; background: #1d2420; box-shadow: 0 .8rem 2rem rgba(29, 36, 32, .16); }
+.docs-dock button { transition: color 180ms ease, background-color 180ms ease; }
+.docs-dock button:hover:not(.is-active) { color: #1d2420; background: rgba(95, 95, 95, .11); }
+.docs-dock button.is-active { color: #fff; background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  .docs-dock::before,
+  .docs-dock button {
+    transition: none;
+  }
+}
 
 .doc-date time {
   font-size: 12px;
@@ -267,5 +293,4 @@
     bottom: 1.4rem;
     width: calc(100% - 2.4rem);
   }
-  .docs-dock button { min-width: 0; width: auto; }
 }

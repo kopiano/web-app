@@ -312,7 +312,7 @@ export default function Docs() {
       <button type="button" className="docs-create-button" onClick={() => setIsCreateOpen(true)} aria-label={t('docs.createDocument')} title={t('docs.createDocument')}>
         <Plus size={24} />
       </button>
-      <nav className="docs-dock" aria-label="Docs navigation">
+      <nav className="docs-dock" data-view={isLibraryView ? 'library' : 'list'} aria-label="Docs navigation">
         <button type="button" className={isLibraryView ? 'is-active' : ''} onClick={() => setSearchParams({ view: 'library' })} aria-label="Library" aria-current={isLibraryView ? 'page' : undefined}>
           <Library size={17} strokeWidth={2} />
           <span>Library</span>
