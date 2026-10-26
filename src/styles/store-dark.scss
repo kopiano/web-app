@@ -176,6 +176,9 @@
 [data-theme='dark'] .store-stepper button:hover:not(:disabled) { background: rgba(155,217,187,.26); color: var(--store-accent); }
 [data-theme='dark'] .store-stepper button:disabled { color: #718278; background: rgba(255,255,255,.04); }
 [data-theme='dark'] .store-stepper output { color: var(--store-ink); }
+[data-theme='dark'] .store-order-hint { color: #e1a46e; }
+[data-theme='dark'] .store-order-item { border-color: var(--store-line); }
+[data-theme='dark'] .store-order-item span { color: var(--store-muted); }
 [data-theme='dark'] .store-cart-trigger:hover { background: rgba(32,32,32,.32); }
 [data-theme='dark'] .store-product-sales {
   color: #f8f8f8;

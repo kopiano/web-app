@@ -52,6 +52,24 @@ const SIZE_EXTRA: Record<Size, number> = { small: 0, medium: 2, large: 4 };
 const CART_KEY = 'kopiano_store_cart';
 type StoredProduct = { id: string; name: string; category: Product['category']; price: number; sales: number; image_url: string };
 type StoredCartItem = { id: string; product_id: string; size: Size; temperature: Temperature; sweetness: Sweetness; quantity: number };
+type StoredOrder = {
+  id: string;
+  status: 'pending' | 'processing' | 'confirmed' | 'failed';
+  total: number;
+  created_at: string;
+  updated_at: string;
+  items?: Array<{
+    id: string;
+    product_id: string;
+    product_name: string;
+    size: Size;
+    temperature: Temperature;
+    sweetness: Sweetness;
+    quantity: number;
+    unit_price: number;
+    line_total: number;
+  }>;
+};
 const fromStoredProduct = (item: StoredProduct): Product => ({
   id: item.id, name: item.name, zh: item.name, category: item.category,
   price: item.price / 100, sales: String(item.sales),
@@ -92,6 +110,11 @@ const copy = {
     sweetnesses: { standard: 'Standard', less: 'Less sweet', extra: 'Extra sweet', none: 'No sugar' },
     quantity: 'Quantity', add: 'Add to cart', done: 'Ready', cart: 'Your cart',
     empty: 'Your cart is empty.', total: 'Total', added: 'Added to cart',
+    checkout: 'Place order', placingOrder: 'Submitting...',
+    loginToOrder: 'Sign in to place an order.',
+    orderFailed: 'Could not place the order. Your cart is unchanged.',
+    order: 'Order', noPayment: 'No payment will be collected.',
+    orderStatus: { pending: 'Waiting for worker', processing: 'Processing', confirmed: 'Confirmed', failed: 'Failed' },
     close: 'Close', remove: 'Remove item', items: 'items',
     newProduct: 'New product', upload: 'Product photo', uploadHint: 'Any image format · converted to WebP by the server',
     name: 'Product name', namePlaceholder: 'e.g. Cappuccino', category: 'Category',
@@ -110,6 +133,11 @@ const copy = {
     sweetnesses: { standard: '标准甜', less: '少甜', extra: '多甜', none: '无糖' },
     quantity: '数量', add: '加入购物车', done: '选好了', cart: '购物车',
     empty: '购物车还是空的。', total: '合计', added: '已加入购物车',
+    checkout: '提交订单', placingOrder: '正在提交...',
+    loginToOrder: '登录后即可提交订单。',
+    orderFailed: '订单提交失败，购物车内容未变。',
+    order: '订单', noPayment: '此流程不扣款。',
+    orderStatus: { pending: '等待队列处理', processing: '处理中', confirmed: '已确认', failed: '处理失败' },
     close: '关闭', remove: '移除商品', items: '件商品',
     newProduct: '新增商品', upload: '商品图片', uploadHint: '支持任意图片格式 · 后端统一转换为 WebP',
     name: '商品名称', namePlaceholder: '例如：卡布奇诺', category: '分类',
@@ -211,6 +239,10 @@ export default function Store() {
   const [loadError, setLoadError] = useState(false);
   const imageRequestRef = useRef(0);
   const [cart, setCart] = useState<CartItem[]>(readCart);
+  const [activeOrder, setActiveOrder] = useState<StoredOrder | null>(null);
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [orderError, setOrderError] = useState('');
+  const orderIdempotencyKeyRef = useRef<string | null>(null);
   const [size, setSize] = useState<Size>('small');
   const [temperature, setTemperature] = useState<Temperature>('iced');
   const [sweetness, setSweetness] = useState<Sweetness>('standard');
@@ -296,6 +328,24 @@ export default function Store() {
     });
     return () => { active = false; };
   }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!activeOrder || activeOrder.status === 'confirmed' || activeOrder.status === 'failed') return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const response = await request.get<StoredOrder>(`/store/orders/${activeOrder.id}`);
+        if (active) setActiveOrder(response.data);
+      } catch (error) {
+        console.error('[Store] failed to refresh order status', error);
+      }
+    };
+    const timer = setInterval(() => void poll(), 1500);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [activeOrder?.id, activeOrder?.status]);
 
   useEffect(() => {
     if (!selected && !cartOpen && !createOpen) return;
@@ -480,6 +530,28 @@ export default function Store() {
       }
     }
     setCart(current => current.map(entry => entry.key === key ? { ...entry, quantity: nextQuantity } : entry));
+  }
+
+  async function submitOrder() {
+    if (!currentUser || cart.length === 0 || placingOrder) return;
+    setPlacingOrder(true);
+    setOrderError('');
+    const idempotencyKey = orderIdempotencyKeyRef.current ?? crypto.randomUUID();
+    orderIdempotencyKeyRef.current = idempotencyKey;
+    try {
+      const response = await request.post<StoredOrder>('/store/orders', {
+        idempotency_key: idempotencyKey,
+      });
+      orderIdempotencyKeyRef.current = null;
+      const detail = await request.get<StoredOrder>(`/store/orders/${response.data.id}`);
+      setActiveOrder(detail.data);
+      setCart([]);
+    } catch (error) {
+      console.error('[Store] failed to submit order', error);
+      setOrderError(text.orderFailed);
+    } finally {
+      setPlacingOrder(false);
+    }
   }
 
   return (
@@ -676,8 +748,29 @@ export default function Store() {
             {cartOpen && (
               <div className="store-cart-body">
                 <span className="store-eyebrow">KOPIANO / STORE</span>
-                <h2>{text.cart} <small>{count}</small></h2>
-                {cart.length === 0 ? (
+                <h2>{activeOrder ? text.order : text.cart} <small>{activeOrder ? activeOrder.id.slice(0, 8).toUpperCase() : count}</small></h2>
+                {activeOrder ? (
+                  <div className="store-order-status" aria-live="polite">
+                    <strong>{text.orderStatus[activeOrder.status]}</strong>
+                    <span>{text.noPayment}</span>
+                    <div className="store-cart-list">
+                      {activeOrder.items?.map(item => (
+                        <div className="store-order-item" key={item.id}>
+                          <span>{item.product_name} · {text.sizes[item.size]} · ×{item.quantity}</span>
+                          <b>¥{(item.line_total / 100).toFixed(2)}</b>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="store-cart-footer">
+                      <span>{text.total}</span>
+                      <strong>¥{(activeOrder.total / 100).toFixed(2)}</strong>
+                    </div>
+                    <button type="button" className="store-add" onClick={() => {
+                      setActiveOrder(null);
+                      closeDialog();
+                    }}>{text.done}</button>
+                  </div>
+                ) : cart.length === 0 ? (
                   <p className="store-empty">{text.empty}</p>
                 ) : (
                   <div className="store-cart-list">
@@ -705,8 +798,20 @@ export default function Store() {
                     })}
                   </div>
                 )}
-                <div className="store-cart-footer"><span>{text.total}</span><strong>¥{total.toFixed(1)}</strong></div>
-                <button type="button" className="store-add" onClick={closeDialog}>{text.done}</button>
+                {!activeOrder && (
+                  <>
+                    <div className="store-cart-footer"><span>{text.total}</span><strong>¥{total.toFixed(2)}</strong></div>
+                    {orderError && <p className="store-create-error" role="alert">{orderError}</p>}
+                    {!currentUser && cart.length > 0 && <p className="store-order-hint">{text.loginToOrder}</p>}
+                    <div className="store-cart-actions">
+                      <button type="button" className="store-done" onClick={closeDialog}>{text.done}</button>
+                      <button type="button" className="store-add" onClick={() => void submitOrder()}
+                        disabled={!currentUser || cart.length === 0 || placingOrder}>
+                        {placingOrder ? text.placingOrder : text.checkout}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

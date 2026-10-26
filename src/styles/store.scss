@@ -234,6 +234,16 @@
 .store-cart-footer { display: flex; justify-content: space-between; align-items: baseline; margin: 2.5rem 0 1.5rem; font-size: 1.4rem; }
 .store-cart-footer strong { font-size: 2.5rem; }
 .store-cart-body > .store-add { width: 100%; }
+.store-cart-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: .8rem; }
+.store-cart-actions button { min-height: 4.2rem; }
+.store-order-hint { margin: 0 0 1rem; color: #ad6330; font-size: 1.15rem; }
+.store-order-status { display: grid; gap: 1rem; }
+.store-order-status > strong { color: var(--store-accent); font-size: 1.55rem; }
+.store-order-status > span { color: var(--store-muted); font-size: 1.2rem; }
+.store-order-status .store-cart-list { margin-top: .6rem; }
+.store-order-item { display: flex; justify-content: space-between; gap: 1rem; padding: .8rem 0; border-bottom: 1px solid #dce4de; font-size: 1.15rem; }
+.store-order-item span { min-width: 0; overflow-wrap: anywhere; color: #536259; }
+.store-order-item b { flex: 0 0 auto; }
 
 .store-create-trigger {
   position: fixed;
