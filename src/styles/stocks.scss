@@ -572,11 +572,11 @@
 [data-theme='dark'] .stocks-picker-search button:hover { color: var(--stock-ink); background: rgba(255, 255, 255, .1); }
 [data-theme='dark'] .stocks-picker-options .stocks-picker-quote strong { color: var(--stock-ink); }
 
-.stocks-feature-top {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-}
+// .stocks-feature-top {
+//   display: grid;
+//   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+//   align-items: center;
+// }
 .stocks-feature-top .stocks-picker { grid-column: 2; justify-self: center; }
 .stocks-feature-top .stocks-company-name { font-size: 1.35rem; }
 .stocks-feature-top .stocks-company-meta { font-size: .95rem; }
