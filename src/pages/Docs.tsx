@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Clock3, FileText, Grid2X2, Library, List, ListVideo, LoaderCircle, Plus, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock3, FileText, Grid2X2, Library, List, ListVideo, LoaderCircle, Plus, Search } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import type { RootState } from '@/store/store';
-import { listDocuments, listPublicDocuments, resolveDocumentAsset, type RemoteDocument } from '@/api/docs';
+import { listDocuments, listPublicDocuments, resolveDocumentAsset, type DocumentPage, type RemoteDocument } from '@/api/docs';
 import NewDocEditor from './NewDocEditor';
 import bg0 from '@/assets/images/bg-0-card.webp';
 import bg1 from '@/assets/images/bg-1-card.webp';
@@ -18,7 +18,8 @@ import '@/styles/docs-dark.scss';
 type ViewMode = 'grid' | 'timeline';
 
 const documentListCache = new Map<string, RemoteDocument[]>();
-const documentCoverVersion = Date.now();
+const documentPageCache = new Map<string, DocumentPage>();
+const DOCUMENTS_PAGE_SIZE = 12;
 
 export const documents = [
   { id: 'quiet-system', title: 'A quiet system for brighter days', category: 'Design', date: 'Aug 08, 2026', image: bg0, accent: 'violet', content: 'Notes on shaping interfaces that feel calm, clear, and quietly alive.' },
@@ -35,11 +36,20 @@ export default function Docs() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isLibraryView = searchParams.get('view') !== 'list';
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All documents');
+  const [documentPage, setDocumentPage] = useState(1);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(0);
+  const [serverPaginated, setServerPaginated] = useState(false);
+  const [serverCategories, setServerCategories] = useState<Array<{ name: string; count: number }>>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const searchRef = useRef<HTMLInputElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const [visibleDocumentCount, setVisibleDocumentCount] = useState(8);
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const cacheKey = `${isLibraryView ? 'library' : 'list'}:${currentUser?.id ?? 'guest'}`;
+  const pageCacheKey = `${cacheKey}:${documentPage}:${DOCUMENTS_PAGE_SIZE}:${activeCategory}:${debouncedQuery.trim().toLowerCase()}`;
   const cachedDocuments = documentListCache.get(cacheKey);
   const [remoteDocuments, setRemoteDocuments] = useState<RemoteDocument[]>(cachedDocuments ?? []);
   const [remoteLoaded, setRemoteLoaded] = useState(Boolean(cachedDocuments));
@@ -49,26 +59,73 @@ export default function Docs() {
     let cancelled = false;
     if (!currentUser && !isLibraryView) {
       setRemoteDocuments([]);
+      setServerTotal(0);
+      setServerTotalPages(0);
+      setServerPaginated(false);
+      setServerCategories([]);
       setRemoteLoaded(true);
       return () => { cancelled = true; };
     }
-    const cached = documentListCache.get(cacheKey);
-    if (cached) {
-      setRemoteDocuments(cached);
+    const cachedList = isLibraryView ? documentListCache.get(cacheKey) : undefined;
+    const cachedPage = !isLibraryView ? documentPageCache.get(pageCacheKey) : undefined;
+    if (cachedList) {
+      setRemoteDocuments(cachedList);
+      setRemoteLoaded(true);
+    } else if (cachedPage) {
+      setRemoteDocuments(cachedPage.items);
+      setServerTotal(cachedPage.total);
+      setServerTotalPages(cachedPage.totalPages);
+      setServerPaginated(cachedPage.serverPaginated);
+      setServerCategories(cachedPage.categories);
       setRemoteLoaded(true);
     } else {
       setRemoteLoaded(false);
     }
-    (isLibraryView ? listPublicDocuments() : listDocuments())
-      .then((items) => {
+    (isLibraryView
+      ? listPublicDocuments().then((items) => ({ kind: 'library' as const, items }))
+      : listDocuments({
+        page: documentPage,
+        pageSize: DOCUMENTS_PAGE_SIZE,
+        search: debouncedQuery,
+        category: activeCategory === 'All documents' ? undefined : activeCategory,
+      }).then((page) => ({ kind: 'page' as const, page })))
+      .then((result) => {
         if (cancelled) return;
-        documentListCache.set(cacheKey, items);
-        setRemoteDocuments(items);
+        if (result.kind === 'library') {
+          documentListCache.set(cacheKey, result.items);
+          setRemoteDocuments(result.items);
+        } else {
+          documentPageCache.set(pageCacheKey, result.page);
+          setRemoteDocuments(result.page.items);
+          setServerTotal(result.page.total);
+          setServerTotalPages(result.page.totalPages);
+          setServerPaginated(result.page.serverPaginated);
+          setServerCategories(result.page.categories);
+          if (result.page.page !== documentPage) setDocumentPage(result.page.page);
+        }
       })
-      .catch(() => { if (!cancelled) setRemoteDocuments([]); })
+      .catch(() => {
+        if (cancelled) return;
+        setRemoteDocuments([]);
+        if (!isLibraryView) {
+          setServerTotal(0);
+          setServerTotalPages(0);
+          setServerPaginated(false);
+          setServerCategories([]);
+        }
+      })
       .finally(() => { if (!cancelled) setRemoteLoaded(true); });
     return () => { cancelled = true; };
-  }, [cacheKey, currentUser?.id, isLibraryView]);
+  }, [activeCategory, cacheKey, currentUser?.id, debouncedQuery, documentPage, isLibraryView, pageCacheKey]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedQuery(query), 250);
+    return () => window.clearTimeout(timeout);
+  }, [query]);
+
+  useEffect(() => {
+    setDocumentPage(1);
+  }, [activeCategory, debouncedQuery]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -90,18 +147,23 @@ export default function Docs() {
     : currentUser
     ? (remoteLoaded ? remoteDocuments : [])
     : documents;
+  const isServerPaginated = Boolean(currentUser && !isLibraryView && serverPaginated);
   const categories = useMemo(() => [
     'All documents',
-    ...Array.from(new Set(libraryDocuments.map((document) => document.category.trim()).filter(Boolean))),
-  ], [libraryDocuments]);
+    ...new Set([
+      ...serverCategories.map((category) => category.name),
+      ...libraryDocuments.map((document) => document.category.trim()).filter(Boolean),
+    ]),
+  ], [libraryDocuments, serverCategories]);
   const categoryCounts = useMemo(() => {
-    const counts = new Map<string, number>([['All documents', libraryDocuments.length]]);
+    const counts = new Map<string, number>([['All documents', isServerPaginated ? serverTotal : libraryDocuments.length]]);
+    serverCategories.forEach(({ name, count }) => counts.set(name, count));
     libraryDocuments.forEach((document) => {
       const category = document.category.trim();
-      if (category) counts.set(category, (counts.get(category) ?? 0) + 1);
+      if (category && !isServerPaginated) counts.set(category, (counts.get(category) ?? 0) + 1);
     });
     return counts;
-  }, [libraryDocuments]);
+  }, [isServerPaginated, libraryDocuments, serverCategories, serverTotal]);
 
   useEffect(() => {
     if (activeCategory !== 'All documents' && !categories.includes(activeCategory)) {
@@ -110,6 +172,7 @@ export default function Docs() {
   }, [activeCategory, categories]);
 
   const filteredDocuments = useMemo(() => {
+    if (isServerPaginated) return libraryDocuments;
     const normalizedQuery = query.trim().toLowerCase();
     return libraryDocuments.filter((document) => {
       const matchesCategory = activeCategory === 'All documents' || document.category === activeCategory;
@@ -117,7 +180,28 @@ export default function Docs() {
         || `${document.title} ${document.category} ${document.content}`.toLowerCase().includes(normalizedQuery);
       return matchesCategory && matchesQuery;
     });
-  }, [activeCategory, libraryDocuments, query]);
+  }, [activeCategory, isServerPaginated, libraryDocuments, query]);
+
+  useEffect(() => {
+    setVisibleDocumentCount(8);
+  }, [activeCategory, isLibraryView, query, viewMode]);
+
+  useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    if (isServerPaginated || !sentinel || visibleDocumentCount >= filteredDocuments.length) return;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisibleDocumentCount((count) => Math.min(count + 8, filteredDocuments.length));
+      }
+    }, { rootMargin: '600px 0px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [filteredDocuments.length, isServerPaginated, visibleDocumentCount]);
+
+  const displayedDocuments = isServerPaginated
+    ? filteredDocuments
+    : filteredDocuments.slice(0, visibleDocumentCount);
 
   return (
     <main className="docs-page">
@@ -172,10 +256,16 @@ export default function Docs() {
           </div>
         ) : filteredDocuments.length ? (
           <div key={viewMode} className={`docs-results is-${viewMode}`}>
-            {filteredDocuments.map((document) => (
+            {displayedDocuments.map((document, index) => (
             <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?view=library&from=library' : '?view=list'}`)}>
                 <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?view=library&from=library' : '?view=list'}`)}>
-                  <img src={resolveDocumentAsset(document.image, documentCoverVersion)} alt="" loading="lazy" decoding="async" />
+                  <img
+                    src={resolveDocumentAsset(document.image)}
+                    alt=""
+                    loading={index < 8 ? 'eager' : 'lazy'}
+                    decoding={index < 8 ? 'sync' : 'async'}
+                    fetchPriority={index < 8 ? 'high' : 'low'}
+                  />
                 </button>
                 <div className="doc-card-body">
                   <h2>{document.title}</h2>
@@ -188,6 +278,7 @@ export default function Docs() {
                 </div>
               </article>
             ))}
+            {!isServerPaginated && <div ref={loadMoreRef} className="docs-load-more-sentinel" aria-hidden="true" />}
           </div>
         ) : (
           <div className="docs-empty">
@@ -195,6 +286,27 @@ export default function Docs() {
             <strong>{t('docs.noDocuments')}</strong>
             <span>{t('docs.tryAnotherSearch')}</span>
           </div>
+        )}
+        {isServerPaginated && serverTotalPages > 1 && (
+          <nav className="docs-pagination" aria-label={t('docs.pagination')}>
+            <span>{t('docs.pageStatus', { page: documentPage, total: serverTotalPages, count: serverTotal })}</span>
+            <button
+              type="button"
+              disabled={!remoteLoaded || documentPage <= 1}
+              onClick={() => setDocumentPage((page) => Math.max(1, page - 1))}
+              aria-label={t('docs.previousPage')}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              disabled={!remoteLoaded || documentPage >= serverTotalPages}
+              onClick={() => setDocumentPage((page) => Math.min(serverTotalPages, page + 1))}
+              aria-label={t('docs.nextPage')}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </nav>
         )}
       </div>
       <button type="button" className="docs-create-button" onClick={() => setIsCreateOpen(true)} aria-label={t('docs.createDocument')} title={t('docs.createDocument')}>

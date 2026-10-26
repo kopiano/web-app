@@ -138,7 +138,8 @@
 }
 .docs-view-toggle-thumb.is-timeline { transform: translate3d(3.8rem, 0, 0); }
 
-.docs-results { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3rem; }
+.docs-results { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3rem; }
+.docs-load-more-sentinel { position: absolute; right: 0; bottom: 0; width: 1px; height: 1px; pointer-events: none; }
 .docs-results.is-grid,
 .docs-results.is-timeline {
   animation: docs-results-switch .24s ease-out both;
@@ -190,6 +191,11 @@
 .docs-results.is-timeline .doc-card-image { height: 100%; aspect-ratio: auto; min-height: 15rem; }
 .docs-results.is-timeline .doc-card p { min-height: 0; max-width: 58rem; }
 .docs-results.is-timeline .doc-read-button { margin-top: 1.2rem; }
+.docs-pagination { display: flex; align-items: center; justify-content: flex-end; gap: .8rem; margin-top: 2.4rem; color: var(--docs-muted); font-size: 1.2rem; }
+.docs-pagination span { margin-right: .6rem; }
+.docs-pagination button { width: 3.6rem; height: 3.6rem; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, .72); border-radius: 50%; color: var(--docs-ink); background: rgba(255, 255, 255, .42); }
+.docs-pagination button:hover:not(:disabled) { background: rgba(255, 255, 255, .78); }
+.docs-pagination button:disabled { opacity: .42; cursor: not-allowed; }
 .docs-empty { min-height: 24rem; display: grid; place-items: center; align-content: center; gap: .8rem; color: var(--docs-muted); }
 .docs-loading-icon { color: #6d557f; animation: docs-loading-spin .9s linear infinite; }
 @keyframes docs-loading-spin { to { transform: rotate(360deg); } }

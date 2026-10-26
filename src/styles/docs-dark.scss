@@ -36,11 +36,24 @@
 
 [data-theme='dark'] .docs-search-wrap,
 [data-theme='dark'] .docs-view-toggle,
+[data-theme='dark'] .docs-pagination button,
 [data-theme='dark'] .doc-card,
 [data-theme='dark'] .doc-card-body,
 [data-theme='dark'] .docs-dock {
   border-color: var(--docs-dark-line);
   background: var(--docs-dark-glass);
+}
+
+[data-theme='dark'] .docs-pagination {
+  color: var(--docs-dark-muted);
+}
+
+[data-theme='dark'] .docs-pagination button {
+  color: var(--docs-dark-ink);
+}
+
+[data-theme='dark'] .docs-pagination button:hover:not(:disabled) {
+  background: var(--docs-dark-hover);
 }
 [data-theme='dark'] .docs-categories button {
   // box-shadow: 0 1.6rem 4rem rgba(0, 0, 0, .18);
