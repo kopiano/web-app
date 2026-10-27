@@ -35,9 +35,21 @@ export default function Docs() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isLibraryView = searchParams.get('view') !== 'list';
+  const activeCategory = searchParams.get('category') || 'All documents';
+  const selectCategory = (category: string) => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (category === 'All documents') nextSearchParams.delete('category');
+    else nextSearchParams.set('category', category);
+    setSearchParams(nextSearchParams);
+  };
+  const switchView = (view: 'library' | 'list') => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.set('view', view);
+    nextSearchParams.delete('category');
+    setSearchParams(nextSearchParams);
+  };
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All documents');
   const [documentPage, setDocumentPage] = useState(1);
   const [serverTotal, setServerTotal] = useState(0);
   const [serverTotalPages, setServerTotalPages] = useState(0);
@@ -50,8 +62,10 @@ export default function Docs() {
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const cacheKey = `${isLibraryView ? 'library' : 'list'}:${currentUser?.id ?? 'guest'}`;
   const pageCacheKey = `${cacheKey}:${documentPage}:${DOCUMENTS_PAGE_SIZE}:${activeCategory}:${debouncedQuery.trim().toLowerCase()}`;
+  const remoteDataKey = isLibraryView ? cacheKey : pageCacheKey;
   const cachedDocuments = documentListCache.get(cacheKey);
   const [remoteDocuments, setRemoteDocuments] = useState<RemoteDocument[]>(cachedDocuments ?? []);
+  const [remoteDocumentsKey, setRemoteDocumentsKey] = useState(remoteDataKey);
   const [remoteLoaded, setRemoteLoaded] = useState(Boolean(cachedDocuments));
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
@@ -59,6 +73,7 @@ export default function Docs() {
     let cancelled = false;
     if (!currentUser && !isLibraryView) {
       setRemoteDocuments([]);
+      setRemoteDocumentsKey(remoteDataKey);
       setServerTotal(0);
       setServerTotalPages(0);
       setServerPaginated(false);
@@ -70,9 +85,11 @@ export default function Docs() {
     const cachedPage = !isLibraryView ? documentPageCache.get(pageCacheKey) : undefined;
     if (cachedList) {
       setRemoteDocuments(cachedList);
+      setRemoteDocumentsKey(remoteDataKey);
       setRemoteLoaded(true);
     } else if (cachedPage) {
       setRemoteDocuments(cachedPage.items);
+      setRemoteDocumentsKey(remoteDataKey);
       setServerTotal(cachedPage.total);
       setServerTotalPages(cachedPage.totalPages);
       setServerPaginated(cachedPage.serverPaginated);
@@ -94,9 +111,11 @@ export default function Docs() {
         if (result.kind === 'library') {
           documentListCache.set(cacheKey, result.items);
           setRemoteDocuments(result.items);
+          setRemoteDocumentsKey(cacheKey);
         } else {
           documentPageCache.set(pageCacheKey, result.page);
           setRemoteDocuments(result.page.items);
+          setRemoteDocumentsKey(pageCacheKey);
           setServerTotal(result.page.total);
           setServerTotalPages(result.page.totalPages);
           setServerPaginated(result.page.serverPaginated);
@@ -107,6 +126,7 @@ export default function Docs() {
       .catch(() => {
         if (cancelled) return;
         setRemoteDocuments([]);
+        setRemoteDocumentsKey(remoteDataKey);
         if (!isLibraryView) {
           setServerTotal(0);
           setServerTotalPages(0);
@@ -143,39 +163,54 @@ export default function Docs() {
   }, []);
 
   const libraryDocuments = isLibraryView
-    ? (remoteLoaded ? remoteDocuments.filter((item) => item.public === true) : [])
+    ? (remoteLoaded && remoteDocumentsKey === cacheKey ? remoteDocuments.filter((item) => item.public === true) : [])
     : currentUser
-    ? (remoteLoaded ? remoteDocuments : [])
+    ? (remoteLoaded && remoteDocumentsKey === pageCacheKey ? remoteDocuments : [])
     : documents;
-  const isServerPaginated = Boolean(currentUser && !isLibraryView && serverPaginated);
+  const isServerPaginated = Boolean(currentUser && !isLibraryView && remoteLoaded && remoteDocumentsKey === pageCacheKey && serverPaginated);
   const categories = useMemo(() => [
     'All documents',
     ...new Set([
-      ...serverCategories.map((category) => category.name),
-      ...libraryDocuments.map((document) => document.category.trim()).filter(Boolean),
+      ...(isServerPaginated
+        ? serverCategories.map((category) => category.name.trim()).filter(Boolean)
+        : libraryDocuments.map((document) => document.category.trim()).filter(Boolean)),
     ]),
-  ], [libraryDocuments, serverCategories]);
+  ], [isServerPaginated, libraryDocuments, serverCategories]);
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>([['All documents', isServerPaginated ? serverTotal : libraryDocuments.length]]);
-    serverCategories.forEach(({ name, count }) => counts.set(name, count));
-    libraryDocuments.forEach((document) => {
-      const category = document.category.trim();
-      if (category && !isServerPaginated) counts.set(category, (counts.get(category) ?? 0) + 1);
-    });
+    if (isServerPaginated) {
+      serverCategories.forEach(({ name, count }) => counts.set(name.trim(), count));
+    } else {
+      libraryDocuments.forEach((document) => {
+        const category = document.category.trim();
+        if (category) counts.set(category, (counts.get(category) ?? 0) + 1);
+      });
+    }
     return counts;
   }, [isServerPaginated, libraryDocuments, serverCategories, serverTotal]);
+  const isDocumentDataReady = (!currentUser && !isLibraryView)
+    || (remoteLoaded && remoteDocumentsKey === remoteDataKey);
+  const documentHref = (documentId: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('view', isLibraryView ? 'library' : 'list');
+    if (isLibraryView) params.set('from', 'library');
+    else params.delete('from');
+    return `/docs/${documentId}?${params.toString()}`;
+  };
 
   useEffect(() => {
-    if (activeCategory !== 'All documents' && !categories.includes(activeCategory)) {
-      setActiveCategory('All documents');
+    if (isDocumentDataReady && activeCategory !== 'All documents' && !categories.includes(activeCategory)) {
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.delete('category');
+      setSearchParams(nextSearchParams, { replace: true });
     }
-  }, [activeCategory, categories]);
+  }, [activeCategory, categories, isDocumentDataReady, searchParams, setSearchParams]);
 
   const filteredDocuments = useMemo(() => {
     if (isServerPaginated) return libraryDocuments;
     const normalizedQuery = query.trim().toLowerCase();
     return libraryDocuments.filter((document) => {
-      const matchesCategory = activeCategory === 'All documents' || document.category === activeCategory;
+      const matchesCategory = activeCategory === 'All documents' || document.category.trim() === activeCategory;
       const matchesQuery = !normalizedQuery
         || `${document.title} ${document.category} ${document.content}`.toLowerCase().includes(normalizedQuery);
       return matchesCategory && matchesQuery;
@@ -233,7 +268,7 @@ export default function Docs() {
                 role="tab"
                 aria-selected={activeCategory === category}
                 className={activeCategory === category ? 'is-active' : ''}
-                onClick={() => setActiveCategory(category)}
+                onClick={() => selectCategory(category)}
               >
                 {category === 'All documents' ? t('docs.allDocuments') : category} <span className="docs-category-count">{categoryCounts.get(category) ?? 0}</span>
               </button>
@@ -250,15 +285,15 @@ export default function Docs() {
           </div>
         </div>
 
-        {!remoteLoaded && currentUser ? (
+        {!isDocumentDataReady && currentUser ? (
           <div className="docs-empty docs-loading" aria-live="polite">
             <LoaderCircle className="docs-loading-icon" size={32} aria-hidden="true" />
           </div>
         ) : filteredDocuments.length ? (
           <div key={viewMode} className={`docs-results is-${viewMode}`}>
             {displayedDocuments.map((document, index) => (
-            <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?view=library&from=library' : '?view=list'}`)}>
-                <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`} onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?view=library&from=library' : '?view=list'}`)}>
+            <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(documentHref(document.id))}>
+                <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`} onClick={() => navigate(documentHref(document.id))}>
                   <img
                     src={resolveDocumentAsset(document.image)}
                     alt=""
@@ -274,7 +309,7 @@ export default function Docs() {
                     <span className="doc-date"><Clock3 size={9} aria-hidden="true" /><time>{document.date}</time></span>
                   </div>
                   <p>{document.content}</p>
-                  <button type="button" className="doc-read-button" onClick={() => navigate(`/docs/${document.id}${isLibraryView ? '?view=library&from=library' : '?view=list'}`)}>{t('docs.readDocument')} <span aria-hidden="true">↗</span></button>
+                  <button type="button" className="doc-read-button" onClick={() => navigate(documentHref(document.id))}>{t('docs.readDocument')} <span aria-hidden="true">↗</span></button>
                 </div>
               </article>
             ))}
@@ -313,11 +348,11 @@ export default function Docs() {
         <Plus size={24} />
       </button>
       <nav className="docs-dock" data-view={isLibraryView ? 'library' : 'list'} aria-label="Docs navigation">
-        <button type="button" className={isLibraryView ? 'is-active' : ''} onClick={() => setSearchParams({ view: 'library' })} aria-label="Library" aria-current={isLibraryView ? 'page' : undefined}>
+        <button type="button" className={isLibraryView ? 'is-active' : ''} onClick={() => switchView('library')} aria-label="Library" aria-current={isLibraryView ? 'page' : undefined}>
           <Library size={17} strokeWidth={2} />
           <span>Library</span>
         </button>
-        <button type="button" className={!isLibraryView ? 'is-active' : ''} onClick={() => setSearchParams({ view: 'list' })} aria-current={!isLibraryView ? 'page' : undefined} aria-label="List">
+        <button type="button" className={!isLibraryView ? 'is-active' : ''} onClick={() => switchView('list')} aria-current={!isLibraryView ? 'page' : undefined} aria-label="List">
           <ListVideo size={17} strokeWidth={2} />
           <span>List</span>
         </button>

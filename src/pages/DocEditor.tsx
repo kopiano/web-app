@@ -366,6 +366,10 @@ export default function DocEditor() {
   const location = useLocation();
   const navigate = useNavigate();
   const isLibraryDocument = new URLSearchParams(location.search).get('from') === 'library';
+  const docsReturnParams = new URLSearchParams(location.search);
+  docsReturnParams.set('view', isLibraryDocument ? 'library' : 'list');
+  docsReturnParams.delete('from');
+  const docsReturnUrl = `/docs?${docsReturnParams.toString()}`;
   const document = documents.find((item) => item.id === id) ?? documents[0];
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const documentId = id ?? document.id;
@@ -743,7 +747,7 @@ export default function DocEditor() {
       <header className="doc-editor-header" style={{ backgroundImage: `url("${remoteImage || document.image}")` }}>
         <div className="doc-editor-header-shade">
           <div className="doc-editor-header-top">
-            <button type="button" className="doc-back-button" onClick={() => navigate(isLibraryDocument ? '/docs?view=library' : '/docs?view=list')}><ArrowLeft size={17} /> {t('docs.back')}</button>
+            <button type="button" className="doc-back-button" onClick={() => navigate(docsReturnUrl)}><ArrowLeft size={17} /> {t('docs.back')}</button>
             {currentUser && id && !documents.some((item) => item.id === id) && <button type="button" className="doc-info-button" onClick={openInfo} disabled={isLibraryDocument} aria-disabled={isLibraryDocument} aria-label={t('docs.documentInformation')}><Info size={17} /></button>}
             <div className="doc-editor-save-status">
               {savedAt && !isSaving ? <><Check size={15} /> {isRemoteDocument ? t('docs.saved') : t('docs.savedLocally')}</> : <><Save size={15} /> {t('docs.saving')}</>}
