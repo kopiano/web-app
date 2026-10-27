@@ -455,10 +455,12 @@ export default function DocEditor() {
   ));
   const [activeHeading, setActiveHeading] = useState('');
   const [markdown, setMarkdown] = useState(() => localStorage.getItem(storageKey) || seedMarkdown(document.title, document.content));
+  const [pendingScrollSync, setPendingScrollSync] = useState<{ headingId: string; viewportTop: number } | null>(null);
   const [savedAt, setSavedAt] = useState(() => Boolean(localStorage.getItem(storageKey)));
   const [isSaving, setIsSaving] = useState(false);
   const [remoteLoaded, setRemoteLoaded] = useState(() => !Boolean(currentUser && id && !documents.some((item) => item.id === id)));
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const editorMirrorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const imageRenameMapRef = useRef<Record<string, string>>({});
   const [imageNameDrafts, setImageNameDrafts] = useState<Record<string, string>>({});
@@ -541,18 +543,38 @@ export default function DocEditor() {
 
   useEffect(() => {
     const preview = previewRef.current;
-    if (!preview || mode !== 'preview') return;
-    const headings = Array.from(preview.querySelectorAll<HTMLElement>('h1, h2, h3'));
+    const editorMirror = editorMirrorRef.current;
+    if (!preview || !editorMirror) return;
+    const headings = mode === 'preview'
+      ? Array.from(preview.querySelectorAll<HTMLElement>('h1, h2, h3'))
+      : Array.from(editorMirror.querySelectorAll<HTMLElement>('[data-heading-id]'));
     const updateActiveHeading = () => {
       const current = headings.reduce<HTMLElement | null>((last, heading) => (
-        heading.offsetTop - preview.scrollTop <= 120 ? heading : last
+        heading.getBoundingClientRect().top <= Math.min(180, window.innerHeight * 0.3) ? heading : last
       ), headings[0] ?? null);
-      if (current) setActiveHeading(current.id);
+      const headingId = current?.id || current?.dataset.headingId;
+      if (headingId) setActiveHeading(headingId);
     };
     updateActiveHeading();
-    preview.addEventListener('scroll', updateActiveHeading, { passive: true });
-    return () => preview.removeEventListener('scroll', updateActiveHeading);
+    window.addEventListener('scroll', updateActiveHeading, { passive: true });
+    return () => window.removeEventListener('scroll', updateActiveHeading);
   }, [markdown, mode]);
+
+  useEffect(() => {
+    if (!pendingScrollSync) return;
+    const frame = window.requestAnimationFrame(() => {
+      const target = mode === 'preview'
+        ? previewRef.current?.querySelector<HTMLElement>(`#${CSS.escape(pendingScrollSync.headingId)}`)
+        : editorMirrorRef.current?.querySelector<HTMLElement>(`[data-heading-id="${CSS.escape(pendingScrollSync.headingId)}"]`);
+      if (target) {
+        const scrollRoot = window.document.scrollingElement ?? window.document.documentElement;
+        const delta = target.getBoundingClientRect().top - pendingScrollSync.viewportTop;
+        scrollRoot.scrollTo({ top: scrollRoot.scrollTop + delta, behavior: 'instant' });
+      }
+      setPendingScrollSync(null);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [mode, pendingScrollSync]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -873,21 +895,41 @@ export default function DocEditor() {
   const outline = useMemo(() => {
     const headingOccurrences = new Map<string, number>();
     let inFence = false;
-    return markdown.split('\n').filter((line) => {
+    return markdown.split('\n').flatMap((line, lineIndex) => {
       if (/^```/.test(line.trim())) {
         inFence = !inFence;
-        return false;
+        return [];
       }
-      if (inFence || /^::::/.test(line.trim()) || /^:::/.test(line.trim())) return false;
-      return /^#{1,3} /.test(line);
-    }).map((line) => {
+      if (inFence || /^::::/.test(line.trim()) || /^:::/.test(line.trim()) || !/^#{1,3} /.test(line)) return [];
       const level = line.match(/^#+/)?.[0].length ?? 1;
       const label = line.slice(level + 1);
       const occurrence = headingOccurrences.get(label) ?? 0;
       headingOccurrences.set(label, occurrence + 1);
-      return { label, id: createHeadingId(label, occurrence), level };
+      return [{ label, id: createHeadingId(label, occurrence), level, lineIndex }];
     });
   }, [markdown]);
+
+  const switchMode = (nextMode: EditorMode) => {
+    if (nextMode === mode) return;
+    const anchorTop = Math.min(180, window.innerHeight * 0.3);
+    const visibleHeading = mode === 'preview'
+      ? Array.from(previewRef.current?.querySelectorAll<HTMLElement>('h1, h2, h3') ?? [])
+        .reduce<HTMLElement | null>((current, heading) => (
+          heading.getBoundingClientRect().top <= anchorTop ? heading : current
+        ), null)
+      : Array.from(editorMirrorRef.current?.querySelectorAll<HTMLElement>('[data-heading-id]') ?? [])
+        .reduce<HTMLElement | null>((current, heading) => (
+          heading.getBoundingClientRect().top <= anchorTop ? heading : current
+        ), null);
+    const headingId = visibleHeading?.id || visibleHeading?.dataset.headingId || activeHeading;
+    if (headingId && outline.some((heading) => heading.id === headingId)) {
+      setPendingScrollSync({
+        headingId,
+        viewportTop: visibleHeading ? visibleHeading.getBoundingClientRect().top : anchorTop,
+      });
+    }
+    setMode(nextMode);
+  };
 
   if (!document) return null;
 
@@ -935,20 +977,28 @@ export default function DocEditor() {
               const filename = path.slice(path.lastIndexOf('/') + 1);
               return <label key={path}><Image size={14} /><input aria-label="Image filename" value={imageNameDrafts[path] ?? filename} onChange={(event) => setImageNameDrafts((drafts) => ({ ...drafts, [path]: event.target.value }))} onBlur={(event) => renameDocumentImage(path, event.currentTarget.value)} /></label>;
             })}</div>}
-            <textarea
-              ref={editorRef}
-              className={`doc-markdown-editor${isImageDropActive ? ' is-image-drop-active' : ''}`}
-              value={markdown}
-              onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }}
-              onKeyDown={handleEditorKeyDown}
-              onPaste={handleEditorPaste}
-              onDragEnter={(event) => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); setIsImageDropActive(true); } }}
-              onDragOver={(event) => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
-              onDragLeave={() => setIsImageDropActive(false)}
-              onDrop={handleEditorDrop}
-              spellCheck={false}
-              aria-label={`${t('docs.markdownEditor')} ${displayTitle}`}
-            />
+            <div className="doc-markdown-editor-wrap">
+              <div ref={editorMirrorRef} className="doc-markdown-editor-mirror" aria-hidden="true">
+                {markdown.split('\n').map((line, lineIndex) => {
+                  const heading = outline.find((item) => item.lineIndex === lineIndex);
+                  return <span className="doc-markdown-editor-mirror-line" data-heading-id={heading?.id} key={lineIndex}>{line || ' '}</span>;
+                })}
+              </div>
+              <textarea
+                ref={editorRef}
+                className={`doc-markdown-editor${isImageDropActive ? ' is-image-drop-active' : ''}`}
+                value={markdown}
+                onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }}
+                onKeyDown={handleEditorKeyDown}
+                onPaste={handleEditorPaste}
+                onDragEnter={(event) => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); setIsImageDropActive(true); } }}
+                onDragOver={(event) => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
+                onDragLeave={() => setIsImageDropActive(false)}
+                onDrop={handleEditorDrop}
+                spellCheck={false}
+                aria-label={`${t('docs.markdownEditor')} ${displayTitle}`}
+              />
+            </div>
         </div>
         <article ref={previewRef} className={`doc-markdown-preview${mode === 'preview' ? ' is-visible' : ''}`} aria-hidden={mode !== 'preview'}>{previewContent}</article>
       </div>
@@ -956,8 +1006,8 @@ export default function DocEditor() {
       <nav className="doc-editor-header-mode" aria-label={t('docs.editorMode')}>
         <div className="doc-editor-modes" role="tablist">
           <span className={`doc-editor-modes-thumb is-${mode}`} aria-hidden="true" />
-          <button type="button" role="tab" aria-selected={mode === 'preview'} className={mode === 'preview' ? 'is-active' : ''} onClick={() => setMode('preview')}><Eye size={16} /> {t('docs.preview')}</button>
-          <button type="button" role="tab" aria-selected={mode === 'edit'} className={mode === 'edit' ? 'is-active' : ''} onClick={() => setMode('edit')} disabled={isLibraryDocument} aria-disabled={isLibraryDocument}><Pencil size={16} /> {t('docs.edit')}</button>
+          <button type="button" role="tab" aria-selected={mode === 'preview'} className={mode === 'preview' ? 'is-active' : ''} onClick={() => switchMode('preview')}><Eye size={16} /> {t('docs.preview')}</button>
+          <button type="button" role="tab" aria-selected={mode === 'edit'} className={mode === 'edit' ? 'is-active' : ''} onClick={() => switchMode('edit')} disabled={isLibraryDocument} aria-disabled={isLibraryDocument}><Pencil size={16} /> {t('docs.edit')}</button>
         </div>
       </nav>
       {infoOpen && (
