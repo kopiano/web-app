@@ -2371,9 +2371,10 @@
   border-radius: 999px;
   outline: 0;
   cursor: pointer;
+  // color(display-p3 0.3324 0.7715 0.9728) 0 var(--video-progress),
   background: linear-gradient(
     to right,
-    color(display-p3 0.3324 0.7715 0.9728) 0 var(--video-progress),
+    rgba(255, 122, 160, 1) 0 var(--video-progress),
     #8e8e8e var(--video-progress) var(--video-buffered),
     #424242 var(--video-buffered) 100%
   );
