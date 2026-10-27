@@ -93,8 +93,14 @@
 .doc-outline a.level-3 .doc-outline-level { color: #7c9d91; }
 .doc-editor-edit-pane { grid-column: 1; grid-row: 1; min-width: 0; min-height: 62rem; display: flex; flex-direction: column; overflow: visible; visibility: hidden; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; background: rgba(255,255,255,.32); box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); transition: opacity .2s ease, visibility 0s linear .2s; }
 .doc-editor-edit-pane.is-visible { visibility: visible; opacity: 1; pointer-events: auto; transition: opacity .2s ease, visibility 0s linear 0s; }
-.doc-markdown-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; padding: 1.2rem 1.6rem; border-bottom: 1px solid rgba(38,48,46,.1); background: rgba(255,255,255,.32); }
-.doc-markdown-toolbar button { width: 3.2rem; height: 3rem; display: grid; place-items: center; border-radius: .8rem; color: rgba(38,48,46,.6); background: transparent; }
+.doc-markdown-toolbar { position: fixed; z-index: 1000;
+  top: 8rem; left: 50%; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .35rem; width: max-content; max-width: calc(100vw - 2.4rem);
+  padding: 0.8rem 1rem;
+  // border: 2px solid rgba(255,255,255,.78);
+  border-radius: 3rem; background: rgba(249,248,252,.88);
+  box-shadow: 0 1rem 3rem rgba(38,48,46,.16);
+  backdrop-filter: blur(2rem); -webkit-backdrop-filter: blur(2rem); transform: translateX(-50%); }
+.doc-markdown-toolbar button { width: 3rem; height: 3rem; display: grid; place-items: center; border-radius: 50%; color: rgba(38,48,46,.6); background: transparent; }
 .doc-markdown-toolbar button:hover { color: #26302e; background: rgba(255,255,255,.72); }
 .doc-image-input { display: none; }
 .doc-image-upload-error { margin: 0; padding: .7rem 1.6rem; color: #9b3d3d; background: rgba(255,229,229,.7); font-size: 1.15rem; }
@@ -373,6 +379,8 @@
   .doc-outline a.level-3 { padding-left: 1rem; }
   .doc-editor-header-mode { bottom: 1.4rem; width: calc(100% - 2.4rem); }
   .doc-editor-modes { width: min(100%, 32rem); }
+  .doc-markdown-toolbar { top: 6.2rem; gap: .15rem; padding: .55rem .65rem; }
+  .doc-markdown-toolbar button { width: 2.8rem; height: 2.8rem; }
   .doc-markdown-editor-mirror { padding: 3.2rem 1.8rem 4.8rem; }
   .doc-markdown-editor { height: 48rem; min-height: 48rem; padding: 3.2rem 1.8rem 4.8rem; }
   .doc-markdown-preview { height: auto; min-height: 58rem; padding: 3.2rem 1.8rem 4.8rem; }

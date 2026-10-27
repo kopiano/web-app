@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js/lib/common';
 import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Image, ImagePlus, Info, Italic, Link2, List, Pencil, Quote, Rows3, Save, Table2, X } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -134,7 +134,7 @@ function renderInlineMarkdown(text: string, onImageClick: (src: string) => void 
   });
 }
 
-function CodeBlock({ content, language, headerContent }: { content: string; language: string; headerContent?: React.ReactNode }) {
+const CodeBlock = memo(function CodeBlock({ content, language, headerContent }: { content: string; language: string; headerContent?: React.ReactNode }) {
   const { t } = useTranslation();
   const lines = content.split('\n');
   const { language: codeLanguage, highlightedLines } = parseCodeFenceInfo(language, lines.length);
@@ -216,7 +216,7 @@ function CodeBlock({ content, language, headerContent }: { content: string; lang
       </pre>
     </div>
   );
-}
+});
 
 function CodeTabs({ content }: { content: string }) {
   const { t } = useTranslation();
@@ -455,6 +455,7 @@ export default function DocEditor() {
   ));
   const [activeHeading, setActiveHeading] = useState('');
   const [markdown, setMarkdown] = useState(() => localStorage.getItem(storageKey) || seedMarkdown(document.title, document.content));
+  const deferredMarkdown = useDeferredValue(markdown);
   const [pendingScrollSync, setPendingScrollSync] = useState<{ headingId: string; viewportTop: number } | null>(null);
   const [savedAt, setSavedAt] = useState(() => Boolean(localStorage.getItem(storageKey)));
   const [isSaving, setIsSaving] = useState(false);
@@ -468,10 +469,37 @@ export default function DocEditor() {
   const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const displayTitle = remoteTitle || document.title;
   const isRemoteDocument = Boolean(currentUser && id && !documents.some((item) => item.id === id));
-  const previewContent = useMemo(() => renderMarkdown(markdown, setImagePreviewUrl), [markdown]);
+  const previewContent = useMemo(() => renderMarkdown(deferredMarkdown, setImagePreviewUrl), [deferredMarkdown]);
+  const outline = useMemo(() => {
+    const headingOccurrences = new Map<string, number>();
+    let inFence = false;
+    return deferredMarkdown.split('\n').flatMap((line, lineIndex) => {
+      if (/^```/.test(line.trim())) {
+        inFence = !inFence;
+        return [];
+      }
+      if (inFence || /^::::/.test(line.trim()) || /^:::/.test(line.trim()) || !/^#{1,3} /.test(line)) return [];
+      const level = line.match(/^#+/)?.[0].length ?? 1;
+      const label = line.slice(level + 1);
+      const occurrence = headingOccurrences.get(label) ?? 0;
+      headingOccurrences.set(label, occurrence + 1);
+      return [{ label, id: createHeadingId(label, occurrence), level, lineIndex }];
+    });
+  }, [deferredMarkdown]);
+  const outlineByLine = useMemo(
+    () => new Map(outline.map((heading) => [heading.lineIndex, heading])),
+    [outline],
+  );
+  const editorMirrorLines = useMemo(
+    () => deferredMarkdown.split('\n').map((line, lineIndex) => {
+      const heading = outlineByLine.get(lineIndex);
+      return <span className="doc-markdown-editor-mirror-line" data-heading-id={heading?.id} key={lineIndex}>{line || ' '}</span>;
+    }),
+    [deferredMarkdown, outlineByLine],
+  );
   const documentImages = useMemo(
-    () => Array.from(markdown.matchAll(/!\[[^\]]*\]\((src\/assets\/docs-img\/[^)\s]+)\)/g), (match) => match[1]),
-    [markdown],
+    () => Array.from(deferredMarkdown.matchAll(/!\[[^\]]*\]\((src\/assets\/docs-img\/[^)\s]+)\)/g), (match) => match[1]),
+    [deferredMarkdown],
   );
 
   const saveDocument = useCallback(() => {
@@ -537,8 +565,12 @@ export default function DocEditor() {
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor || mode !== 'edit') return;
-    editor.style.height = 'auto';
-    editor.style.height = `${editor.scrollHeight}px`;
+    const frame = window.requestAnimationFrame(() => {
+      editor.style.height = 'auto';
+      const nextHeight = `${editor.scrollHeight}px`;
+      if (editor.style.height !== nextHeight) editor.style.height = nextHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [markdown, mode]);
 
   useEffect(() => {
@@ -558,10 +590,10 @@ export default function DocEditor() {
     updateActiveHeading();
     window.addEventListener('scroll', updateActiveHeading, { passive: true });
     return () => window.removeEventListener('scroll', updateActiveHeading);
-  }, [markdown, mode]);
+  }, [deferredMarkdown, mode]);
 
   useEffect(() => {
-    if (!pendingScrollSync) return;
+    if (!pendingScrollSync || deferredMarkdown !== markdown) return;
     const frame = window.requestAnimationFrame(() => {
       const target = mode === 'preview'
         ? previewRef.current?.querySelector<HTMLElement>(`#${CSS.escape(pendingScrollSync.headingId)}`)
@@ -574,7 +606,7 @@ export default function DocEditor() {
       setPendingScrollSync(null);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [mode, pendingScrollSync]);
+  }, [deferredMarkdown, markdown, mode, pendingScrollSync]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -892,23 +924,6 @@ export default function DocEditor() {
     });
   };
 
-  const outline = useMemo(() => {
-    const headingOccurrences = new Map<string, number>();
-    let inFence = false;
-    return markdown.split('\n').flatMap((line, lineIndex) => {
-      if (/^```/.test(line.trim())) {
-        inFence = !inFence;
-        return [];
-      }
-      if (inFence || /^::::/.test(line.trim()) || /^:::/.test(line.trim()) || !/^#{1,3} /.test(line)) return [];
-      const level = line.match(/^#+/)?.[0].length ?? 1;
-      const label = line.slice(level + 1);
-      const occurrence = headingOccurrences.get(label) ?? 0;
-      headingOccurrences.set(label, occurrence + 1);
-      return [{ label, id: createHeadingId(label, occurrence), level, lineIndex }];
-    });
-  }, [markdown]);
-
   const switchMode = (nextMode: EditorMode) => {
     if (nextMode === mode) return;
     const anchorTop = Math.min(180, window.innerHeight * 0.3);
@@ -955,22 +970,24 @@ export default function DocEditor() {
           {outline.map((item) => <a className={`level-${item.level}${activeHeading === item.id ? ' is-active' : ''}`} href={`#${item.id}`} key={item.id} aria-current={activeHeading === item.id ? 'location' : undefined} onClick={(event) => { setActiveHeading(item.id); event.currentTarget.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }}><span className="doc-outline-marker" aria-hidden="true" /><span className="doc-outline-level">H{item.level}</span><span className="doc-outline-label">{item.label}</span></a>)}
         </nav>
       </aside>
+      {mode === 'edit' && (
+        <div className="doc-markdown-toolbar" aria-label={t('docs.markdownFormatting')}>
+          <button type="button" onClick={() => insertMarkdown('**', '**', 'bold')} aria-label={t('docs.bold')}><Bold size={16} /></button>
+          <button type="button" onClick={() => insertMarkdown('*', '*', 'italic')} aria-label={t('docs.italic')}><Italic size={16} /></button>
+          <button type="button" onClick={() => insertMarkdown('## ', '', 'Heading')} aria-label={t('docs.heading')}><Heading2 size={16} /></button>
+          <button type="button" onClick={() => insertMarkdown('- ', '', 'List item')} aria-label={t('docs.bulletList')}><List size={16} /></button>
+          <button type="button" onClick={() => insertMarkdown('> ', '', 'Quote')} aria-label={t('docs.quote')}><Quote size={16} /></button>
+          <button type="button" onClick={() => insertMarkdown('`', '`', 'code')} aria-label={t('docs.inlineCode')}><Code2 size={16} /></button>
+          <button type="button" onClick={insertCodeBlock} aria-label={t('docs.codeBlock')}><Braces size={16} /></button>
+          <button type="button" onClick={insertCodeTabs} aria-label={t('docs.codeGroup')}><FolderCode size={16} /></button>
+          <button type="button" onClick={insertTable} aria-label={t('docs.insertTable')}><Table2 size={16} /></button>
+          <button type="button" onClick={insertUnicodeTable} aria-label={t('docs.insertUnicodeTable')}><Rows3 size={16} /></button>
+          <button type="button" onClick={() => insertMarkdown('[', '](https://)', 'link text')} aria-label={t('docs.link')}><Link2 size={16} /></button>
+          <button type="button" onClick={() => imageInputRef.current?.click()} aria-label="Upload image" title="Upload image"><ImagePlus size={16} /></button>
+        </div>
+      )}
       <div className={`doc-editor-workspace is-${mode}`}>
         <div className={`doc-editor-edit-pane${mode === 'edit' ? ' is-visible' : ''}`} aria-hidden={mode !== 'edit'}>
-            <div className="doc-markdown-toolbar" aria-label={t('docs.markdownFormatting')}>
-              <button type="button" onClick={() => insertMarkdown('**', '**', 'bold')} aria-label={t('docs.bold')}><Bold size={16} /></button>
-              <button type="button" onClick={() => insertMarkdown('*', '*', 'italic')} aria-label={t('docs.italic')}><Italic size={16} /></button>
-              <button type="button" onClick={() => insertMarkdown('## ', '', 'Heading')} aria-label={t('docs.heading')}><Heading2 size={16} /></button>
-              <button type="button" onClick={() => insertMarkdown('- ', '', 'List item')} aria-label={t('docs.bulletList')}><List size={16} /></button>
-              <button type="button" onClick={() => insertMarkdown('> ', '', 'Quote')} aria-label={t('docs.quote')}><Quote size={16} /></button>
-              <button type="button" onClick={() => insertMarkdown('`', '`', 'code')} aria-label={t('docs.inlineCode')}><Code2 size={16} /></button>
-              <button type="button" onClick={insertCodeBlock} aria-label={t('docs.codeBlock')}><Braces size={16} /></button>
-              <button type="button" onClick={insertCodeTabs} aria-label={t('docs.codeGroup')}><FolderCode size={16} /></button>
-              <button type="button" onClick={insertTable} aria-label={t('docs.insertTable')}><Table2 size={16} /></button>
-              <button type="button" onClick={insertUnicodeTable} aria-label={t('docs.insertUnicodeTable')}><Rows3 size={16} /></button>
-              <button type="button" onClick={() => insertMarkdown('[', '](https://)', 'link text')} aria-label={t('docs.link')}><Link2 size={16} /></button>
-              <button type="button" onClick={() => imageInputRef.current?.click()} aria-label="Upload image" title="Upload image"><ImagePlus size={16} /></button>
-            </div>
             <input ref={imageInputRef} className="doc-image-input" type="file" accept="image/*" multiple onChange={(event) => { if (event.target.files) void uploadAndInsertImages(event.target.files); event.currentTarget.value = ''; }} />
             {imageUploadError && <p className="doc-image-upload-error" role="alert">{imageUploadError}</p>}
             {documentImages.length > 0 && <div className="doc-image-name-list" aria-label="Document images">{Array.from(new Set(documentImages)).map((path) => {
@@ -979,10 +996,7 @@ export default function DocEditor() {
             })}</div>}
             <div className="doc-markdown-editor-wrap">
               <div ref={editorMirrorRef} className="doc-markdown-editor-mirror" aria-hidden="true">
-                {markdown.split('\n').map((line, lineIndex) => {
-                  const heading = outline.find((item) => item.lineIndex === lineIndex);
-                  return <span className="doc-markdown-editor-mirror-line" data-heading-id={heading?.id} key={lineIndex}>{line || ' '}</span>;
-                })}
+                {editorMirrorLines}
               </div>
               <textarea
                 ref={editorRef}
