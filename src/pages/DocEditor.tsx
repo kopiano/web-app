@@ -879,13 +879,6 @@ export default function DocEditor() {
               {savedAt && !isSaving ? <><Check size={15} /> {isRemoteDocument ? t('docs.saved') : t('docs.savedLocally')}</> : <><Save size={15} /> {t('docs.saving')}</>}
             </div>
           </div>
-          <div className="doc-editor-header-mode">
-            <div className="doc-editor-modes" role="tablist" aria-label={t('docs.editorMode')}>
-              <span className={`doc-editor-modes-thumb is-${mode}`} aria-hidden="true" />
-              <button type="button" className={mode === 'preview' ? 'is-active' : ''} onClick={() => setMode('preview')}><Eye size={16} /> {t('docs.preview')}</button>
-              <button type="button" className={mode === 'edit' ? 'is-active' : ''} onClick={() => setMode('edit')} disabled={isLibraryDocument} aria-disabled={isLibraryDocument}><Pencil size={16} /> {t('docs.edit')}</button>
-            </div>
-          </div>
         </div>
       </header>
       <aside className="doc-outline">
@@ -937,6 +930,13 @@ export default function DocEditor() {
         <article ref={previewRef} className={`doc-markdown-preview${mode === 'preview' ? ' is-visible' : ''}`} aria-hidden={mode !== 'preview'}>{previewContent}</article>
       </div>
       {imagePreviewUrl && <button type="button" className="doc-image-lightbox" onClick={() => setImagePreviewUrl('')} aria-label="Close image preview"><img src={imagePreviewUrl} alt="" /><X size={22} /></button>}
+      <nav className="doc-editor-header-mode" aria-label={t('docs.editorMode')}>
+        <div className="doc-editor-modes" role="tablist">
+          <span className={`doc-editor-modes-thumb is-${mode}`} aria-hidden="true" />
+          <button type="button" role="tab" aria-selected={mode === 'preview'} className={mode === 'preview' ? 'is-active' : ''} onClick={() => setMode('preview')}><Eye size={16} /> {t('docs.preview')}</button>
+          <button type="button" role="tab" aria-selected={mode === 'edit'} className={mode === 'edit' ? 'is-active' : ''} onClick={() => setMode('edit')} disabled={isLibraryDocument} aria-disabled={isLibraryDocument}><Pencil size={16} /> {t('docs.edit')}</button>
+        </div>
+      </nav>
       {infoOpen && (
         <main className="doc-create-overlay">
           <button type="button" className="doc-create-backdrop" onClick={() => setInfoOpen(false)} aria-label={t('docs.closeDocumentInformation')} />

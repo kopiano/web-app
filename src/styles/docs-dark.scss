@@ -171,6 +171,35 @@
   border-color: rgba(255, 255, 255, .22);
 }
 
+[data-theme='dark'] .doc-editor-modes {
+  // border-color: var(--docs-dark-line);
+  // background: rgba(24, 24, 26, .82);
+  // box-shadow: 0 1rem 3rem rgba(0, 0, 0, .34), inset 0 1px 0 rgba(255, 255, 255, .06);
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(32, 32, 32, 0.32);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 1px rgba(32, 32, 32, 0.18), 0 0.4rem 1rem rgba(0, 0, 0, 0.18), 0 1.8rem 5rem rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .doc-editor-modes button {
+  color: var(--docs-dark-muted);
+}
+
+[data-theme='dark'] .doc-editor-modes button:hover,
+[data-theme='dark'] .doc-editor-modes button.is-active {
+  color: #fff;
+}
+
+[data-theme='dark'] .doc-editor-modes button:disabled,
+[data-theme='dark'] .doc-editor-modes button:disabled:hover {
+  color: rgba(255, 255, 255, .3);
+}
+
+[data-theme='dark'] .doc-editor-modes-thumb {
+  background: #54545a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 .4rem 1rem rgba(0, 0, 0, .3);
+}
+
 [data-theme='dark'] .doc-editor-workspace,
 [data-theme='dark'] .doc-editor-edit-pane,
 [data-theme='dark'] .doc-markdown-preview,

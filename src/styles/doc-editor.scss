@@ -1,7 +1,5 @@
-.doc-editor-page { min-height: 100vh; padding: 8rem clamp(1.6rem, 5vw, 8rem) 6rem; color: #26302e; }
-.doc-editor-header, .doc-editor-toolbar, .doc-editor-workspace { width: min(100%, 118rem); margin: 0 auto; }
-.doc-editor-header { width: calc(min(100%, 118rem) - 24.6rem); margin-left: max(0px, calc((100% - min(100%, 118rem)) / 2)); margin-right: auto; }
-.doc-editor-workspace { width: calc(min(100%, 118rem) - 24.6rem); margin-left: max(0px, calc((100% - min(100%, 118rem)) / 2)); margin-right: auto; }
+.doc-editor-page { min-height: 100vh; padding: 8rem clamp(1.6rem, 5vw, 8rem) 10rem; color: #26302e; }
+.doc-editor-header, .doc-editor-toolbar, .doc-editor-workspace { width: min(100%, 136rem); margin: 0 auto; }
 .doc-editor-header {
   position: relative;
   min-height: 25rem;
@@ -19,7 +17,7 @@
 .doc-editor-header-shade { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 2.2rem 3rem 3.2rem; background: linear-gradient(180deg, rgba(22,27,28,.58), rgba(22,27,28,.12) 48%, rgba(22,27,28,.72)); }
 .doc-editor-header-top { display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
 .doc-info-button {
-  position: absolute; bottom: 2rem; right: 2rem; z-index: 2;
+  position: absolute; bottom: 2rem; left: 2rem; z-index: 2;
   display: inline-grid; place-items: center;
   width: 3rem; height: 3rem; margin-left: auto;
   border-radius: 50%; color: rgba(255,255,255,.92); background: rgba(20,25,25,.22); cursor: pointer; box-shadow: 0 .5rem 1.2rem rgba(20,25,25,.12); backdrop-filter: blur(1rem); -webkit-backdrop-filter: blur(1rem); transition: color .2s ease, border-color .2s ease, background .2s ease, transform .2s ease; }
@@ -29,11 +27,12 @@
 .doc-info-button svg { width: 2.3rem; height: 2.3rem; }
 .doc-info-button:focus-visible { outline: 2px solid rgba(255,255,255,.9); outline-offset: 3px; }
 .doc-editor-header-mode {
-  display: flex; justify-content: center;
-  position: absolute;
+  position: fixed;
+  z-index: 20;
   bottom: 2rem;
-  z-index: 2;
   left: 50%;
+  display: flex;
+  justify-content: center;
   transform: translateX(-50%);
 }
 .doc-back-button, .doc-editor-modes button { display: inline-flex; align-items: center; gap: .7rem; color: rgba(38,48,46,.68); background: transparent; font: inherit; font-size: 1.25rem; }
@@ -49,15 +48,16 @@
 .doc-editor-modes {
   --doc-mode-gap: .35rem;
   --doc-mode-padding: .4rem;
-  position: relative; display: grid; grid-template-columns: repeat(2, minmax(8rem, 1fr)); gap: var(--doc-mode-gap); padding: var(--doc-mode-padding); border: 1px solid rgba(255,255,255,.72);
-  border-radius: 3rem; background: rgba(255,255,255,.4); backdrop-filter: blur(1.5rem); }
-.doc-editor-modes button { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: .7rem; padding: .85rem 1.3rem; border-radius: 1rem; color: rgba(38,48,46,.56); background: transparent; font: inherit; font-size: 1.25rem; transition: color .42s ease; }
+  position: relative; display: grid; grid-template-columns: repeat(2, minmax(9rem, 1fr)); gap: var(--doc-mode-gap); padding: var(--doc-mode-padding); border: 1px solid rgba(255,255,255,.78);
+  border-radius: 3rem; background: rgba(249,248,252,.82); box-shadow: 0 1rem 3rem rgba(38,48,46,.18), inset 0 1px 0 rgba(255,255,255,.8); backdrop-filter: blur(2rem); -webkit-backdrop-filter: blur(2rem); }
+.doc-editor-modes button { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: .7rem; min-height: 3.6rem; padding: .85rem 1.3rem; border-radius: 3rem; color: rgba(38,48,46,.62); background: transparent; font: inherit; font-size: 1.25rem; transition: color .42s ease; }
 .doc-editor-modes button:disabled { color: rgba(38,48,46,.28); cursor: not-allowed; opacity: .55; }
 .doc-editor-modes button:disabled:hover { color: rgba(38,48,46,.28); background: transparent; }
-.doc-editor-modes button:hover, .doc-editor-modes button.is-active { color: #26302e; }
+.doc-editor-modes button:hover { color: #26302e; }
+.doc-editor-modes button.is-active { color: #fff; }
 .doc-editor-modes-thumb {
-   position: absolute; z-index: 0; top: var(--doc-mode-padding); left: var(--doc-mode-padding); width: calc((100% - (var(--doc-mode-padding) * 2) - var(--doc-mode-gap)) / 2); height: 3.2rem;
-  border-radius: 3rem; background: rgba(255,255,255,.86); box-shadow: 0 .5rem 1.4rem rgba(50,60,56,.08); transform: translate3d(0, 0, 0); will-change: transform; transition: transform .62s cubic-bezier(.16, 1, .3, 1); }
+   position: absolute; z-index: 0; top: var(--doc-mode-padding); left: var(--doc-mode-padding); width: calc((100% - (var(--doc-mode-padding) * 2) - var(--doc-mode-gap)) / 2); height: 3.6rem;
+  border-radius: 3rem; background: #54545a; box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 .4rem 1rem rgba(0,0,0,.18); transform: translate3d(0, 0, 0); will-change: transform; transition: transform .42s cubic-bezier(.25, .8, .25, 1); }
 .doc-editor-modes-thumb.is-edit { transform: translate3d(calc(100% + var(--doc-mode-gap)), 0, 0); }
 .doc-editor-workspace {
   display: grid;
@@ -65,7 +65,7 @@
   background: rgba(255,255,255,.6);
   box-shadow: none;
 }
-.doc-outline { position: fixed; z-index: 5; top: 8rem; right: max(1.2rem, calc((100vw - 118rem) / 2)); width: 23rem; height: min(62rem, calc(100vh - 10rem)); min-height: 24rem; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 1.6rem 1rem 1.2rem; border: 2px solid rgba(255,255,255,.86); border-radius: 1.4rem; color: #3f4845; background: rgba(249,248,252,.78); box-shadow: 0 1.2rem 3rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); scrollbar-width: thin; scrollbar-color: rgba(111,77,131,.35) transparent; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; }
+.doc-outline { position: fixed; z-index: 5; top: 8rem; right: max(.6rem, calc((100vw - 136rem) / 2 - .8rem)); width: 23rem; height: min(62rem, calc(100vh - 10rem)); min-height: 24rem; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 1.6rem 1rem 1.2rem; border: 2px solid rgba(255,255,255,.86); border-radius: 1.4rem; color: #3f4845; background: rgba(249,248,252,.78); box-shadow: 0 1.2rem 3rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); scrollbar-width: thin; scrollbar-color: rgba(111,77,131,.35) transparent; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; }
 .doc-outline-heading { display: flex; align-items: center; justify-content: space-between; margin: 0 .35rem 1rem; color: #473452; }
 .doc-outline-heading-title { display: flex; align-items: center; gap: .65rem; font-size: 1rem; font-weight: 700; letter-spacing: .14em; }
 .doc-outline-heading svg { color: #875ca5; }
@@ -127,6 +127,7 @@
 .doc-markdown-table tr:last-child td { border-bottom: 0; }
 .doc-markdown-table tbody tr:nth-child(even) { background: rgba(255,255,255,.34); }
 .doc-markdown-preview blockquote { max-width: 72rem; margin: 2.8rem 0; padding: 1.8rem 2.2rem; border-left: 3px solid #aa8cba; border-radius: 0 1rem 1rem 0; color: rgba(38,48,46,.74); background: rgba(255,255,255,.56); font-family: inherit; font-size: 1.7rem; line-height: 1.7; }
+.doc-markdown-preview .doc-code-block, .doc-markdown-preview .doc-code-tabs { width: min(100%, 96rem); }
 .doc-code-block { overflow: hidden; margin: 1.8rem 0; border: 1px solid #30363d; border-radius: 2rem; background: #0d1117; box-shadow: 0 1.4rem 3rem rgba(13,17,23,.24); font-family: "Quicksand", sans-serif;}
 .doc-code-tabs { margin: 1.8rem 0; }
 .doc-code-tabs .doc-code-block { margin: 0; }
@@ -336,7 +337,7 @@
 .doc-info-delete-confirm:disabled { cursor: wait; opacity: .55; }
 
 @media (max-width: 760px) {
-  .doc-editor-page { padding: 7rem 1.2rem 4rem; }
+  .doc-editor-page { padding: 7rem 1.2rem 9rem; }
   .doc-editor-header { width: 100%; margin-inline: auto; }
   .doc-editor-workspace { width: 100%; margin-inline: auto; }
   .doc-editor-header { min-height: 22rem; background-position: 58% center; }
@@ -347,6 +348,8 @@
   .doc-outline { position: static; width: auto; height: auto; min-height: 0; max-height: none; margin-bottom: 1rem; border: 1px solid rgba(255,255,255,.78); border-radius: 1.2rem; box-shadow: 0 1rem 2rem rgba(55,63,61,.08); }
   .doc-outline nav { flex-direction: row; overflow-x: auto; }
   .doc-outline a.level-3 { padding-left: 1rem; }
+  .doc-editor-header-mode { bottom: 1.4rem; width: calc(100% - 2.4rem); }
+  .doc-editor-modes { width: min(100%, 32rem); }
   .doc-markdown-editor { height: 48rem; min-height: 48rem; padding: 3.2rem 1.8rem 4.8rem; }
   .doc-markdown-preview { height: auto; min-height: 58rem; padding: 3.2rem 1.8rem 4.8rem; }
   .doc-markdown-preview h1 { margin-bottom: 2.8rem; font-size: 3rem; }
