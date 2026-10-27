@@ -1,4 +1,4 @@
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import hljs from 'highlight.js/lib/common';
 import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Image, ImagePlus, Info, Italic, Link2, List, Pencil, Quote, Rows3, Save, Table2, X } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -457,6 +457,8 @@ export default function DocEditor() {
   const [markdown, setMarkdown] = useState(() => localStorage.getItem(storageKey) || seedMarkdown(document.title, document.content));
   const deferredMarkdown = useDeferredValue(markdown);
   const [pendingScrollSync, setPendingScrollSync] = useState<{ headingId: string; viewportTop: number } | null>(null);
+  const outlineScrollLockRef = useRef('');
+  const outlineScrollTimerRef = useRef<number | null>(null);
   const [savedAt, setSavedAt] = useState(() => Boolean(localStorage.getItem(storageKey)));
   const [isSaving, setIsSaving] = useState(false);
   const [remoteLoaded, setRemoteLoaded] = useState(() => !Boolean(currentUser && id && !documents.some((item) => item.id === id)));
@@ -562,15 +564,12 @@ export default function DocEditor() {
     return () => window.clearTimeout(timer);
   }, [isRemoteDocument, remoteLoaded, saveDocument]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const editor = editorRef.current;
     if (!editor || mode !== 'edit') return;
-    const frame = window.requestAnimationFrame(() => {
-      editor.style.height = 'auto';
-      const nextHeight = `${editor.scrollHeight}px`;
-      if (editor.style.height !== nextHeight) editor.style.height = nextHeight;
-    });
-    return () => window.cancelAnimationFrame(frame);
+    editor.style.height = 'auto';
+    const nextHeight = `${editor.scrollHeight}px`;
+    if (editor.style.height !== nextHeight) editor.style.height = nextHeight;
   }, [markdown, mode]);
 
   useEffect(() => {
@@ -581,31 +580,57 @@ export default function DocEditor() {
       ? Array.from(preview.querySelectorAll<HTMLElement>('h1, h2, h3'))
       : Array.from(editorMirror.querySelectorAll<HTMLElement>('[data-heading-id]'));
     const updateActiveHeading = () => {
+      if (outlineScrollLockRef.current) return;
+      const activationLine = window.innerHeight / 2;
       const current = headings.reduce<HTMLElement | null>((last, heading) => (
-        heading.getBoundingClientRect().top <= Math.min(180, window.innerHeight * 0.3) ? heading : last
+        heading.getBoundingClientRect().top <= activationLine ? heading : last
       ), headings[0] ?? null);
       const headingId = current?.id || current?.dataset.headingId;
       if (headingId) setActiveHeading(headingId);
     };
+    const finishOutlineScroll = () => {
+      if (outlineScrollTimerRef.current !== null) {
+        window.clearTimeout(outlineScrollTimerRef.current);
+        outlineScrollTimerRef.current = null;
+      }
+      outlineScrollLockRef.current = '';
+      updateActiveHeading();
+    };
+    const handleScroll = () => {
+      if (!outlineScrollLockRef.current) {
+        updateActiveHeading();
+        return;
+      }
+      if (outlineScrollTimerRef.current !== null) window.clearTimeout(outlineScrollTimerRef.current);
+      outlineScrollTimerRef.current = window.setTimeout(finishOutlineScroll, 180);
+    };
     updateActiveHeading();
-    window.addEventListener('scroll', updateActiveHeading, { passive: true });
-    return () => window.removeEventListener('scroll', updateActiveHeading);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scrollend', finishOutlineScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scrollend', finishOutlineScroll);
+      if (outlineScrollTimerRef.current !== null) {
+        window.clearTimeout(outlineScrollTimerRef.current);
+        outlineScrollTimerRef.current = null;
+      }
+      outlineScrollLockRef.current = '';
+    };
   }, [deferredMarkdown, mode]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!pendingScrollSync || deferredMarkdown !== markdown) return;
-    const frame = window.requestAnimationFrame(() => {
-      const target = mode === 'preview'
-        ? previewRef.current?.querySelector<HTMLElement>(`#${CSS.escape(pendingScrollSync.headingId)}`)
-        : editorMirrorRef.current?.querySelector<HTMLElement>(`[data-heading-id="${CSS.escape(pendingScrollSync.headingId)}"]`);
-      if (target) {
-        const scrollRoot = window.document.scrollingElement ?? window.document.documentElement;
-        const delta = target.getBoundingClientRect().top - pendingScrollSync.viewportTop;
+    const target = mode === 'preview'
+      ? previewRef.current?.querySelector<HTMLElement>(`#${CSS.escape(pendingScrollSync.headingId)}`)
+      : editorMirrorRef.current?.querySelector<HTMLElement>(`[data-heading-id="${CSS.escape(pendingScrollSync.headingId)}"]`);
+    if (target) {
+      const scrollRoot = window.document.scrollingElement ?? window.document.documentElement;
+      const delta = target.getBoundingClientRect().top - pendingScrollSync.viewportTop;
+      if (Math.abs(delta) > 1) {
         scrollRoot.scrollTo({ top: scrollRoot.scrollTop + delta, behavior: 'instant' });
       }
-      setPendingScrollSync(null);
-    });
-    return () => window.cancelAnimationFrame(frame);
+    }
+    setPendingScrollSync(null);
   }, [deferredMarkdown, markdown, mode, pendingScrollSync]);
 
   useEffect(() => {
@@ -927,23 +952,45 @@ export default function DocEditor() {
   const switchMode = (nextMode: EditorMode) => {
     if (nextMode === mode) return;
     const anchorTop = Math.min(180, window.innerHeight * 0.3);
-    const visibleHeading = mode === 'preview'
+    const headings = mode === 'preview'
       ? Array.from(previewRef.current?.querySelectorAll<HTMLElement>('h1, h2, h3') ?? [])
-        .reduce<HTMLElement | null>((current, heading) => (
-          heading.getBoundingClientRect().top <= anchorTop ? heading : current
-        ), null)
-      : Array.from(editorMirrorRef.current?.querySelectorAll<HTMLElement>('[data-heading-id]') ?? [])
-        .reduce<HTMLElement | null>((current, heading) => (
-          heading.getBoundingClientRect().top <= anchorTop ? heading : current
-        ), null);
-    const headingId = visibleHeading?.id || visibleHeading?.dataset.headingId || activeHeading;
-    if (headingId && outline.some((heading) => heading.id === headingId)) {
+      : Array.from(editorMirrorRef.current?.querySelectorAll<HTMLElement>('[data-heading-id]') ?? []);
+    const visibleHeading = headings.reduce<HTMLElement | null>((current, heading) => (
+      heading.getBoundingClientRect().top <= anchorTop ? heading : current
+    ), headings[0] ?? null);
+    const headingId = visibleHeading?.id || visibleHeading?.dataset.headingId;
+    if (headingId && visibleHeading) {
+      setActiveHeading(headingId);
       setPendingScrollSync({
         headingId,
-        viewportTop: visibleHeading ? visibleHeading.getBoundingClientRect().top : anchorTop,
+        viewportTop: visibleHeading.getBoundingClientRect().top,
       });
     }
     setMode(nextMode);
+  };
+
+  const navigateToOutlineHeading = (event: MouseEvent<HTMLAnchorElement>, headingId: string) => {
+    event.preventDefault();
+    if (outlineScrollTimerRef.current !== null) window.clearTimeout(outlineScrollTimerRef.current);
+    outlineScrollLockRef.current = headingId;
+    setActiveHeading(headingId);
+
+    const target = mode === 'preview'
+      ? previewRef.current?.querySelector<HTMLElement>(`#${CSS.escape(headingId)}`)
+      : editorMirrorRef.current?.querySelector<HTMLElement>(`[data-heading-id="${CSS.escape(headingId)}"]`);
+    if (!target) {
+      outlineScrollLockRef.current = '';
+      return;
+    }
+
+    const scrollRoot = window.document.scrollingElement ?? window.document.documentElement;
+    const targetRect = target.getBoundingClientRect();
+    const targetTop = scrollRoot.scrollTop + targetRect.top - (window.innerHeight - targetRect.height) / 2;
+    if (Math.abs(targetTop - scrollRoot.scrollTop) <= 1) {
+      outlineScrollLockRef.current = '';
+      return;
+    }
+    scrollRoot.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
   };
 
   if (!document) return null;
@@ -967,7 +1014,7 @@ export default function DocEditor() {
         </div>
         <div className="doc-outline-rule" aria-hidden="true"><span style={{ width: `${outline.length ? ((outline.findIndex((item) => item.id === activeHeading) + 1) / outline.length) * 100 : 0}%` }} /></div>
         <nav aria-label={t('docs.documentOutline')}>
-          {outline.map((item) => <a className={`level-${item.level}${activeHeading === item.id ? ' is-active' : ''}`} href={`#${item.id}`} key={item.id} aria-current={activeHeading === item.id ? 'location' : undefined} onClick={(event) => { setActiveHeading(item.id); event.currentTarget.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }}><span className="doc-outline-marker" aria-hidden="true" /><span className="doc-outline-level">H{item.level}</span><span className="doc-outline-label">{item.label}</span></a>)}
+          {outline.map((item) => <a className={`level-${item.level}${activeHeading === item.id ? ' is-active' : ''}`} href={`#${item.id}`} key={item.id} aria-current={activeHeading === item.id ? 'location' : undefined} onClick={(event) => navigateToOutlineHeading(event, item.id)}><span className="doc-outline-marker" aria-hidden="true" /><span className="doc-outline-level">H{item.level}</span><span className="doc-outline-label">{item.label}</span></a>)}
         </nav>
       </aside>
       {mode === 'edit' && (

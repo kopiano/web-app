@@ -257,8 +257,17 @@
 
 [data-theme='dark'] .doc-outline a.is-active {
   border-color: rgba(194, 155, 216, .36);
+  color: var(--docs-dark-ink);
   background: rgba(194, 155, 216, .18);
   box-shadow: inset 3px 0 0 var(--docs-dark-accent), 0 .35rem 1rem rgba(0, 0, 0, .16);
+  font-weight: 650;
+}
+
+[data-theme='dark'] .doc-outline a.is-active.level-1,
+[data-theme='dark'] .doc-outline a.is-active.level-2,
+[data-theme='dark'] .doc-outline a.is-active.level-3 {
+  color: var(--docs-dark-ink);
+  font-weight: 650;
 }
 
 [data-theme='dark'] .doc-markdown-toolbar {
