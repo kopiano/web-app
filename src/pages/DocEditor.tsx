@@ -111,7 +111,33 @@ function renderInlineMarkdown(text: string) {
 function CodeBlock({ content, language, headerContent }: { content: string; language: string; headerContent?: React.ReactNode }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const [isScrollReady, setIsScrollReady] = useState(false);
+  const codePreRef = useRef<HTMLPreElement | null>(null);
+  const scrollReadyTimerRef = useRef<number | null>(null);
   const lines = content.split('\n');
+
+  useEffect(() => () => {
+    if (scrollReadyTimerRef.current !== null) {
+      window.clearTimeout(scrollReadyTimerRef.current);
+    }
+  }, []);
+
+  const handlePointerEnter = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse' || isScrollReady || scrollReadyTimerRef.current !== null) return;
+    scrollReadyTimerRef.current = window.setTimeout(() => {
+      scrollReadyTimerRef.current = null;
+      setIsScrollReady(true);
+    }, 500);
+  };
+
+  const handlePointerLeave = () => {
+    if (scrollReadyTimerRef.current !== null) {
+      window.clearTimeout(scrollReadyTimerRef.current);
+      scrollReadyTimerRef.current = null;
+    }
+    if (codePreRef.current) codePreRef.current.scrollTop = 0;
+    setIsScrollReady(false);
+  };
 
   const copyCode = async () => {
     try {
@@ -137,7 +163,11 @@ function CodeBlock({ content, language, headerContent }: { content: string; lang
   };
 
   return (
-    <div className="doc-code-block">
+    <div
+      className={`doc-code-block${isScrollReady ? ' is-scroll-ready' : ''}`}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+    >
       <div className="doc-code-header">
         {headerContent ?? <span className="doc-code-language">{(language || 'text').toLowerCase()}</span>}
         <button type="button" className={`doc-code-copy${copied ? ' is-copied' : ''}`} onClick={copyCode} aria-label={t('docs.copyCode')}>
@@ -145,7 +175,7 @@ function CodeBlock({ content, language, headerContent }: { content: string; lang
           {copied ? t('docs.copied') : t('docs.copy')}
         </button>
       </div>
-      <pre>
+      <pre ref={codePreRef}>
         <code>
           {lines.map((line, index) => (
             <span className="doc-code-line" key={`${index}-${line}`}>
