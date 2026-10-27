@@ -112,6 +112,7 @@ function CodeBlock({ content, language, headerContent }: { content: string; lang
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [isScrollReady, setIsScrollReady] = useState(false);
+  const [isResettingScroll, setIsResettingScroll] = useState(false);
   const codePreRef = useRef<HTMLPreElement | null>(null);
   const scrollReadyTimerRef = useRef<number | null>(null);
   const lines = content.split('\n');
@@ -131,12 +132,14 @@ function CodeBlock({ content, language, headerContent }: { content: string; lang
   };
 
   const handlePointerLeave = () => {
+    const shouldAnimateReset = isScrollReady || (codePreRef.current?.scrollTop ?? 0) > 0;
     if (scrollReadyTimerRef.current !== null) {
       window.clearTimeout(scrollReadyTimerRef.current);
       scrollReadyTimerRef.current = null;
     }
     if (codePreRef.current) codePreRef.current.scrollTop = 0;
     setIsScrollReady(false);
+    if (shouldAnimateReset) setIsResettingScroll(true);
   };
 
   const copyCode = async () => {
@@ -164,7 +167,7 @@ function CodeBlock({ content, language, headerContent }: { content: string; lang
 
   return (
     <div
-      className={`doc-code-block${isScrollReady ? ' is-scroll-ready' : ''}`}
+      className={`doc-code-block${isScrollReady ? ' is-scroll-ready' : ''}${isResettingScroll ? ' is-resetting-scroll' : ''}`}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
     >
@@ -175,7 +178,7 @@ function CodeBlock({ content, language, headerContent }: { content: string; lang
           {copied ? t('docs.copied') : t('docs.copy')}
         </button>
       </div>
-      <pre ref={codePreRef}>
+      <pre ref={codePreRef} onAnimationEnd={() => setIsResettingScroll(false)}>
         <code>
           {lines.map((line, index) => (
             <span className="doc-code-line" key={`${index}-${line}`}>

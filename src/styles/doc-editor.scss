@@ -163,6 +163,11 @@
 .doc-code-copy.is-copied { border-color: #238636; color: #3fb950; background: rgba(35,134,54,.16); }
 .doc-code-block pre { max-height: 42rem; overflow-x: auto; overflow-y: hidden; margin: 0; padding: 1.5rem 0; color: #e6edf3; background: #0d1117; tab-size: 2; }
 .doc-code-block.is-scroll-ready pre { overflow-y: auto; }
+.doc-code-block.is-resetting-scroll pre code { animation: doc-code-scroll-reset .7s ease-in-out; }
+@keyframes doc-code-scroll-reset { 0%, 100% { opacity: 1; } 48% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .doc-code-block.is-resetting-scroll pre code { animation-duration: .01ms; }
+}
 .doc-code-block code { display: block; font: 1.27rem/1.75 ui-monospace, SFMono-Regular, Menlo, monospace; tab-size: 2; }
 .doc-code-token-comment { color: #8b949e; }
 .doc-code-token-string { color: #74d4fe; }
