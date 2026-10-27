@@ -61,6 +61,29 @@ const languageAliases: Record<string, string> = {
   'c++': 'cpp',
 };
 
+function parseCodeFenceInfo(value: string, lineCount: number) {
+  const annotation = value.trim().match(/^(.*?)\s*\{([^{}]+)\}\s*$/);
+  const language = (annotation?.[1] ?? value).trim();
+  const highlightedLines = new Set<number>();
+
+  if (!annotation) return { language, highlightedLines };
+
+  for (const entry of annotation[2].split(/[,，]/)) {
+    const lineSpec = entry.trim().match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+    if (!lineSpec) continue;
+
+    const start = Number(lineSpec[1]);
+    const end = Number(lineSpec[2] ?? lineSpec[1]);
+    if (start < 1 || end < start || start > lineCount) continue;
+
+    for (let line = start; line <= Math.min(end, lineCount); line += 1) {
+      highlightedLines.add(line);
+    }
+  }
+
+  return { language, highlightedLines };
+}
+
 function highlightCode(line: string, language: string) {
   const expandedLine = line.replace(/\t/g, '  ');
   const normalizedLanguage = language.trim().toLowerCase();
@@ -113,13 +136,13 @@ function renderInlineMarkdown(text: string, onImageClick: (src: string) => void 
 
 function CodeBlock({ content, language, headerContent }: { content: string; language: string; headerContent?: React.ReactNode }) {
   const { t } = useTranslation();
+  const lines = content.split('\n');
+  const { language: codeLanguage, highlightedLines } = parseCodeFenceInfo(language, lines.length);
   const [copied, setCopied] = useState(false);
   const [isScrollReady, setIsScrollReady] = useState(false);
   const [isResettingScroll, setIsResettingScroll] = useState(false);
   const codePreRef = useRef<HTMLPreElement | null>(null);
   const scrollReadyTimerRef = useRef<number | null>(null);
-  const lines = content.split('\n');
-
   useEffect(() => () => {
     if (scrollReadyTimerRef.current !== null) {
       window.clearTimeout(scrollReadyTimerRef.current);
@@ -175,7 +198,7 @@ function CodeBlock({ content, language, headerContent }: { content: string; lang
       onPointerLeave={handlePointerLeave}
     >
       <div className="doc-code-header">
-        {headerContent ?? <span className="doc-code-language">{(language || 'text').toLowerCase()}</span>}
+        {headerContent ?? <span className="doc-code-language">{(codeLanguage || 'text').toLowerCase()}</span>}
         <button type="button" className={`doc-code-copy${copied ? ' is-copied' : ''}`} onClick={copyCode} aria-label={t('docs.copyCode')}>
           {copied ? <Check size={14} /> : <Copy size={14} />}
           {copied ? t('docs.copied') : t('docs.copy')}
@@ -184,9 +207,9 @@ function CodeBlock({ content, language, headerContent }: { content: string; lang
       <pre ref={codePreRef} onAnimationEnd={() => setIsResettingScroll(false)}>
         <code>
           {lines.map((line, index) => (
-            <span className="doc-code-line" key={`${index}-${line}`}>
+            <span className={`doc-code-line${highlightedLines.has(index + 1) ? ' is-highlighted' : ''}`} key={`${index}-${line}`}>
               <span className="doc-code-line-number">{index + 1}</span>
-              <span className="doc-code-line-content">{highlightCode(line, language)}</span>
+              <span className="doc-code-line-content">{highlightCode(line, codeLanguage)}</span>
             </span>
           ))}
         </code>
