@@ -22,12 +22,12 @@ const documentPageCache = new Map<string, DocumentPage>();
 const DOCUMENTS_PAGE_SIZE = 12;
 
 export const documents = [
-  { id: 'quiet-system', title: 'A quiet system for brighter days', category: 'Design', date: 'Aug 08, 2026', image: bg0, accent: 'violet', content: 'Notes on shaping interfaces that feel calm, clear, and quietly alive.' },
-  { id: 'next-horizon', title: 'Building for the next horizon', category: 'Product', date: 'Aug 02, 2026', image: bg1, accent: 'blue', content: 'A field guide to turning a strong idea into a useful, enduring product.' },
-  { id: 'small-details', title: 'The language of small details', category: 'Research', date: 'Jul 26, 2026', image: bg2, accent: 'gold', content: 'Observations on motion, rhythm, and the moments that make a tool memorable.' },
-  { id: 'unfinished-worlds', title: 'A map of unfinished worlds', category: 'Engineering', date: 'Jul 18, 2026', image: bg3, accent: 'rose', content: 'Practical patterns for making complex systems easier to explore and change.' },
-  { id: 'readable-space', title: 'Light, depth, and readable space', category: 'Design', date: 'Jul 09, 2026', image: bg4, accent: 'mint', content: 'A visual study of contrast, atmosphere, and the discipline of restraint.' },
-  { id: 'beyond-interface', title: 'Notes from beyond the interface', category: 'Product', date: 'Jun 28, 2026', image: bg5, accent: 'peach', content: 'What product teams can learn from stories, games, and imagined futures.' },
+  { id: 'quiet-system', title: 'A quiet system for brighter days', category: 'Design', date: 'Aug 08, 2026', cover: bg0, accent: 'violet', content: 'Notes on shaping interfaces that feel calm, clear, and quietly alive.' },
+  { id: 'next-horizon', title: 'Building for the next horizon', category: 'Product', date: 'Aug 02, 2026', cover: bg1, accent: 'blue', content: 'A field guide to turning a strong idea into a useful, enduring product.' },
+  { id: 'small-details', title: 'The language of small details', category: 'Research', date: 'Jul 26, 2026', cover: bg2, accent: 'gold', content: 'Observations on motion, rhythm, and the moments that make a tool memorable.' },
+  { id: 'unfinished-worlds', title: 'A map of unfinished worlds', category: 'Engineering', date: 'Jul 18, 2026', cover: bg3, accent: 'rose', content: 'Practical patterns for making complex systems easier to explore and change.' },
+  { id: 'readable-space', title: 'Light, depth, and readable space', category: 'Design', date: 'Jul 09, 2026', cover: bg4, accent: 'mint', content: 'A visual study of contrast, atmosphere, and the discipline of restraint.' },
+  { id: 'beyond-interface', title: 'Notes from beyond the interface', category: 'Product', date: 'Jun 28, 2026', cover: bg5, accent: 'peach', content: 'What product teams can learn from stories, games, and imagined futures.' },
 ];
 
 export default function Docs() {
@@ -295,7 +295,7 @@ export default function Docs() {
             <article className="doc-card" key={document.id} data-accent={document.accent} onClick={() => navigate(documentHref(document.id))}>
                 <button type="button" className="doc-card-image" aria-label={`Open ${document.title}`} onClick={() => navigate(documentHref(document.id))}>
                   <img
-                    src={resolveDocumentAsset(document.image)}
+                    src={resolveDocumentAsset(document.cover)}
                     alt=""
                     loading={index < 8 ? 'eager' : 'lazy'}
                     decoding={index < 8 ? 'sync' : 'async'}

@@ -6,7 +6,7 @@ export interface RemoteDocument {
   title: string;
   category: string;
   date: string;
-  image?: string | null;
+  cover?: string | null;
   accent: string;
   content: string;
   public: boolean;
@@ -16,7 +16,7 @@ export interface RemoteDocumentContent {
   id: string;
   title: string;
   category: string;
-  image?: string | null;
+  cover?: string | null;
   content: string;
   public: boolean;
 }
@@ -40,15 +40,15 @@ export function resolveDocumentAsset(value?: string | null, cacheBust?: string |
   return `${resolved}${separator}v=${encodeURIComponent(String(cacheBust))}`;
 }
 
-export async function createDocumentCoverThumbnail(image: File) {
+export async function createDocumentCoverThumbnail(cover: File) {
   let bitmap: ImageBitmap | undefined;
   try {
-    bitmap = await createImageBitmap(image);
+    bitmap = await createImageBitmap(cover);
     const canvas = document.createElement('canvas');
     canvas.width = 720;
     canvas.height = 480;
     const context = canvas.getContext('2d');
-    if (!context) return image;
+    if (!context) return cover;
 
     const scale = Math.max(canvas.width / bitmap.width, canvas.height / bitmap.height);
     const cropWidth = canvas.width / scale;
@@ -70,15 +70,15 @@ export async function createDocumentCoverThumbnail(image: File) {
     const thumbnail = await new Promise<Blob | null>((resolve) => {
       canvas.toBlob(resolve, 'image/webp', 0.82);
     });
-    if (!thumbnail || thumbnail.type !== 'image/webp') return image;
+    if (!thumbnail || thumbnail.type !== 'image/webp') return cover;
 
-    const baseName = image.name.replace(/\.[^.]+$/, '') || 'cover';
+    const baseName = cover.name.replace(/\.[^.]+$/, '') || 'cover';
     return new File([thumbnail], `${baseName}.webp`, {
       type: 'image/webp',
-      lastModified: image.lastModified,
+      lastModified: cover.lastModified,
     });
   } catch {
-    return image;
+    return cover;
   } finally {
     bitmap?.close();
   }
@@ -158,15 +158,15 @@ export async function updateDocument(id: string, content: string) {
 export async function updateDocumentInfo(id: string, input: {
   title: string;
   category: string;
-  image?: File | null;
+  cover?: File | null;
   public: boolean;
 }) {
   const form = new FormData();
   form.append('title', input.title);
   form.append('category', input.category);
   form.append('public', String(input.public));
-  if (input.image) {
-    form.append('image', await createDocumentCoverThumbnail(input.image));
+  if (input.cover) {
+    form.append('cover', await createDocumentCoverThumbnail(input.cover));
   }
   const { data } = await request.patch<RemoteDocumentContent>(`/docs/${id}`, form);
   return data;
@@ -179,15 +179,15 @@ export async function deleteDocument(id: string) {
 export async function createDocument(input: {
   title: string;
   category: string;
-  image?: File | null;
+  cover?: File | null;
   content?: string;
 }) {
   const form = new FormData();
   form.append('title', input.title);
   form.append('category', input.category);
   if (input.content !== undefined) form.append('content', input.content);
-  if (input.image) {
-    form.append('image', await createDocumentCoverThumbnail(input.image));
+  if (input.cover) {
+    form.append('cover', await createDocumentCoverThumbnail(input.cover));
   }
   const { data } = await request.post<RemoteDocument>('/docs', form);
   return data;

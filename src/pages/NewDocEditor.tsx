@@ -12,14 +12,14 @@ export default function NewDocEditor({ onClose }: { onClose?: () => void }) {
   const close = onClose ?? (() => navigate('/docs'));
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
-  const [image, setImage] = useState<File | null>(null);
+  const [cover, setCover] = useState<File | null>(null);
   const [preview, setPreview] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const selectImage = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
-    setImage(file);
+    setCover(file);
     setPreview(file ? URL.createObjectURL(file) : '');
   };
 
@@ -29,7 +29,7 @@ export default function NewDocEditor({ onClose }: { onClose?: () => void }) {
     setSaving(true);
     setError('');
     try {
-      const document = await createDocument({ title: title.trim(), category: category.trim(), image });
+      const document = await createDocument({ title: title.trim(), category: category.trim(), cover });
       navigate(`/docs/${document.id}`, { state: { startInEdit: true } });
     } catch (cause) {
       const error = cause as {
@@ -60,9 +60,9 @@ export default function NewDocEditor({ onClose }: { onClose?: () => void }) {
           <div><h2 id="doc-create-title">{t('docs.createDocument')}</h2><p>{t('docs.updateCardDetails')}</p></div>
         </div>
         <div className="doc-create-form">
-          <div className="doc-new-image-wrap">
+          <div className="doc-new-cover-wrap">
             <label
-              className={`doc-new-image${preview ? ' has-preview' : ''}`}
+              className={`doc-new-cover${preview ? ' has-preview' : ''}`}
               style={preview ? { backgroundImage: `url("${preview}")` } : undefined}
               aria-label={preview ? t('docs.changeCover') : t('docs.chooseCover')}
               title={preview ? t('docs.changeCover') : t('docs.chooseCover')}

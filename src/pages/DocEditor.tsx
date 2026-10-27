@@ -410,14 +410,14 @@ export default function DocEditor() {
   const [remoteTitle, setRemoteTitle] = useState('');
   const [remoteCategory, setRemoteCategory] = useState('');
   const [remotePublic, setRemotePublic] = useState(false);
-  const [remoteImage, setRemoteImage] = useState<string | undefined>();
+  const [remoteCover, setRemoteCover] = useState<string | undefined>();
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoTab, setInfoTab] = useState<'detail' | 'delete'>('detail');
   const [infoTitle, setInfoTitle] = useState('');
   const [infoCategory, setInfoCategory] = useState('');
   const [infoPublic, setInfoPublic] = useState(false);
-  const [infoImage, setInfoImage] = useState<File | null>(null);
-  const [infoPreview, setInfoPreview] = useState('');
+  const [infoCover, setInfoCover] = useState<File | null>(null);
+  const [infoCoverPreview, setInfoCoverPreview] = useState('');
   const [infoSaving, setInfoSaving] = useState(false);
   const [infoDeleting, setInfoDeleting] = useState(false);
   const [infoError, setInfoError] = useState('');
@@ -470,7 +470,7 @@ export default function DocEditor() {
       setRemoteTitle(remote.title);
       setRemoteCategory(remote.category);
       setRemotePublic(remote.public === true);
-      setRemoteImage(resolveDocumentAsset(remote.image, Date.now()));
+      setRemoteCover(resolveDocumentAsset(remote.cover, Date.now()));
       const localDraft = localStorage.getItem(storageKey);
       setMarkdown(localDraft ?? remote.content);
       setSavedAt(Boolean(localDraft) || Boolean(remote.content));
@@ -538,8 +538,8 @@ export default function DocEditor() {
     setInfoTitle(remoteTitle || document.title);
     setInfoCategory(remoteCategory || document.category);
     setInfoPublic(remotePublic);
-    setInfoImage(null);
-    setInfoPreview(remoteImage || document.image);
+    setInfoCover(null);
+    setInfoCoverPreview(remoteCover || document.cover);
     setInfoTab('detail');
     setInfoError('');
     setInfoOpen(true);
@@ -563,11 +563,11 @@ export default function DocEditor() {
     if (!id || documents.some((item) => item.id === id) || !infoTitle.trim() || !infoCategory.trim() || infoSaving) return;
     setInfoSaving(true);
     try {
-      const updated = await updateDocumentInfo(id, { title: infoTitle.trim(), category: infoCategory.trim(), image: infoImage, public: infoPublic });
+      const updated = await updateDocumentInfo(id, { title: infoTitle.trim(), category: infoCategory.trim(), cover: infoCover, public: infoPublic });
       setRemoteTitle(updated.title);
       setRemoteCategory(updated.category);
       setInfoPublic(updated.public === true);
-      setRemoteImage(resolveDocumentAsset(updated.image, Date.now()));
+      setRemoteCover(resolveDocumentAsset(updated.cover, Date.now()));
       setInfoOpen(false);
     } finally {
       setInfoSaving(false);
@@ -777,7 +777,7 @@ export default function DocEditor() {
 
   return (
     <main className="doc-editor-page">
-      <header className="doc-editor-header" style={{ backgroundImage: `url("${remoteImage || document.image}")` }}>
+      <header className="doc-editor-header" style={{ backgroundImage: `url("${remoteCover || document.cover}")` }}>
         <div className="doc-editor-header-shade">
           <div className="doc-editor-header-top">
             <button type="button" className="doc-back-button" onClick={() => navigate(docsReturnUrl)}><ArrowLeft size={17} /> {t('docs.back')}</button>
@@ -841,10 +841,10 @@ export default function DocEditor() {
                 <form onSubmit={saveInfo}>
                   <div className="doc-create-heading"><span className="doc-create-icon"><Info size={22} /></span><div><h2 id="doc-info-title">{t('docs.documentDetails')}</h2><p>{t('docs.updateCardDetails')}</p></div></div>
                   <div className="doc-create-form">
-                    <div className="doc-new-image-wrap">
-                      <label className={`doc-new-image${infoPreview ? ' has-preview' : ''}`} style={infoPreview ? { backgroundImage: `url("${infoPreview}")` } : undefined} aria-label={t('docs.changeCover')}>
-                        <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0] ?? null; setInfoImage(file); setInfoPreview(file ? URL.createObjectURL(file) : infoPreview); }} />
-                        {!infoPreview && <span>{t('docs.chooseCover')}</span>}
+                    <div className="doc-new-cover-wrap">
+                      <label className={`doc-new-cover${infoCoverPreview ? ' has-preview' : ''}`} style={infoCoverPreview ? { backgroundImage: `url("${infoCoverPreview}")` } : undefined} aria-label={t('docs.changeCover')}>
+                        <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0] ?? null; setInfoCover(file); setInfoCoverPreview(file ? URL.createObjectURL(file) : infoCoverPreview); }} />
+                        {!infoCoverPreview && <span>{t('docs.chooseCover')}</span>}
                       </label>
                       <small>{t('docs.coverCropHint')}</small>
                     </div>
