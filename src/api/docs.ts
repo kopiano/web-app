@@ -16,6 +16,7 @@ export interface RemoteDocumentContent {
   id: string;
   title: string;
   category: string;
+  markdown_stem: string;
   cover?: string | null;
   content: string;
   public: boolean;
@@ -38,6 +39,50 @@ export function resolveDocumentAsset(value?: string | null, cacheBust?: string |
   if (cacheBust === undefined) return resolved;
   const separator = resolved.includes('?') ? '&' : '?';
   return `${resolved}${separator}v=${encodeURIComponent(String(cacheBust))}`;
+}
+
+export async function prepareDocumentImage(file: File) {
+  let bitmap: ImageBitmap | undefined;
+  try {
+    bitmap = await createImageBitmap(file);
+    const width = 1200;
+    const height = 800;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) return file;
+
+    const scale = Math.max(width / bitmap.width, height / bitmap.height);
+    const cropWidth = width / scale;
+    const cropHeight = height / scale;
+    context.drawImage(
+      bitmap,
+      (bitmap.width - cropWidth) / 2,
+      (bitmap.height - cropHeight) / 2,
+      cropWidth,
+      cropHeight,
+      0,
+      0,
+      width,
+      height,
+    );
+
+    const thumbnail = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/webp', 0.78);
+    });
+    if (!thumbnail || thumbnail.type !== 'image/webp') return file;
+
+    const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
+    return new File([thumbnail], `${baseName}.webp`, {
+      type: 'image/webp',
+      lastModified: file.lastModified,
+    });
+  } catch {
+    return file;
+  } finally {
+    bitmap?.close();
+  }
 }
 
 export async function createDocumentCoverThumbnail(cover: File) {
@@ -150,8 +195,22 @@ export async function getDocument(id: string) {
   return data;
 }
 
-export async function updateDocument(id: string, content: string) {
-  const { data } = await request.put<RemoteDocumentContent>(`/docs/${id}`, { content });
+export async function updateDocument(
+  id: string,
+  content: string,
+  imageRenames: Array<{ from: string; to: string }> = [],
+) {
+  const { data } = await request.put<RemoteDocumentContent>(`/docs/${id}`, {
+    content,
+    image_renames: imageRenames,
+  });
+  return data;
+}
+
+export async function uploadDocumentImage(id: string, file: File) {
+  const form = new FormData();
+  form.append('file', await prepareDocumentImage(file));
+  const { data } = await request.post<{ path: string; url: string }>(`/docs/${id}/images`, form);
   return data;
 }
 

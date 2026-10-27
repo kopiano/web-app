@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js/lib/common';
-import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Info, Italic, Link2, List, Pencil, Quote, Rows3, Save, Table2, X } from 'lucide-react';
+import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Image, ImagePlus, Info, Italic, Link2, List, Pencil, Quote, Rows3, Save, Table2, X } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import type { RootState } from '@/store/store';
-import { deleteDocument, getDocument, resolveDocumentAsset, updateDocument, updateDocumentInfo } from '@/api/docs';
+import { deleteDocument, getDocument, resolveDocumentAsset, updateDocument, updateDocumentInfo, uploadDocumentImage } from '@/api/docs';
 import { resolveAssetUrl } from '@/lib/avatar';
 import { documents } from './Docs';
 import customCodeKeywords from '@/config/codeKeywords.json';
@@ -87,14 +87,17 @@ function highlightCode(line: string, language: string) {
   }
 }
 
-function renderInlineMarkdown(text: string) {
+function renderInlineMarkdown(text: string, onImageClick: (src: string) => void = () => undefined) {
   return text.split(/(!\[[^\]]*\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g).map((part, index) => {
     const image = part.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
     if (image) {
-      const imageSrc = resolveAssetUrl(image[2].trim());
+      const imagePath = image[2].trim();
+      const imageSrc = resolveAssetUrl(imagePath.replace(/^src\/assets\/docs-img\//, '/api/assets/docs-img/'));
       return (
         <figure className="doc-markdown-image" key={`${index}-${part}`}>
-          <img src={imageSrc} alt={image[1]} loading="lazy" />
+          <button type="button" className="doc-markdown-image-preview" onClick={() => onImageClick(imageSrc)} aria-label="Preview image">
+            <img src={imageSrc} alt={image[1]} loading="lazy" />
+          </button>
           {image[1] && <figcaption>{image[1]}</figcaption>}
         </figure>
       );
@@ -239,11 +242,11 @@ function MarkdownTable({ lines }: { lines: string[] }) {
   return (
     <div className="doc-markdown-table-wrap">
       <table className="doc-markdown-table">
-        <thead><tr>{headers.map((cell, index) => <th key={`${cell}-${index}`}>{renderInlineMarkdown(cell)}</th>)}</tr></thead>
+        <thead><tr>{headers.map((cell, index) => <th key={`${cell}-${index}`}>{renderInlineMarkdown(cell, () => undefined)}</th>)}</tr></thead>
         <tbody>
           {rows.map((row, rowIndex) => (
             <tr key={rowIndex}>
-              {headers.map((_, index) => <td key={`${rowIndex}-${index}`}>{renderInlineMarkdown(row[index] ?? '')}</td>)}
+              {headers.map((_, index) => <td key={`${rowIndex}-${index}`}>{renderInlineMarkdown(row[index] ?? '', () => undefined)}</td>)}
             </tr>
           ))}
         </tbody>
@@ -261,11 +264,11 @@ function BoxTable({ lines }: { lines: string[] }) {
   return (
     <div className="doc-markdown-table-wrap">
       <table className="doc-markdown-table">
-        <thead><tr>{headers.map((cell, index) => <th key={`${cell}-${index}`}>{renderInlineMarkdown(cell)}</th>)}</tr></thead>
+        <thead><tr>{headers.map((cell, index) => <th key={`${cell}-${index}`}>{renderInlineMarkdown(cell, () => undefined)}</th>)}</tr></thead>
         <tbody>
           {rows.slice(1).map((row, rowIndex) => (
             <tr key={rowIndex}>
-              {headers.map((_, index) => <td key={`${rowIndex}-${index}`}>{renderInlineMarkdown(row[index] ?? '')}</td>)}
+              {headers.map((_, index) => <td key={`${rowIndex}-${index}`}>{renderInlineMarkdown(row[index] ?? '', () => undefined)}</td>)}
             </tr>
           ))}
         </tbody>
@@ -319,7 +322,7 @@ function separateMarkdownTables(markdown: string) {
   return result.join('\n');
 }
 
-function renderMarkdown(markdown: string) {
+function renderMarkdown(markdown: string, onImageClick: (src: string) => void) {
   const markdownWithBlockBoundaries = separateMarkdownTables(markdown)
     .split('\n')
     .reduce<{ lines: string[]; inFence: boolean }>((state, line, index, lines) => {
@@ -382,14 +385,14 @@ function renderMarkdown(markdown: string) {
     if (headingLevel === 3) return <h3 id={createHeadingId(headingLabel, headingOccurrence)} key={index}>{headingLabel}</h3>;
     const unorderedItems = lines.map((line) => line.match(/^\s*[-*+]\s+(.+)$/)?.[1]);
     if (unorderedItems.every((item): item is string => Boolean(item))) {
-      return <ul key={index}>{unorderedItems.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item)}</li>)}</ul>;
+      return <ul key={index}>{unorderedItems.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item, onImageClick)}</li>)}</ul>;
     }
     const orderedItems = lines.map((line) => line.match(/^\s*\d+[.)]\s+(.+)$/)?.[1]);
     if (orderedItems.every((item): item is string => Boolean(item))) {
-      return <ol key={index}>{orderedItems.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item)}</li>)}</ol>;
+      return <ol key={index}>{orderedItems.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item, onImageClick)}</li>)}</ol>;
     }
-    if (first.startsWith('> ')) return <blockquote key={index}>{renderInlineMarkdown(first.slice(2))}</blockquote>;
-    return <p key={index}>{lines.map((line, lineIndex) => <span key={`${index}-${lineIndex}`}>{lineIndex > 0 && <br />}{renderInlineMarkdown(line)}</span>)}</p>;
+    if (first.startsWith('> ')) return <blockquote key={index}>{renderInlineMarkdown(first.slice(2), onImageClick)}</blockquote>;
+    return <p key={index}>{lines.map((line, lineIndex) => <span key={`${index}-${lineIndex}`}>{lineIndex > 0 && <br />}{renderInlineMarkdown(line, onImageClick)}</span>)}</p>;
   });
 }
 
@@ -411,6 +414,9 @@ export default function DocEditor() {
   const [remoteCategory, setRemoteCategory] = useState('');
   const [remotePublic, setRemotePublic] = useState(false);
   const [remoteCover, setRemoteCover] = useState<string | undefined>();
+  const [imagePreviewUrl, setImagePreviewUrl] = useState('');
+  const [imageUploadError, setImageUploadError] = useState('');
+  const [isImageDropActive, setIsImageDropActive] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoTab, setInfoTab] = useState<'detail' | 'delete'>('detail');
   const [infoTitle, setInfoTitle] = useState('');
@@ -430,14 +436,22 @@ export default function DocEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [remoteLoaded, setRemoteLoaded] = useState(() => !Boolean(currentUser && id && !documents.some((item) => item.id === id)));
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const imageRenameMapRef = useRef<Record<string, string>>({});
+  const [imageNameDrafts, setImageNameDrafts] = useState<Record<string, string>>({});
   const previewRef = useRef<HTMLElement>(null);
   const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const displayTitle = remoteTitle || document.title;
   const isRemoteDocument = Boolean(currentUser && id && !documents.some((item) => item.id === id));
-  const previewContent = useMemo(() => renderMarkdown(markdown), [markdown]);
+  const previewContent = useMemo(() => renderMarkdown(markdown, setImagePreviewUrl), [markdown]);
+  const documentImages = useMemo(
+    () => Array.from(markdown.matchAll(/!\[[^\]]*\]\((src\/assets\/docs-img\/[^)\s]+)\)/g), (match) => match[1]),
+    [markdown],
+  );
 
   const saveDocument = useCallback(() => {
     const contentToSave = markdown;
+    const imageRenamesToSave = { ...imageRenameMapRef.current };
     const save = async () => {
       localStorage.setItem(storageKey, contentToSave);
       if (!isRemoteDocument) {
@@ -446,7 +460,17 @@ export default function DocEditor() {
       }
       setIsSaving(true);
       try {
-        await updateDocument(id!, contentToSave);
+        await updateDocument(
+          id!,
+          contentToSave,
+          Object.entries(imageRenamesToSave).map(([from, to]) => ({
+            from: from.slice(from.lastIndexOf('/') + 1),
+            to: to.slice(to.lastIndexOf('/') + 1),
+          })),
+        );
+        for (const [from, to] of Object.entries(imageRenamesToSave)) {
+          if (imageRenameMapRef.current[from] === to) delete imageRenameMapRef.current[from];
+        }
         setSavedAt(true);
         return true;
       } catch {
@@ -532,6 +556,75 @@ export default function DocEditor() {
       const cursor = start + before.length + selected.length + after.length;
       editor.setSelectionRange(cursor, cursor);
     });
+  };
+
+  const insertAtSelection = (text: string) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const next = `${markdown.slice(0, start)}${text}${markdown.slice(end)}`;
+    setMarkdown(next);
+    setSavedAt(false);
+    requestAnimationFrame(() => {
+      editor.focus();
+      editor.setSelectionRange(start + text.length, start + text.length);
+    });
+  };
+
+  const uploadAndInsertImages = async (files: FileList | File[]) => {
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    if (!imageFiles.length) return;
+    if (!id || !isRemoteDocument) {
+      setImageUploadError('Save this document to your account before uploading images.');
+      return;
+    }
+    setImageUploadError('');
+    try {
+      const uploaded = await Promise.all(imageFiles.map((file) => uploadDocumentImage(id, file)));
+      insertAtSelection(uploaded.map((item) => `![](${item.path})`).join('\n\n'));
+    } catch {
+      setImageUploadError('Image upload failed. Please try again.');
+    }
+  };
+
+  const handleEditorPaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === 'file')
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file && file.type.startsWith('image/')));
+    if (!files.length) return;
+    event.preventDefault();
+    void uploadAndInsertImages(files);
+  };
+
+  const handleEditorDrop = (event: React.DragEvent<HTMLTextAreaElement>) => {
+    const files = event.dataTransfer.files;
+    if (!Array.from(files).some((file) => file.type.startsWith('image/'))) return;
+    event.preventDefault();
+    setIsImageDropActive(false);
+    void uploadAndInsertImages(files);
+  };
+
+  const renameDocumentImage = (oldPath: string, nextName: string) => {
+    const cleanName = nextName.trim().replace(/[^a-zA-Z0-9._-]/g, '');
+    const currentName = oldPath.slice(oldPath.lastIndexOf('/') + 1);
+    const nextPath = `${oldPath.slice(0, oldPath.lastIndexOf('/') + 1)}${cleanName}`;
+    if (!cleanName || !cleanName.endsWith('.webp') || (nextPath !== oldPath && documentImages.includes(nextPath))) {
+      setImageNameDrafts((drafts) => ({ ...drafts, [oldPath]: currentName }));
+      return;
+    }
+    const renameMap = imageRenameMapRef.current;
+    const originalPath = Object.keys(renameMap).find((path) => renameMap[path] === oldPath) ?? oldPath;
+    renameMap[originalPath] = nextPath;
+    setImageNameDrafts((drafts) => {
+      const nextDrafts = { ...drafts };
+      delete nextDrafts[oldPath];
+      nextDrafts[nextPath] = cleanName;
+      return nextDrafts;
+    });
+    setMarkdown((value) => value.split(oldPath).join(nextPath));
+    setSavedAt(false);
   };
 
   const openInfo = () => {
@@ -818,11 +911,32 @@ export default function DocEditor() {
               <button type="button" onClick={insertTable} aria-label={t('docs.insertTable')}><Table2 size={16} /></button>
               <button type="button" onClick={insertUnicodeTable} aria-label={t('docs.insertUnicodeTable')}><Rows3 size={16} /></button>
               <button type="button" onClick={() => insertMarkdown('[', '](https://)', 'link text')} aria-label={t('docs.link')}><Link2 size={16} /></button>
+              <button type="button" onClick={() => imageInputRef.current?.click()} aria-label="Upload image" title="Upload image"><ImagePlus size={16} /></button>
             </div>
-            <textarea ref={editorRef} className="doc-markdown-editor" value={markdown} onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }} onKeyDown={handleEditorKeyDown} spellCheck={false} aria-label={`${t('docs.markdownEditor')} ${displayTitle}`} />
+            <input ref={imageInputRef} className="doc-image-input" type="file" accept="image/*" multiple onChange={(event) => { if (event.target.files) void uploadAndInsertImages(event.target.files); event.currentTarget.value = ''; }} />
+            {imageUploadError && <p className="doc-image-upload-error" role="alert">{imageUploadError}</p>}
+            {documentImages.length > 0 && <div className="doc-image-name-list" aria-label="Document images">{Array.from(new Set(documentImages)).map((path) => {
+              const filename = path.slice(path.lastIndexOf('/') + 1);
+              return <label key={path}><Image size={14} /><input aria-label="Image filename" value={imageNameDrafts[path] ?? filename} onChange={(event) => setImageNameDrafts((drafts) => ({ ...drafts, [path]: event.target.value }))} onBlur={(event) => renameDocumentImage(path, event.currentTarget.value)} /></label>;
+            })}</div>}
+            <textarea
+              ref={editorRef}
+              className={`doc-markdown-editor${isImageDropActive ? ' is-image-drop-active' : ''}`}
+              value={markdown}
+              onChange={(event) => { setMarkdown(event.target.value); setSavedAt(false); }}
+              onKeyDown={handleEditorKeyDown}
+              onPaste={handleEditorPaste}
+              onDragEnter={(event) => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); setIsImageDropActive(true); } }}
+              onDragOver={(event) => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
+              onDragLeave={() => setIsImageDropActive(false)}
+              onDrop={handleEditorDrop}
+              spellCheck={false}
+              aria-label={`${t('docs.markdownEditor')} ${displayTitle}`}
+            />
         </div>
         <article ref={previewRef} className={`doc-markdown-preview${mode === 'preview' ? ' is-visible' : ''}`} aria-hidden={mode !== 'preview'}>{previewContent}</article>
       </div>
+      {imagePreviewUrl && <button type="button" className="doc-image-lightbox" onClick={() => setImagePreviewUrl('')} aria-label="Close image preview"><img src={imagePreviewUrl} alt="" /><X size={22} /></button>}
       {infoOpen && (
         <main className="doc-create-overlay">
           <button type="button" className="doc-create-backdrop" onClick={() => setInfoOpen(false)} aria-label={t('docs.closeDocumentInformation')} />

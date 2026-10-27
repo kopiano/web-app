@@ -93,7 +93,13 @@
 .doc-markdown-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; padding: 1.2rem 1.6rem; border-bottom: 1px solid rgba(38,48,46,.1); background: rgba(255,255,255,.32); }
 .doc-markdown-toolbar button { width: 3.2rem; height: 3rem; display: grid; place-items: center; border-radius: .8rem; color: rgba(38,48,46,.6); background: transparent; }
 .doc-markdown-toolbar button:hover { color: #26302e; background: rgba(255,255,255,.72); }
+.doc-image-input { display: none; }
+.doc-image-upload-error { margin: 0; padding: .7rem 1.6rem; color: #9b3d3d; background: rgba(255,229,229,.7); font-size: 1.15rem; }
+.doc-image-name-list { display: flex; flex-wrap: wrap; gap: .55rem; padding: .8rem 1.6rem; border-bottom: 1px solid rgba(38,48,46,.1); background: rgba(255,255,255,.22); }
+.doc-image-name-list label { display: inline-flex; align-items: center; gap: .45rem; min-width: 0; padding: .35rem .6rem; border: 1px solid rgba(38,48,46,.14); border-radius: .6rem; color: rgba(38,48,46,.65); background: rgba(255,255,255,.52); }
+.doc-image-name-list input { width: 9rem; min-width: 0; border: 0; outline: 0; color: inherit; background: transparent; font: 1.05rem ui-monospace, SFMono-Regular, Menlo, monospace; }
 .doc-markdown-editor { width: 100%; min-width: 0; min-height: 48rem; flex: 0 0 auto; overflow: hidden; resize: none; padding: 3rem clamp(2rem, 6vw, 8rem); border: 0; outline: 0; color: #34403c; background: rgba(255,255,255,.18); font: 1.4rem/1.9 ui-monospace, SFMono-Regular, Menlo, monospace; tab-size: 2; }
+.doc-markdown-editor.is-image-drop-active { outline: 2px dashed rgba(111,77,131,.62); outline-offset: -1rem; background: rgba(231,220,238,.35); }
 .doc-markdown-editor::selection { color: #26302e; background: rgba(171, 142, 190, .24); }
 .doc-markdown-preview { width: 100%; min-height: 62rem; justify-self: center; padding: 5.8rem clamp(2.8rem, 7vw, 9rem) 7rem; background: rgba(255,255,255,.5); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .doc-markdown-preview h1 { margin: 0 0 3.6rem; color: #26302e; font-family: inherit; font-size: clamp(3rem, 4vw, 4.4rem); font-weight: 650; line-height: 1.12; letter-spacing: -.02em; }
@@ -106,6 +112,7 @@
 .doc-markdown-preview em { color: #634879; }
 .doc-markdown-preview a { color: #6f4d83; text-decoration: underline; text-decoration-color: rgba(111,77,131,.35); text-underline-offset: .18em; }
 .doc-markdown-image { max-width: 72rem; margin: 2.4rem 0 2.8rem; }
+.doc-markdown-image-preview { display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; }
 .doc-markdown-image img { display: block; width: 100%; max-height: 52rem; object-fit: cover; border: 1px solid rgba(255,255,255,.72); border-radius: 1.5rem; background: rgba(255,255,255,.36); box-shadow: 0 1.2rem 2.8rem rgba(55,63,61,.14); }
 .doc-markdown-image figcaption { margin-top: .85rem; color: rgba(38,48,46,.5); font-size: 1.1rem; line-height: 1.5; text-align: center; }
 .doc-markdown-preview ul { max-width: 72rem; margin: 1.2rem 0 2.2rem; padding-left: 2.2rem; list-style: disc; }
@@ -190,6 +197,9 @@
 .doc-code-line-content { padding-right: 2rem; white-space: pre; word-spacing: normal; letter-spacing: 0; tab-size: 2;}
 .doc-markdown-preview { grid-column: 1; grid-row: 1; visibility: hidden; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); transition: opacity .2s ease, visibility 0s linear .2s; }
 .doc-markdown-preview.is-visible { visibility: visible; opacity: 1; pointer-events: auto; transition: opacity .2s ease, visibility 0s linear 0s; }
+.doc-image-lightbox { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 5vw; border: 0; color: #fff; background: rgba(20,25,25,.82); cursor: zoom-out; }
+.doc-image-lightbox img { max-width: min(92vw, 110rem); max-height: 88vh; object-fit: contain; border-radius: 1rem; box-shadow: 0 2rem 6rem rgba(0,0,0,.35); }
+.doc-image-lightbox svg { position: absolute; top: 2rem; right: 2rem; }
 .doc-editor-workspace.is-edit { grid-template-columns: minmax(0, 1fr); }
 .doc-new-page { width: min(100%, 92rem); margin: 0 auto; padding: 1.8rem 2.2rem 3rem; border: 1px solid rgba(255,255,255,.78); border-radius: 2rem; background: rgba(255,255,255,.58); box-shadow: 0 2rem 5rem rgba(55,63,61,.12); }
 .doc-new-topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 2.4rem; }
