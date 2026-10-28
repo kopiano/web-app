@@ -1340,6 +1340,7 @@ function VideoWatch({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [volumeControlOpen, setVolumeControlOpen] = useState(false);
   const [loopMenuOpen, setLoopMenuOpen] = useState(false);
+  const [loopAnimation, setLoopAnimation] = useState<'intro' | 'on' | 'off' | null>(null);
   const [singleLoop, setSingleLoop] = useState(false);
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -1739,12 +1740,24 @@ function VideoWatch({
                     />
                   </div>
                   <div
-                    className={`video-watch-settings${loopMenuOpen ? ' is-open' : ''}`}
-                    onPointerEnter={() => setLoopMenuOpen(true)}
-                    onPointerLeave={() => setLoopMenuOpen(false)}
-                    onFocus={() => setLoopMenuOpen(true)}
+                    className={`video-watch-settings${loopMenuOpen ? ' is-open' : ''}${loopAnimation ? ` is-loop-${loopAnimation}` : ''}`}
+                    onPointerEnter={() => {
+                      setLoopMenuOpen(true);
+                      setLoopAnimation('intro');
+                    }}
+                    onPointerLeave={() => {
+                      setLoopMenuOpen(false);
+                      setLoopAnimation(null);
+                    }}
+                    onFocus={() => {
+                      setLoopMenuOpen(true);
+                      setLoopAnimation('intro');
+                    }}
                     onBlur={(event) => {
-                      if (!event.currentTarget.contains(event.relatedTarget)) setLoopMenuOpen(false);
+                      if (!event.currentTarget.contains(event.relatedTarget)) {
+                        setLoopMenuOpen(false);
+                        setLoopAnimation(null);
+                      }
                     }}
                   >
                     <button type="button" aria-label={t('video.player.settings')}><Settings2 size={18} /></button>
@@ -1755,14 +1768,33 @@ function VideoWatch({
                         aria-label={singleLoop ? t('video.player.singleLoopOn') : t('video.player.singleLoopOff')}
                         aria-pressed={singleLoop}
                         title={singleLoop ? t('video.player.singleLoopOn') : t('video.player.singleLoopOff')}
-                        onClick={() => setSingleLoop((enabled) => !enabled)}
+                        onClick={() => {
+                          setLoopAnimation(singleLoop ? 'off' : 'on');
+                          setSingleLoop((enabled) => !enabled);
+                        }}
                       >
                         <span className="video-watch-loop-icon" aria-hidden="true">
                           <svg viewBox="0 0 1025 1024" focusable="false">
-                            {singleLoop && (
-                              <path d="M464.444076 698.006706a53.692824 53.692824 0 0 1-28.380493-7.670403 55.610424 55.610424 0 0 1-28.380492-48.707061V383.520168a56.760985 56.760985 0 0 1 84.757957-49.090581l224.742819 129.629817a56.377465 56.377465 0 0 1 27.996972 49.090581 55.226904 55.226904 0 0 1-27.996972 48.707062L492.441048 690.336303a53.309303 53.309303 0 0 1-27.996972 7.670403z m0-334.046066a16.491367 16.491367 0 0 0-9.204484 2.684641 17.641928 17.641928 0 0 0-9.204484 15.724327v259.259634a18.408968 18.408968 0 0 0 9.204484 15.724327 18.025448 18.025448 0 0 0 18.025448 0l224.742818-129.629817a18.025448 18.025448 0 0 0 8.820964-15.724327 17.641928 17.641928 0 0 0-8.820964-15.724327l-224.742818-129.629817a16.491367 16.491367 0 0 0-8.820964-2.684641z" />
-                            )}
-                            <path d="M513.151137 1023.998849A511.999425 511.999425 0 0 1 510.850016 0a19.176008 19.176008 0 0 1 19.176008 19.176008 19.176008 19.176008 0 0 1-18.792488 19.176009 473.647408 473.647408 0 1 0 475.565009 473.647408 469.045166 469.045166 0 0 0-139.984861-335.580148 19.176008 19.176008 0 0 1 26.846411-27.613452 511.615905 511.615905 0 0 1-360.508958 875.193024z" />
+                            <path
+                              className="video-watch-loop-play-draw"
+                              pathLength="1"
+                              d="M428 384 Q428 360 453 354 L733 492 Q773 512 733 529 L500 661 Q428 697 428 640 Z"
+                              onAnimationEnd={() => {
+                                setLoopAnimation((animation) => (
+                                  animation === 'on' || animation === 'off' ? null : animation
+                                ));
+                              }}
+                            />
+                            <path className="video-watch-loop-play-fill" d="M464.444076 698.006706a53.692824 53.692824 0 0 1-28.380493-7.670403 55.610424 55.610424 0 0 1-28.380492-48.707061V383.520168a56.760985 56.760985 0 0 1 84.757957-49.090581l224.742819 129.629817a56.377465 56.377465 0 0 1 27.996972 49.090581 55.226904 55.226904 0 0 1-27.996972 48.707062L492.441048 690.336303a53.309303 53.309303 0 0 1-27.996972 7.670403z m0-334.046066a16.491367 16.491367 0 0 0-9.204484 2.684641 17.641928 17.641928 0 0 0-9.204484 15.724327v259.259634a18.408968 18.408968 0 0 0 9.204484 15.724327 18.025448 18.025448 0 0 0 18.025448 0l224.742818-129.629817a18.025448 18.025448 0 0 0 8.820964-15.724327 17.641928 17.641928 0 0 0-8.820964-15.724327l-224.742818-129.629817a16.491367 16.491367 0 0 0-8.820964-2.684641z" />
+                            <path
+                              className="video-watch-loop-ring-draw"
+                              pathLength="1"
+                              d="M 513 19 A 493 493 0 1 0 861 163"
+                              onAnimationEnd={() => {
+                                setLoopAnimation((animation) => animation === 'intro' ? null : animation);
+                              }}
+                            />
+                            <path className="video-watch-loop-ring-fill" d="M513.151137 1023.998849A511.999425 511.999425 0 0 1 510.850016 0a19.176008 19.176008 0 0 1 19.176008 19.176008 19.176008 19.176008 0 0 1-18.792488 19.176009 473.647408 473.647408 0 1 0 475.565009 473.647408 469.045166 469.045166 0 0 0-139.984861-335.580148 19.176008 19.176008 0 0 1 26.846411-27.613452 511.615905 511.615905 0 0 1-360.508958 875.193024z" />
                           </svg>
                         </span>
                         <span className="video-watch-loop-label">Single loop</span>

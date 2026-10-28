@@ -2506,7 +2506,7 @@
   backdrop-filter: blur(16px);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(0.45rem) scale(0.94);
+  transform: translateY(0.45rem);
   transition: opacity 0.16s ease, transform 0.2s ease;
 }
 
@@ -2561,16 +2561,159 @@
   fill: currentColor;
 }
 
+.video-watch-loop-icon > svg .video-watch-loop-ring-draw,
+.video-watch-loop-icon > svg .video-watch-loop-play-draw {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 40;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+
+.video-watch-loop-ring-fill {
+  opacity: 1;
+}
+
+.video-watch-loop-play-fill {
+  opacity: 0;
+}
+
+.video-watch-loop-menu button.is-active .video-watch-loop-play-fill {
+  opacity: 1;
+}
+
+.video-watch-settings.is-loop-intro .video-watch-loop-ring-draw {
+  animation: video-watch-loop-ring-draw 0.8s ease-out both;
+}
+
+.video-watch-settings.is-loop-intro .video-watch-loop-ring-fill {
+  animation: video-watch-loop-fill-reveal 0.8s steps(1, end) both;
+}
+
+.video-watch-settings.is-loop-on .video-watch-loop-play-draw {
+  animation: video-watch-loop-play-draw 0.7s ease-out both;
+}
+
+.video-watch-settings.is-loop-on .video-watch-loop-play-fill {
+  animation: video-watch-loop-fill-reveal 0.7s steps(1, end) both;
+}
+
+.video-watch-settings.is-loop-off .video-watch-loop-play-draw {
+  animation: video-watch-loop-play-erase 0.7s ease-in both;
+}
+
+.video-watch-settings.is-loop-off .video-watch-loop-play-fill {
+  opacity: 0;
+}
+
+@keyframes video-watch-loop-ring-draw {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 1;
+  }
+
+  72% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+
+  99.9% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+    animation-timing-function: steps(1, end);
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes video-watch-loop-play-draw {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 1;
+  }
+
+  72% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+
+  99.9% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+    animation-timing-function: steps(1, end);
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes video-watch-loop-play-erase {
+  0% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+
+  99.9% {
+    stroke-dashoffset: 1;
+    opacity: 1;
+    animation-timing-function: steps(1, end);
+  }
+
+  100% {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+}
+
+@keyframes video-watch-loop-fill-reveal {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
 .video-watch-settings.is-open .video-watch-loop-menu {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0) scale(1);
+  transform: translateY(0);
 }
 
 .video-watch-loop-menu button.is-active {
   color: #fff;
   background: rgba(255, 255, 255, 0.08);
   box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-watch-settings.is-loop-intro .video-watch-loop-ring-draw,
+  .video-watch-settings.is-loop-intro .video-watch-loop-ring-fill,
+  .video-watch-settings.is-loop-on .video-watch-loop-play-draw,
+  .video-watch-settings.is-loop-on .video-watch-loop-play-fill,
+  .video-watch-settings.is-loop-off .video-watch-loop-play-draw {
+    animation: none;
+    opacity: 1;
+  }
+
+  .video-watch-loop-ring-draw,
+  .video-watch-loop-play-draw {
+    opacity: 0;
+  }
+
+  .video-watch-settings.is-loop-intro .video-watch-loop-ring-fill,
+  .video-watch-settings.is-loop-off .video-watch-loop-play-fill {
+    opacity: 1;
+  }
 }
 
 .video-watch-volume-range {

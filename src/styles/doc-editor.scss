@@ -233,7 +233,7 @@
   background-color: rgba(250, 247, 247, 0.11);
   box-shadow: inset 3px 0 0 #58a6ff; }
 .doc-code-line.is-highlighted .doc-code-line-number { color: #8fc8ff; }
-.doc-code-line.is-highlighted:hover { background: linear-gradient(90deg, rgba(88,166,255,.2), rgba(88,166,255,.08) 72%, rgba(88,166,255,.035)); }
+// .doc-code-line.is-highlighted:hover { background: linear-gradient(90deg, rgba(88,166,255,.2), rgba(88,166,255,.08) 72%, rgba(88,166,255,.035)); }
 .doc-code-line-number { padding-right: 1.4rem; color: #949494; text-align: right; user-select: none; }
 .doc-code-line-content { padding-right: 2rem; white-space: pre; word-spacing: normal; letter-spacing: 0; tab-size: 2;}
 .doc-markdown-preview { grid-column: 1; grid-row: 1; visibility: hidden; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); transition: opacity .2s ease, visibility 0s linear .2s; }
