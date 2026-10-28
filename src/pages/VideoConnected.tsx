@@ -1701,7 +1701,10 @@ function VideoWatch({
                     <span
                       className={`video-watch-playback-icon ${isPlaying ? 'video-watch-playback-icon--pause' : 'video-watch-playback-icon--play'}`}
                       aria-hidden="true"
-                    />
+                    >
+                      <span className="video-watch-playback-icon__play" />
+                      <span className="video-watch-playback-icon__pause" />
+                    </span>
                   </button>
                   <span className="video-watch-time">
                     {formatPlaybackTime(currentTime)} <i>/</i> {formatPlaybackTime(duration)}
