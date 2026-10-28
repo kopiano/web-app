@@ -156,7 +156,7 @@
 
 [data-theme='dark'] .docs-dock button:hover:not(.is-active) {
   color: #fff;
-  background: var(--docs-dark-hover);
+  // background: var(--docs-dark-hover);
 }
 
 [data-theme='dark'] .docs-dock::before {

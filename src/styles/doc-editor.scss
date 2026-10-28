@@ -125,7 +125,12 @@
 }
 .doc-markdown-editor.is-image-drop-active { outline: 2px dashed rgba(111,77,131,.62); outline-offset: -1rem; background: rgba(231,220,238,.35); }
 .doc-markdown-editor::selection { color: #26302e; background: rgba(171, 142, 190, .24); }
-.doc-markdown-preview { width: 100%; min-height: 62rem; justify-self: center; padding: 5.8rem clamp(2.8rem, 7vw, 9rem) 7rem; background: rgba(255,255,255,.5); font-family: "Comfortaa", sans-serif; }
+.doc-markdown-preview { width: 100%; min-height: 0; justify-self: center;
+  padding: 5.8rem clamp(2.8rem, 7vw, 9rem) 3rem; background: rgba(255,255,255,.5);
+  font-family: "Comfortaa", sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
 .doc-markdown-preview h1 { margin: 0 0 3.6rem; color: #26302e; font-family: inherit; font-size: clamp(3rem, 4vw, 4.4rem); font-weight: 650; line-height: 1.12; letter-spacing: -.02em; }
 .doc-markdown-preview h2 { margin: 5rem 0 1.4rem; padding-bottom: .8rem; border-bottom: 1px solid rgba(38,48,46,.1); color: #26302e; font-family: inherit; font-size: clamp(2.2rem, 3vw, 2.8rem); font-weight: 650; line-height: 1.2; letter-spacing: -.015em; }
 .doc-markdown-preview h3 { margin: 3rem 0 1rem; color: #26302e; font-family: inherit; font-size: 1.75rem; font-weight: 650; line-height: 1.35; }
@@ -233,6 +238,7 @@
 .doc-code-line-content { padding-right: 2rem; white-space: pre; word-spacing: normal; letter-spacing: 0; tab-size: 2;}
 .doc-markdown-preview { grid-column: 1; grid-row: 1; visibility: hidden; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; box-shadow: 0 2rem 5rem rgba(55,63,61,.12); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); transition: opacity .2s ease, visibility 0s linear .2s; }
 .doc-markdown-preview.is-visible { visibility: visible; opacity: 1; pointer-events: auto; transition: opacity .2s ease, visibility 0s linear 0s; }
+.doc-editor-workspace.is-preview { min-height: 0; }
 .doc-image-lightbox { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 5vw; border: 0; color: #fff; background: rgba(20,25,25,.82); cursor: zoom-out; }
 .doc-image-lightbox img { max-width: min(92vw, 110rem); max-height: 88vh; object-fit: contain; border-radius: 1rem; box-shadow: 0 2rem 6rem rgba(0,0,0,.35); }
 .doc-image-lightbox svg { position: absolute; top: 2rem; right: 2rem; }
@@ -379,6 +385,7 @@
   .doc-editor-header-shade { padding: 1.8rem; }
   .doc-editor-save-status { padding: .65rem .8rem; font-size: 1rem; }
   .doc-editor-workspace, .doc-editor-workspace.is-edit { display: flex; flex-direction: column; height: auto; min-height: 58rem; }
+  .doc-editor-workspace.is-preview { min-height: 0; }
   .doc-editor-workspace { background: rgba(255,255,255,.6); border: 1px solid rgba(255,255,255,.78); border-radius: 0 0 2rem 2rem; overflow: hidden; box-shadow: 0 2rem 5rem rgba(55,63,61,.12); }
   .doc-outline { position: static; width: auto; height: auto; min-height: 0; max-height: none; margin-bottom: 1rem; border: 1px solid rgba(255,255,255,.78); border-radius: 1.2rem; box-shadow: 0 1rem 2rem rgba(55,63,61,.08); }
   .doc-outline nav { flex-direction: row; overflow-x: auto; }
@@ -389,12 +396,11 @@
   .doc-markdown-toolbar button { width: 2.8rem; height: 2.8rem; }
   .doc-markdown-editor-mirror { padding: 3.2rem 1.8rem 4.8rem; }
   .doc-markdown-editor { height: 48rem; min-height: 48rem; padding: 3.2rem 1.8rem 4.8rem; }
-  .doc-markdown-preview { height: auto; min-height: 58rem; padding: 3.2rem 1.8rem 4.8rem; }
+  .doc-markdown-preview { height: auto; min-height: 0; padding: 3.2rem 1.8rem 2.4rem; }
   .doc-markdown-preview h1 { margin-bottom: 2.8rem; font-size: 3rem; }
   .doc-markdown-preview h2 { margin-top: 3.8rem; font-size: 2.25rem; }
   .doc-markdown-preview p, .doc-markdown-preview li { font-size: 1.48rem; line-height: 1.82; }
   .doc-markdown-toolbar { padding-inline: 1rem; }
-  .doc-editor-workspace.is-preview .doc-markdown-preview { min-height: 58rem; }
   .docs-create-button { right: 1.4rem; bottom: 1.4rem; }
   .doc-new-page { padding: 1.2rem; }
   .doc-new-form { grid-template-columns: 1fr; }

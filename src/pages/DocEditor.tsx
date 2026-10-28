@@ -97,6 +97,34 @@ function isFenceClosing(line: string, fence: MarkdownFence) {
   return new RegExp(`^ {0,3}${marker}{${fence.length},}[ \\t]*$`).test(line);
 }
 
+function parseCodeTabs(content: string) {
+  const lines = content.split('\n');
+  const tabs: Array<{ label: string; language: string; content: string }> = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const labelMatch = lines[index].trim().match(/^:::\s+(.+?)\s*$/);
+    if (!labelMatch) continue;
+
+    let fenceIndex = index + 1;
+    while (fenceIndex < lines.length && !lines[fenceIndex].trim()) fenceIndex += 1;
+    const fence = parseFenceOpening(lines[fenceIndex] ?? '');
+    if (!fence) continue;
+
+    let closingIndex = fenceIndex + 1;
+    while (closingIndex < lines.length && !isFenceClosing(lines[closingIndex], fence)) closingIndex += 1;
+    if (closingIndex === lines.length) continue;
+
+    tabs.push({
+      label: labelMatch[1].trim(),
+      language: fence.info,
+      content: lines.slice(fenceIndex + 1, closingIndex).join('\n'),
+    });
+    index = closingIndex;
+  }
+
+  return tabs;
+}
+
 function highlightCode(line: string, language: string) {
   const expandedLine = line.replace(/\t/g, '  ');
   const normalizedLanguage = language.trim().toLowerCase();
@@ -244,12 +272,7 @@ const CodeBlock = memo(function CodeBlock({ content, language, headerContent, so
 
 function CodeTabs({ content, sourceLine }: { content: string; sourceLine?: number }) {
   const { t } = useTranslation();
-  const tabs = Array.from(content.matchAll(/:::\s*([^\n]+)\n```([^\n]*)\n([\s\S]*?)```\s*:::/g))
-    .map((match) => ({
-      label: match[1].trim(),
-      language: match[2].trim(),
-      content: match[3].replace(/^\n/, '').replace(/\n$/, ''),
-    }));
+  const tabs = parseCodeTabs(content);
   const [activeTab, setActiveTab] = useState(0);
 
   if (!tabs.length) return null;
@@ -258,6 +281,7 @@ function CodeTabs({ content, sourceLine }: { content: string; sourceLine?: numbe
   return (
     <div className="doc-code-tabs" data-source-line={sourceLine}>
       <CodeBlock
+        key={`${active.label}-${activeTab}`}
         content={active.content}
         language={active.language}
         sourceLine={sourceLine}
@@ -466,13 +490,13 @@ function renderMarkdown(markdown: string, onImageClick: (src: string) => void) {
       continue;
     }
     if (codeTabsStart >= 0) {
-      if (line.startsWith('::::')) {
+      if (line.trim() === '::::') {
         specialBlockRanges.push({ start: codeTabsStart, end });
         codeTabsStart = -1;
       }
       continue;
     }
-    if (line.startsWith('::::')) {
+    if (line.trim() === '::::') {
       codeTabsStart = start;
       continue;
     }
@@ -521,8 +545,8 @@ function renderMarkdown(markdown: string, onImageClick: (src: string) => void) {
     let renderedBlock: ReactElement;
     const openingFence = parseFenceOpening(first);
 
-    if (block.startsWith('::::') && block.endsWith('::::')) {
-      renderedBlock = <CodeTabs key={index} content={block.slice(4, -4).trim()} sourceLine={sourceLineIndex} />;
+    if (first.trim() === '::::' && lines[lines.length - 1].trim() === '::::') {
+      renderedBlock = <CodeTabs key={index} content={lines.slice(1, -1).join('\n')} sourceLine={sourceLineIndex} />;
     } else if (openingFence && isFenceClosing(lines[lines.length - 1], openingFence)) {
       renderedBlock = <CodeBlock
         key={index}
