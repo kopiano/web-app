@@ -649,6 +649,8 @@ export default function DocEditor() {
   const [remoteLoaded, setRemoteLoaded] = useState(() => !Boolean(currentUser && id && !documents.some((item) => item.id === id)));
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const editorMirrorRef = useRef<HTMLDivElement>(null);
+  const outlineRef = useRef<HTMLElement>(null);
+  const outlineNavRef = useRef<HTMLElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const imageRenameMapRef = useRef<Record<string, string>>({});
   const [imageNameDrafts, setImageNameDrafts] = useState<Record<string, string>>({});
@@ -807,6 +809,27 @@ export default function DocEditor() {
       outlineScrollLockRef.current = '';
     };
   }, [deferredMarkdown, mode]);
+
+  useEffect(() => {
+    if (!activeHeading) return;
+    const outline = outlineRef.current;
+    const nav = outlineNavRef.current;
+    const activeLink = nav?.querySelector<HTMLElement>(`[data-outline-id="${CSS.escape(activeHeading)}"]`);
+    if (!outline || !nav || !activeLink) return;
+
+    if (nav.scrollWidth > nav.clientWidth) {
+      const navRect = nav.getBoundingClientRect();
+      const linkRect = activeLink.getBoundingClientRect();
+      if (linkRect.left < navRect.left) nav.scrollLeft += linkRect.left - navRect.left;
+      else if (linkRect.right > navRect.right) nav.scrollLeft += linkRect.right - navRect.right;
+      return;
+    }
+
+    const outlineRect = outline.getBoundingClientRect();
+    const linkRect = activeLink.getBoundingClientRect();
+    if (linkRect.top < outlineRect.top) outline.scrollTop += linkRect.top - outlineRect.top;
+    else if (linkRect.bottom > outlineRect.bottom) outline.scrollTop += linkRect.bottom - outlineRect.bottom;
+  }, [activeHeading]);
 
   useLayoutEffect(() => {
     if (!pendingScrollSync || deferredMarkdown !== markdown) return;
@@ -1226,13 +1249,13 @@ export default function DocEditor() {
           </div>
         </div>
       </header>
-      <aside className="doc-outline">
+      <aside ref={outlineRef} className="doc-outline">
         <div className="doc-outline-heading">
           <div className="doc-outline-heading-title"><FileText size={15} /><span>{t('docs.index')}</span></div>
         </div>
         <div className="doc-outline-rule" aria-hidden="true"><span style={{ width: `${outline.length ? ((outline.findIndex((item) => item.id === activeHeading) + 1) / outline.length) * 100 : 0}%` }} /></div>
-        <nav aria-label={t('docs.documentOutline')}>
-          {outline.map((item) => <a className={`level-${item.level}${activeHeading === item.id ? ' is-active' : ''}`} href={`#${item.id}`} key={item.id} aria-current={activeHeading === item.id ? 'location' : undefined} onClick={(event) => navigateToOutlineHeading(event, item.id)}><span className="doc-outline-marker" aria-hidden="true" /><span className="doc-outline-level">H{item.level}</span><span className="doc-outline-label">{item.label}</span></a>)}
+        <nav ref={outlineNavRef} aria-label={t('docs.documentOutline')}>
+          {outline.map((item) => <a data-outline-id={item.id} className={`level-${item.level}${activeHeading === item.id ? ' is-active' : ''}`} href={`#${item.id}`} key={item.id} aria-current={activeHeading === item.id ? 'location' : undefined} onClick={(event) => navigateToOutlineHeading(event, item.id)}><span className="doc-outline-marker" aria-hidden="true" /><span className="doc-outline-level">H{item.level}</span><span className="doc-outline-label">{item.label}</span></a>)}
         </nav>
       </aside>
       {mode === 'edit' && (
