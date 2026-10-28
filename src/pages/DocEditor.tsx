@@ -1,4 +1,4 @@
-import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactElement } from 'react';
 import hljs from 'highlight.js/lib/common';
 import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Image, ImagePlus, Info, Italic, Link2, List, Pencil, Quote, Rows3, Save, Table2, X } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -134,7 +134,13 @@ function renderInlineMarkdown(text: string, onImageClick: (src: string) => void 
   });
 }
 
-const CodeBlock = memo(function CodeBlock({ content, language, headerContent }: { content: string; language: string; headerContent?: React.ReactNode }) {
+const CodeBlock = memo(function CodeBlock({ content, language, headerContent, sourceLine, sourceLines }: {
+  content: string;
+  language: string;
+  headerContent?: React.ReactNode;
+  sourceLine?: number;
+  sourceLines?: number[];
+}) {
   const { t } = useTranslation();
   const lines = content.split('\n');
   const { language: codeLanguage, highlightedLines } = parseCodeFenceInfo(language, lines.length);
@@ -193,6 +199,7 @@ const CodeBlock = memo(function CodeBlock({ content, language, headerContent }: 
 
   return (
     <div
+      data-source-line={sourceLine}
       className={`doc-code-block${isScrollReady ? ' is-scroll-ready' : ''}${isResettingScroll ? ' is-resetting-scroll' : ''}`}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
@@ -207,7 +214,11 @@ const CodeBlock = memo(function CodeBlock({ content, language, headerContent }: 
       <pre ref={codePreRef} onAnimationEnd={() => setIsResettingScroll(false)}>
         <code>
           {lines.map((line, index) => (
-            <span className={`doc-code-line${highlightedLines.has(index + 1) ? ' is-highlighted' : ''}`} key={`${index}-${line}`}>
+            <span
+              className={`doc-code-line${highlightedLines.has(index + 1) ? ' is-highlighted' : ''}`}
+              data-source-line={sourceLines?.[index]}
+              key={`${index}-${line}`}
+            >
               <span className="doc-code-line-number">{index + 1}</span>
               <span className="doc-code-line-content">{highlightCode(line, codeLanguage)}</span>
             </span>
@@ -218,7 +229,7 @@ const CodeBlock = memo(function CodeBlock({ content, language, headerContent }: 
   );
 });
 
-function CodeTabs({ content }: { content: string }) {
+function CodeTabs({ content, sourceLine }: { content: string; sourceLine?: number }) {
   const { t } = useTranslation();
   const tabs = Array.from(content.matchAll(/:::\s*([^\n]+)\n```([^\n]*)\n([\s\S]*?)```\s*:::/g))
     .map((match) => ({
@@ -232,10 +243,11 @@ function CodeTabs({ content }: { content: string }) {
   const active = tabs[Math.min(activeTab, tabs.length - 1)];
 
   return (
-    <div className="doc-code-tabs">
+    <div className="doc-code-tabs" data-source-line={sourceLine}>
       <CodeBlock
         content={active.content}
         language={active.language}
+        sourceLine={sourceLine}
         headerContent={(
           <div className="doc-code-tab-list" role="tablist" aria-label={t('docs.codeFiles')}>
             {tabs.map((tab, index) => (
@@ -257,13 +269,13 @@ function CodeTabs({ content }: { content: string }) {
   );
 }
 
-function MarkdownTable({ lines }: { lines: string[] }) {
+function MarkdownTable({ lines, sourceLine }: { lines: string[]; sourceLine?: number }) {
   const cells = (line: string) => line.trim().replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim());
   const headers = cells(lines[0]);
   const rows = lines.slice(2).map(cells);
 
   return (
-    <div className="doc-markdown-table-wrap">
+    <div className="doc-markdown-table-wrap" data-source-line={sourceLine}>
       <table className="doc-markdown-table">
         <thead><tr>{headers.map((cell, index) => <th key={`${cell}-${index}`}>{renderInlineMarkdown(cell, () => undefined)}</th>)}</tr></thead>
         <tbody>
@@ -278,14 +290,14 @@ function MarkdownTable({ lines }: { lines: string[] }) {
   );
 }
 
-function BoxTable({ lines }: { lines: string[] }) {
+function BoxTable({ lines, sourceLine }: { lines: string[]; sourceLine?: number }) {
   const rows = lines
     .filter((line) => line.startsWith('│'))
     .map((line) => line.slice(1, -1).split('│').map((cell) => cell.trim()));
   const headers = rows[0] ?? [];
 
   return (
-    <div className="doc-markdown-table-wrap">
+    <div className="doc-markdown-table-wrap" data-source-line={sourceLine}>
       <table className="doc-markdown-table">
         <thead><tr>{headers.map((cell, index) => <th key={`${cell}-${index}`}>{renderInlineMarkdown(cell, () => undefined)}</th>)}</tr></thead>
         <tbody>
@@ -303,6 +315,7 @@ function BoxTable({ lines }: { lines: string[] }) {
 function separateMarkdownTables(markdown: string) {
   const lines = markdown.split('\n');
   const result: string[] = [];
+  const sourceLineIndices: number[] = [];
   let inFence = false;
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -310,17 +323,26 @@ function separateMarkdownTables(markdown: string) {
     if (line.startsWith('```')) {
       inFence = !inFence;
       result.push(line);
+      sourceLineIndices.push(index);
       continue;
     }
     if (!inFence && line.startsWith('┌')) {
-      if (result.length && result[result.length - 1] !== '') result.push('');
+      if (result.length && result[result.length - 1] !== '') {
+        result.push('');
+        sourceLineIndices.push(-1);
+      }
       result.push(line);
+      sourceLineIndices.push(index);
       while (index + 1 < lines.length) {
         index += 1;
         result.push(lines[index]);
+        sourceLineIndices.push(index);
         if (lines[index].startsWith('└')) break;
       }
-      if (index + 1 < lines.length && lines[index + 1] !== '') result.push('');
+      if (index + 1 < lines.length && lines[index + 1] !== '') {
+        result.push('');
+        sourceLineIndices.push(-1);
+      }
       continue;
     }
     const separator = lines[index + 1];
@@ -328,29 +350,43 @@ function separateMarkdownTables(markdown: string) {
       && line.includes('|')
       && Boolean(separator && /^\s*\|?[\s:-]+(\|[\s:-]+)+\|?\s*$/.test(separator));
 
-    if (isTableStart && result.length && result[result.length - 1] !== '') result.push('');
+    if (isTableStart && result.length && result[result.length - 1] !== '') {
+      result.push('');
+      sourceLineIndices.push(-1);
+    }
     result.push(line);
+    sourceLineIndices.push(index);
 
     if (isTableStart) {
       index += 1;
       result.push(lines[index]);
+      sourceLineIndices.push(index);
       while (index + 1 < lines.length && lines[index + 1].includes('|')) {
         index += 1;
         result.push(lines[index]);
+        sourceLineIndices.push(index);
       }
-      if (index + 1 < lines.length && lines[index + 1] !== '') result.push('');
+      if (index + 1 < lines.length && lines[index + 1] !== '') {
+        result.push('');
+        sourceLineIndices.push(-1);
+      }
     }
   }
 
-  return result.join('\n');
+  return { text: result.join('\n'), sourceLineIndices };
 }
 
 function renderMarkdown(markdown: string, onImageClick: (src: string) => void) {
-  const markdownWithBlockBoundaries = separateMarkdownTables(markdown)
-    .split('\n')
-    .reduce<{ lines: string[]; inFence: boolean }>((state, line, index, lines) => {
-      const previous = lines[index - 1] ?? '';
-      const next = lines[index + 1] ?? '';
+  const separatedMarkdown = separateMarkdownTables(markdown);
+  const separatedLines = separatedMarkdown.text.split('\n');
+  const mappedMarkdown = separatedLines.reduce<{
+    lines: string[];
+    sourceLineIndices: number[];
+    inFence: boolean;
+  }>((state, line, index) => {
+      const sourceLineIndex = separatedMarkdown.sourceLineIndices[index] ?? -1;
+      const previous = separatedLines[index - 1] ?? '';
+      const next = separatedLines[index + 1] ?? '';
       const isFence = /^```/.test(line);
       const isInsideFence = state.inFence;
       const isHeading = !isInsideFence && /^#{1,3}\s+/.test(line);
@@ -359,8 +395,10 @@ function renderMarkdown(markdown: string, onImageClick: (src: string) => void) {
       const nextIsListItem = /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(next);
       if (line.trim() && previous.trim() && (isHeading || (isListItem && !previousIsListItem))) {
         state.lines.push('');
+        state.sourceLineIndices.push(-1);
       }
       state.lines.push(line);
+      state.sourceLineIndices.push(sourceLineIndex);
       // Treat standalone Markdown blocks as boundaries even when the author
       // did not add a blank line after them.
       if (line.trim() && next.trim() && (
@@ -368,54 +406,116 @@ function renderMarkdown(markdown: string, onImageClick: (src: string) => void) {
         || (isListItem && !nextIsListItem)
       )) {
         state.lines.push('');
+        state.sourceLineIndices.push(-1);
       }
       if (isFence) state.inFence = !state.inFence;
       return state;
-    }, { lines: [], inFence: false })
-    .lines
-    .join('\n');
-  const blocks = markdownWithBlockBoundaries
-    .split(/(::::[\s\S]*?::::|```[^\r\n]*\r?\n[\s\S]*?```)/g)
-    .flatMap((segment) => (
-      segment.startsWith('```') || segment.startsWith('::::')
-        ? [segment]
-        : segment.split(/\n{2,}/)
-    ))
-    .filter((block) => block.trim());
+    }, { lines: [], sourceLineIndices: [], inFence: false });
+  const mappedText = mappedMarkdown.lines.join('\n');
+  const blocks: Array<{ text: string; startOffset: number }> = [];
+  const addPlainBlocks = (start: number, end: number) => {
+    const boundaries = /\n{2,}/g;
+    boundaries.lastIndex = start;
+    let blockStart = start;
+    let boundary = boundaries.exec(mappedText);
+    while (boundary && boundary.index < end) {
+      blocks.push({ text: mappedText.slice(blockStart, boundary.index), startOffset: blockStart });
+      blockStart = boundaries.lastIndex;
+      boundary = boundaries.exec(mappedText);
+    }
+    blocks.push({ text: mappedText.slice(blockStart, end), startOffset: blockStart });
+  };
+  const specialBlocks = /(::::[\s\S]*?::::|```[^\r\n]*\r?\n[\s\S]*?```)/g;
+  let segmentStart = 0;
+  let specialBlock = specialBlocks.exec(mappedText);
+  while (specialBlock) {
+    addPlainBlocks(segmentStart, specialBlock.index);
+    blocks.push({ text: specialBlock[0], startOffset: specialBlock.index });
+    segmentStart = specialBlocks.lastIndex;
+    specialBlock = specialBlocks.exec(mappedText);
+  }
+  addPlainBlocks(segmentStart, mappedText.length);
+
+  const mappedLineOffsets = [0];
+  for (let index = 0; index < mappedText.length; index += 1) {
+    if (mappedText[index] === '\n') mappedLineOffsets.push(index + 1);
+  }
+  const mappedLineAtOffset = (offset: number) => {
+    let low = 0;
+    let high = mappedLineOffsets.length;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (mappedLineOffsets[middle] <= offset) low = middle + 1;
+      else high = middle;
+    }
+    return Math.max(0, low - 1);
+  };
+  const nonEmptyBlocks = blocks.filter(({ text }) => text.trim());
   const headingOccurrences = new Map<string, number>();
 
-  return blocks.map((block, index) => {
+  return nonEmptyBlocks.map(({ text: block, startOffset }, index) => {
     const lines = block.split('\n');
     const first = lines[0];
+    const mappedBlockStart = mappedLineAtOffset(startOffset);
+    const blockSourceLines = lines.map((_, lineIndex) => (
+      mappedMarkdown.sourceLineIndices[mappedBlockStart + lineIndex] ?? -1
+    ));
+    const sourceLineIndex = blockSourceLines.find((lineIndex) => lineIndex >= 0) ?? 0;
+    let renderedBlock: ReactElement;
+
     if (block.startsWith('::::') && block.endsWith('::::')) {
-      return <CodeTabs key={index} content={block.slice(4, -4).trim()} />;
+      renderedBlock = <CodeTabs key={index} content={block.slice(4, -4).trim()} sourceLine={sourceLineIndex} />;
+    } else if (first.startsWith('```') && lines[lines.length - 1].trim() === '```') {
+      renderedBlock = <CodeBlock
+        key={index}
+        language={first.slice(3).trim()}
+        content={lines.slice(1, -1).join('\n')}
+        sourceLine={sourceLineIndex}
+        sourceLines={blockSourceLines.slice(1, -1)}
+      />;
+    } else if (first.startsWith('┌') && lines.some((line) => line.startsWith('└'))) {
+      renderedBlock = <BoxTable key={index} lines={lines} sourceLine={sourceLineIndex} />;
+    } else if (lines.length >= 2 && lines[0].includes('|') && /^\s*\|?[\s:-]+(\|[\s:-]+)+\|?\s*$/.test(lines[1])) {
+      renderedBlock = <MarkdownTable key={index} lines={lines} sourceLine={sourceLineIndex} />;
+    } else {
+      const headingLevel = first.match(/^(#{1,3}) /)?.[1].length;
+      const headingLabel = headingLevel ? first.slice(headingLevel + 1) : '';
+      const headingOccurrence = headingLabel ? headingOccurrences.get(headingLabel) ?? 0 : 0;
+      if (headingLabel) headingOccurrences.set(headingLabel, headingOccurrence + 1);
+      if (headingLevel === 1) {
+        renderedBlock = <h1 data-source-line={sourceLineIndex} id={createHeadingId(headingLabel, headingOccurrence)} key={index}>{headingLabel}</h1>;
+      } else if (headingLevel === 2) {
+        renderedBlock = <h2 data-source-line={sourceLineIndex} id={createHeadingId(headingLabel, headingOccurrence)} key={index}>{headingLabel}</h2>;
+      } else if (headingLevel === 3) {
+        renderedBlock = <h3 data-source-line={sourceLineIndex} id={createHeadingId(headingLabel, headingOccurrence)} key={index}>{headingLabel}</h3>;
+      } else {
+        const unorderedItems = lines.map((line) => line.match(/^\s*[-*+]\s+(.+)$/)?.[1]);
+        const orderedItems = lines.map((line) => line.match(/^\s*\d+[.)]\s+(.+)$/)?.[1]);
+        if (unorderedItems.every((item): item is string => Boolean(item))) {
+          renderedBlock = <ul key={index}>{unorderedItems.map((item, itemIndex) => (
+            <li data-source-line={blockSourceLines[itemIndex]} key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item, onImageClick)}</li>
+          ))}</ul>;
+        } else if (orderedItems.every((item): item is string => Boolean(item))) {
+          renderedBlock = <ol key={index}>{orderedItems.map((item, itemIndex) => (
+            <li data-source-line={blockSourceLines[itemIndex]} key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item, onImageClick)}</li>
+          ))}</ol>;
+        } else if (first.startsWith('> ')) {
+          renderedBlock = <blockquote data-source-line={sourceLineIndex} key={index}>{renderInlineMarkdown(first.slice(2), onImageClick)}</blockquote>;
+        } else {
+          renderedBlock = (
+            <p data-source-line={sourceLineIndex} key={index}>
+              {lines.map((line, lineIndex) => (
+                <span data-source-line={blockSourceLines[lineIndex]} key={`${index}-${lineIndex}`}>
+                  {lineIndex > 0 && <br />}{renderInlineMarkdown(line, onImageClick)}
+                </span>
+              ))}
+            </p>
+          );
+        }
+      }
     }
-    if (first.startsWith('```') && lines[lines.length - 1].trim() === '```') {
-      return <CodeBlock key={index} language={first.slice(3).trim()} content={lines.slice(1, -1).join('\n')} />;
-    }
-    if (first.startsWith('┌') && lines.some((line) => line.startsWith('└'))) {
-      return <BoxTable key={index} lines={lines} />;
-    }
-    if (lines.length >= 2 && lines[0].includes('|') && /^\s*\|?[\s:-]+(\|[\s:-]+)+\|?\s*$/.test(lines[1])) {
-      return <MarkdownTable key={index} lines={lines} />;
-    }
-    const headingLevel = first.match(/^(#{1,3}) /)?.[1].length;
-    const headingLabel = headingLevel ? first.slice(headingLevel + 1) : '';
-    const headingOccurrence = headingLabel ? headingOccurrences.get(headingLabel) ?? 0 : 0;
-    if (headingLabel) headingOccurrences.set(headingLabel, headingOccurrence + 1);
-    if (headingLevel === 1) return <h1 id={createHeadingId(headingLabel, headingOccurrence)} key={index}>{headingLabel}</h1>;
-    if (headingLevel === 2) return <h2 id={createHeadingId(headingLabel, headingOccurrence)} key={index}>{headingLabel}</h2>;
-    if (headingLevel === 3) return <h3 id={createHeadingId(headingLabel, headingOccurrence)} key={index}>{headingLabel}</h3>;
-    const unorderedItems = lines.map((line) => line.match(/^\s*[-*+]\s+(.+)$/)?.[1]);
-    if (unorderedItems.every((item): item is string => Boolean(item))) {
-      return <ul key={index}>{unorderedItems.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item, onImageClick)}</li>)}</ul>;
-    }
-    const orderedItems = lines.map((line) => line.match(/^\s*\d+[.)]\s+(.+)$/)?.[1]);
-    if (orderedItems.every((item): item is string => Boolean(item))) {
-      return <ol key={index}>{orderedItems.map((item, itemIndex) => <li key={`${index}-${itemIndex}`}>{renderInlineMarkdown(item, onImageClick)}</li>)}</ol>;
-    }
-    if (first.startsWith('> ')) return <blockquote key={index}>{renderInlineMarkdown(first.slice(2), onImageClick)}</blockquote>;
-    return <p key={index}>{lines.map((line, lineIndex) => <span key={`${index}-${lineIndex}`}>{lineIndex > 0 && <br />}{renderInlineMarkdown(line, onImageClick)}</span>)}</p>;
+
+    return renderedBlock;
   });
 }
 
@@ -456,7 +556,10 @@ export default function DocEditor() {
   const [activeHeading, setActiveHeading] = useState('');
   const [markdown, setMarkdown] = useState(() => localStorage.getItem(storageKey) || seedMarkdown(document.title, document.content));
   const deferredMarkdown = useDeferredValue(markdown);
-  const [pendingScrollSync, setPendingScrollSync] = useState<{ headingId: string; viewportTop: number } | null>(null);
+  const [pendingScrollSync, setPendingScrollSync] = useState<{
+    lineIndex: number;
+    viewportTop: number;
+  } | null>(null);
   const outlineScrollLockRef = useRef('');
   const outlineScrollTimerRef = useRef<number | null>(null);
   const [savedAt, setSavedAt] = useState(() => Boolean(localStorage.getItem(storageKey)));
@@ -495,7 +598,7 @@ export default function DocEditor() {
   const editorMirrorLines = useMemo(
     () => deferredMarkdown.split('\n').map((line, lineIndex) => {
       const heading = outlineByLine.get(lineIndex);
-      return <span className="doc-markdown-editor-mirror-line" data-heading-id={heading?.id} key={lineIndex}>{line || ' '}</span>;
+      return <span className="doc-markdown-editor-mirror-line" data-heading-id={heading?.id} data-line-index={lineIndex} key={lineIndex}>{line || ' '}</span>;
     }),
     [deferredMarkdown, outlineByLine],
   );
@@ -620,14 +723,36 @@ export default function DocEditor() {
 
   useLayoutEffect(() => {
     if (!pendingScrollSync || deferredMarkdown !== markdown) return;
-    const target = mode === 'preview'
-      ? previewRef.current?.querySelector<HTMLElement>(`#${CSS.escape(pendingScrollSync.headingId)}`)
-      : editorMirrorRef.current?.querySelector<HTMLElement>(`[data-heading-id="${CSS.escape(pendingScrollSync.headingId)}"]`);
+    const root = mode === 'preview' ? previewRef.current : editorMirrorRef.current;
+    const lineKey = mode === 'preview' ? 'sourceLine' : 'lineIndex';
+    const lineAttribute = mode === 'preview' ? 'data-source-line' : 'data-line-index';
+    const candidates = Array.from(root?.querySelectorAll<HTMLElement>(`[${lineAttribute}]`) ?? [])
+      .filter((element) => Number(element.dataset[lineKey]) >= 0);
+    const exactTargets = candidates.filter((element) => (
+      Number(element.dataset[lineKey]) === pendingScrollSync.lineIndex
+    ));
+    const targetPool = exactTargets.length ? exactTargets : candidates;
+    const target = targetPool.reduce<HTMLElement | null>((closest, element) => {
+      if (!closest) return element;
+      const elementLine = Number(element.dataset[lineKey]);
+      const closestLine = Number(closest.dataset[lineKey]);
+      const elementDistance = Math.abs(elementLine - pendingScrollSync.lineIndex);
+      const closestDistance = Math.abs(closestLine - pendingScrollSync.lineIndex);
+      if (elementDistance !== closestDistance) return elementDistance < closestDistance ? element : closest;
+      return Math.abs(element.getBoundingClientRect().top - pendingScrollSync.viewportTop)
+        < Math.abs(closest.getBoundingClientRect().top - pendingScrollSync.viewportTop) ? element : closest;
+    }, null);
     if (target) {
       const scrollRoot = window.document.scrollingElement ?? window.document.documentElement;
       const delta = target.getBoundingClientRect().top - pendingScrollSync.viewportTop;
       if (Math.abs(delta) > 1) {
         scrollRoot.scrollTo({ top: scrollRoot.scrollTop + delta, behavior: 'instant' });
+      }
+      if (mode === 'edit') {
+        const lineStart = markdown.split('\n').slice(0, pendingScrollSync.lineIndex).join('\n').length
+          + (pendingScrollSync.lineIndex > 0 ? 1 : 0);
+        editorRef.current?.setSelectionRange(lineStart, lineStart);
+        editorRef.current?.focus({ preventScroll: true });
       }
     }
     setPendingScrollSync(null);
@@ -951,19 +1076,25 @@ export default function DocEditor() {
 
   const switchMode = (nextMode: EditorMode) => {
     if (nextMode === mode) return;
-    const anchorTop = Math.min(180, window.innerHeight * 0.3);
-    const headings = mode === 'preview'
-      ? Array.from(previewRef.current?.querySelectorAll<HTMLElement>('h1, h2, h3') ?? [])
-      : Array.from(editorMirrorRef.current?.querySelectorAll<HTMLElement>('[data-heading-id]') ?? []);
-    const visibleHeading = headings.reduce<HTMLElement | null>((current, heading) => (
-      heading.getBoundingClientRect().top <= anchorTop ? heading : current
-    ), headings[0] ?? null);
-    const headingId = visibleHeading?.id || visibleHeading?.dataset.headingId;
-    if (headingId && visibleHeading) {
-      setActiveHeading(headingId);
+    const sourceElements = mode === 'preview'
+      ? Array.from(previewRef.current?.querySelectorAll<HTMLElement>('[data-source-line]') ?? [])
+      : Array.from(editorMirrorRef.current?.querySelectorAll<HTMLElement>('[data-line-index]') ?? []);
+    const anchorTop = window.innerHeight / 2;
+    const lineKey = mode === 'preview' ? 'sourceLine' : 'lineIndex';
+    const validSourceElements = sourceElements.filter((element) => {
+      const line = Number(element.dataset[lineKey]);
+      return Number.isInteger(line) && line >= 0;
+    });
+    const visibleSource = validSourceElements.reduce<HTMLElement | null>((current, element) => (
+      element.getBoundingClientRect().top <= anchorTop ? element : current
+    ), null) ?? validSourceElements[0] ?? null;
+    const lineIndex = Number(mode === 'preview'
+      ? visibleSource?.dataset.sourceLine
+      : visibleSource?.dataset.lineIndex);
+    if (visibleSource && Number.isFinite(lineIndex)) {
       setPendingScrollSync({
-        headingId,
-        viewportTop: visibleHeading.getBoundingClientRect().top,
+        lineIndex,
+        viewportTop: visibleSource.getBoundingClientRect().top,
       });
     }
     setMode(nextMode);

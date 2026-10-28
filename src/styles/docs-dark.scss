@@ -57,6 +57,7 @@
 }
 [data-theme='dark'] .docs-categories button {
   // box-shadow: 0 1.6rem 4rem rgba(0, 0, 0, .18);
+  color: #323232;
 }
 
 [data-theme='dark'] .docs-search-wrap {
@@ -78,7 +79,7 @@
   color: rgba(255, 255, 255, .42);
 }
 
-[data-theme='dark'] .docs-categories button,
+// [data-theme='dark'] .docs-categories button,
 [data-theme='dark'] .docs-view-toggle button {
   color: var(--docs-dark-muted);
 }
@@ -88,8 +89,9 @@
   background: rgba(255, 255, 255, .1);
 }
 
-[data-theme='dark'] .docs-categories button:hover,
-[data-theme='dark'] .docs-categories button.is-active {
+[data-theme='dark'] .docs-categories button:hover
+// [data-theme='dark'] .docs-categories button.is-active
+{
   color: #fff;
   border-color: rgba(194, 155, 216, .54);
   background: rgba(194, 155, 216, .22);
