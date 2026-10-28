@@ -84,6 +84,19 @@ function parseCodeFenceInfo(value: string, lineCount: number) {
   return { language, highlightedLines };
 }
 
+type MarkdownFence = { marker: '`' | '~'; length: number; info: string };
+
+function parseFenceOpening(line: string): MarkdownFence | null {
+  const match = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+  if (!match || (match[1][0] === '`' && match[2].includes('`'))) return null;
+  return { marker: match[1][0] as MarkdownFence['marker'], length: match[1].length, info: match[2].trim() };
+}
+
+function isFenceClosing(line: string, fence: MarkdownFence) {
+  const marker = fence.marker === '`' ? '`' : '~';
+  return new RegExp(`^ {0,3}${marker}{${fence.length},}[ \\t]*$`).test(line);
+}
+
 function highlightCode(line: string, language: string) {
   const expandedLine = line.replace(/\t/g, '  ');
   const normalizedLanguage = language.trim().toLowerCase();
@@ -316,17 +329,24 @@ function separateMarkdownTables(markdown: string) {
   const lines = markdown.split('\n');
   const result: string[] = [];
   const sourceLineIndices: number[] = [];
-  let inFence = false;
+  let fence: MarkdownFence | null = null;
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (line.startsWith('```')) {
-      inFence = !inFence;
+    if (fence) {
+      result.push(line);
+      sourceLineIndices.push(index);
+      if (isFenceClosing(line, fence)) fence = null;
+      continue;
+    }
+    const openingFence = parseFenceOpening(line);
+    if (openingFence) {
+      fence = openingFence;
       result.push(line);
       sourceLineIndices.push(index);
       continue;
     }
-    if (!inFence && line.startsWith('┌')) {
+    if (line.startsWith('┌')) {
       if (result.length && result[result.length - 1] !== '') {
         result.push('');
         sourceLineIndices.push(-1);
@@ -346,8 +366,7 @@ function separateMarkdownTables(markdown: string) {
       continue;
     }
     const separator = lines[index + 1];
-    const isTableStart = !inFence
-      && line.includes('|')
+    const isTableStart = line.includes('|')
       && Boolean(separator && /^\s*\|?[\s:-]+(\|[\s:-]+)+\|?\s*$/.test(separator));
 
     if (isTableStart && result.length && result[result.length - 1] !== '') {
@@ -382,13 +401,13 @@ function renderMarkdown(markdown: string, onImageClick: (src: string) => void) {
   const mappedMarkdown = separatedLines.reduce<{
     lines: string[];
     sourceLineIndices: number[];
-    inFence: boolean;
+    fence: MarkdownFence | null;
   }>((state, line, index) => {
       const sourceLineIndex = separatedMarkdown.sourceLineIndices[index] ?? -1;
       const previous = separatedLines[index - 1] ?? '';
       const next = separatedLines[index + 1] ?? '';
-      const isFence = /^```/.test(line);
-      const isInsideFence = state.inFence;
+      const openingFence = state.fence ? null : parseFenceOpening(line);
+      const isInsideFence = Boolean(state.fence);
       const isHeading = !isInsideFence && /^#{1,3}\s+/.test(line);
       const isListItem = !isInsideFence && /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(line);
       const previousIsListItem = /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(previous);
@@ -408,9 +427,10 @@ function renderMarkdown(markdown: string, onImageClick: (src: string) => void) {
         state.lines.push('');
         state.sourceLineIndices.push(-1);
       }
-      if (isFence) state.inFence = !state.inFence;
+      if (state.fence && isFenceClosing(line, state.fence)) state.fence = null;
+      else if (openingFence) state.fence = openingFence;
       return state;
-    }, { lines: [], sourceLineIndices: [], inFence: false });
+    }, { lines: [], sourceLineIndices: [], fence: null });
   const mappedText = mappedMarkdown.lines.join('\n');
   const blocks: Array<{ text: string; startOffset: number }> = [];
   const addPlainBlocks = (start: number, end: number) => {
@@ -425,14 +445,51 @@ function renderMarkdown(markdown: string, onImageClick: (src: string) => void) {
     }
     blocks.push({ text: mappedText.slice(blockStart, end), startOffset: blockStart });
   };
-  const specialBlocks = /(::::[\s\S]*?::::|```[^\r\n]*\r?\n[\s\S]*?```)/g;
+  const lineOffsets = [0];
+  for (let index = 0; index < mappedText.length; index += 1) {
+    if (mappedText[index] === '\n') lineOffsets.push(index + 1);
+  }
+  const specialBlockRanges: Array<{ start: number; end: number }> = [];
+  let fence: MarkdownFence | null = null;
+  let fenceStart = -1;
+  let codeTabsStart = -1;
+  for (let lineIndex = 0; lineIndex < lineOffsets.length; lineIndex += 1) {
+    const start = lineOffsets[lineIndex];
+    const end = lineIndex + 1 < lineOffsets.length ? lineOffsets[lineIndex + 1] - 1 : mappedText.length;
+    const line = mappedText.slice(start, end);
+    if (fence) {
+      if (isFenceClosing(line, fence)) {
+        specialBlockRanges.push({ start: fenceStart, end });
+        fence = null;
+        fenceStart = -1;
+      }
+      continue;
+    }
+    if (codeTabsStart >= 0) {
+      if (line.startsWith('::::')) {
+        specialBlockRanges.push({ start: codeTabsStart, end });
+        codeTabsStart = -1;
+      }
+      continue;
+    }
+    if (line.startsWith('::::')) {
+      codeTabsStart = start;
+      continue;
+    }
+    const openingFence = parseFenceOpening(line);
+    if (openingFence) {
+      fence = openingFence;
+      fenceStart = start;
+    }
+  }
+  if (fenceStart >= 0) specialBlockRanges.push({ start: fenceStart, end: mappedText.length });
+  if (codeTabsStart >= 0) specialBlockRanges.push({ start: codeTabsStart, end: mappedText.length });
+
   let segmentStart = 0;
-  let specialBlock = specialBlocks.exec(mappedText);
-  while (specialBlock) {
-    addPlainBlocks(segmentStart, specialBlock.index);
-    blocks.push({ text: specialBlock[0], startOffset: specialBlock.index });
-    segmentStart = specialBlocks.lastIndex;
-    specialBlock = specialBlocks.exec(mappedText);
+  for (const range of specialBlockRanges) {
+    addPlainBlocks(segmentStart, range.start);
+    blocks.push({ text: mappedText.slice(range.start, range.end), startOffset: range.start });
+    segmentStart = range.end;
   }
   addPlainBlocks(segmentStart, mappedText.length);
 
@@ -462,13 +519,14 @@ function renderMarkdown(markdown: string, onImageClick: (src: string) => void) {
     ));
     const sourceLineIndex = blockSourceLines.find((lineIndex) => lineIndex >= 0) ?? 0;
     let renderedBlock: ReactElement;
+    const openingFence = parseFenceOpening(first);
 
     if (block.startsWith('::::') && block.endsWith('::::')) {
       renderedBlock = <CodeTabs key={index} content={block.slice(4, -4).trim()} sourceLine={sourceLineIndex} />;
-    } else if (first.startsWith('```') && lines[lines.length - 1].trim() === '```') {
+    } else if (openingFence && isFenceClosing(lines[lines.length - 1], openingFence)) {
       renderedBlock = <CodeBlock
         key={index}
-        language={first.slice(3).trim()}
+        language={openingFence.info}
         content={lines.slice(1, -1).join('\n')}
         sourceLine={sourceLineIndex}
         sourceLines={blockSourceLines.slice(1, -1)}
@@ -577,13 +635,18 @@ export default function DocEditor() {
   const previewContent = useMemo(() => renderMarkdown(deferredMarkdown, setImagePreviewUrl), [deferredMarkdown]);
   const outline = useMemo(() => {
     const headingOccurrences = new Map<string, number>();
-    let inFence = false;
+    let fence: MarkdownFence | null = null;
     return deferredMarkdown.split('\n').flatMap((line, lineIndex) => {
-      if (/^```/.test(line.trim())) {
-        inFence = !inFence;
+      if (fence) {
+        if (isFenceClosing(line, fence)) fence = null;
         return [];
       }
-      if (inFence || /^::::/.test(line.trim()) || /^:::/.test(line.trim()) || !/^#{1,3} /.test(line)) return [];
+      const openingFence = parseFenceOpening(line);
+      if (openingFence) {
+        fence = openingFence;
+        return [];
+      }
+      if (/^::::/.test(line.trim()) || /^:::/.test(line.trim()) || !/^#{1,3} /.test(line)) return [];
       const level = line.match(/^#+/)?.[0].length ?? 1;
       const label = line.slice(level + 1);
       const occurrence = headingOccurrences.get(label) ?? 0;
