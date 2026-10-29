@@ -2069,7 +2069,7 @@
   }
 }
 .video-page .video-action-button {
-  min-height: 4rem;
+  // min-height: 4rem;
   padding: 0 1.6rem 0 0.6rem;
   display: inline-flex;
   align-items: center;
@@ -6336,4 +6336,8 @@
   .video-upload-close {
     transition: none;
   }
+}
+
+.video-action-button:hover span {
+  color: rgba(255, 255, 255, 0.96)
 }

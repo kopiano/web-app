@@ -218,6 +218,7 @@
 .doc-code-token-number { color: #79c0ff; }
 .doc-code-block .hljs { color: #e6edf3; background: transparent; }
 .doc-code-block .hljs-comment, .doc-code-block .hljs-quote { color: #8b949e; font-style: italic; }
+.doc-code-block .doc-code-line-content .hljs-comment * { color: inherit; font-style: inherit; }
 .doc-code-block .hljs-name { color: #fc64b6; }
 .doc-code-block .hljs-keyword, .doc-code-block .hljs-selector-tag, .doc-code-block .hljs-literal, .doc-code-block .hljs-section, .doc-code-block .hljs-link { color: #fc64b6; }
 .doc-code-block .hljs-string, .doc-code-block .hljs-title, .doc-code-block .hljs-attribute, .doc-code-block .hljs-symbol, .doc-code-block .hljs-bullet, .doc-code-block .hljs-addition { color: #74d4fe; }

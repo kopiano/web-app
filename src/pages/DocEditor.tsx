@@ -125,15 +125,15 @@ function parseCodeTabs(content: string) {
   return tabs;
 }
 
-function highlightCode(line: string, language: string) {
-  const expandedLine = line.replace(/\t/g, '  ');
+function highlightCodeLines(code: string, language: string) {
+  const expandedCode = code.replace(/\t/g, '  ');
   const normalizedLanguage = language.trim().toLowerCase();
   const languageName = languageAliases[normalizedLanguage] ?? normalizedLanguage;
 
   try {
     const highlighted = languageName && hljs.getLanguage(languageName)
-      ? hljs.highlight(expandedLine, { language: languageName, ignoreIllegals: true }).value
-      : hljs.highlightAuto(expandedLine).value;
+      ? hljs.highlight(expandedCode, { language: languageName, ignoreIllegals: true }).value
+      : hljs.highlightAuto(expandedCode).value;
     const customKeywords = customCodeKeywords[normalizedLanguage as keyof typeof customCodeKeywords] ?? [];
     const keywordPattern = customKeywords.length
       ? new RegExp(`\\b(?:${customKeywords.map((keyword) => keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'gi')
@@ -145,9 +145,38 @@ function highlightCode(line: string, language: string) {
           : part.replace(keywordPattern, '<span class="hljs-custom-keyword">$&</span>')
       )).join('')
       : highlighted;
-    return <span dangerouslySetInnerHTML={{ __html: highlightedWithCustomKeywords || '&nbsp;' }} />;
+
+    const result: string[] = [];
+    const openTags: string[] = [];
+    let currentLine = '';
+    const tokens = highlightedWithCustomKeywords.match(/<\/?span\b[^>]*>|[^<]+|<[^>]*>/g) ?? [];
+
+    for (const token of tokens) {
+      if (token.startsWith('</')) {
+        currentLine += token;
+        openTags.pop();
+        continue;
+      }
+      if (token.startsWith('<')) {
+        currentLine += token;
+        if (!token.endsWith('/>')) openTags.push(token);
+        continue;
+      }
+
+      const segments = token.split('\n');
+      segments.forEach((segment, index) => {
+        currentLine += segment;
+        if (index < segments.length - 1) {
+          currentLine += '</span>'.repeat(openTags.length);
+          result.push(currentLine);
+          currentLine = openTags.join('');
+        }
+      });
+    }
+    result.push(currentLine);
+    return result.map((line) => line || '&nbsp;');
   } catch {
-    return <span>{expandedLine || ' '}</span>;
+    return expandedCode.split('\n').map((line) => line || '&nbsp;');
   }
 }
 
@@ -185,6 +214,7 @@ const CodeBlock = memo(function CodeBlock({ content, language, headerContent, so
   const { t } = useTranslation();
   const lines = content.split('\n');
   const { language: codeLanguage, highlightedLines } = parseCodeFenceInfo(language, lines.length);
+  const highlightedCodeLines = highlightCodeLines(content, codeLanguage);
   const [copied, setCopied] = useState(false);
   const [isScrollReady, setIsScrollReady] = useState(false);
   const [isResettingScroll, setIsResettingScroll] = useState(false);
@@ -261,7 +291,7 @@ const CodeBlock = memo(function CodeBlock({ content, language, headerContent, so
               key={`${index}-${line}`}
             >
               <span className="doc-code-line-number">{index + 1}</span>
-              <span className="doc-code-line-content">{highlightCode(line, codeLanguage)}</span>
+              <span className="doc-code-line-content" dangerouslySetInnerHTML={{ __html: highlightedCodeLines[index] ?? '&nbsp;' }} />
             </span>
           ))}
         </code>
