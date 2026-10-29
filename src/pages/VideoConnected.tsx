@@ -1416,7 +1416,10 @@ function VideoWatch({
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
-    const update = () => setPlayerHeight(stage.getBoundingClientRect().height);
+    const update = () => {
+      const nextHeight = Math.round(stage.getBoundingClientRect().height);
+      setPlayerHeight((currentHeight) => (currentHeight === nextHeight ? currentHeight : nextHeight));
+    };
     const observer = new ResizeObserver(update);
     observer.observe(stage);
     update();
