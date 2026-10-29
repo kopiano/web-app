@@ -1335,7 +1335,6 @@ function VideoWatch({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(video.raw.duration);
   const [bufferedTime, setBufferedTime] = useState(0);
-  const [playerHeight, setPlayerHeight] = useState<number>();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [volumeControlOpen, setVolumeControlOpen] = useState(false);
@@ -1412,19 +1411,6 @@ function VideoWatch({
     media.addEventListener('playing', clearEndedEventLock);
     return () => media.removeEventListener('playing', clearEndedEventLock);
   }, [media]);
-
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    const update = () => {
-      const nextHeight = Math.round(stage.getBoundingClientRect().height);
-      setPlayerHeight((currentHeight) => (currentHeight === nextHeight ? currentHeight : nextHeight));
-    };
-    const observer = new ResizeObserver(update);
-    observer.observe(stage);
-    update();
-    return () => observer.disconnect();
-  }, []);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -1987,7 +1973,7 @@ function VideoWatch({
             </div>
           </section>
         </div>
-        <aside className="video-watch-queue" style={playerHeight ? { height: playerHeight } : undefined}>
+        <aside className="video-watch-queue">
           <header>
             <div><span>{t('video.queue.label')}</span></div>
             <strong>{t('video.queue.count', { count: playlist.length })}</strong>
