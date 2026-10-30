@@ -150,6 +150,16 @@ type ReplyTarget = {
   username: string | null;
 };
 
+const VIDEO_SINGLE_LOOP_KEY = 'video-single-loop';
+
+function readVideoSingleLoopPreference() {
+  try {
+    return window.localStorage.getItem(VIDEO_SINGLE_LOOP_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
 type UploadDraft = {
   isOpen: boolean;
   step: UploadStep;
@@ -1340,7 +1350,7 @@ function VideoWatch({
   const [volumeControlOpen, setVolumeControlOpen] = useState(false);
   const [loopMenuOpen, setLoopMenuOpen] = useState(false);
   const [loopAnimation, setLoopAnimation] = useState<'intro' | 'on' | 'off' | null>(null);
-  const [singleLoop, setSingleLoop] = useState(false);
+  const [singleLoop, setSingleLoop] = useState(readVideoSingleLoopPreference);
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
@@ -1394,9 +1404,16 @@ function VideoWatch({
     setDraft('');
     setReplyTarget(null);
     setViewIncrementVisible(false);
-    setSingleLoop(false);
     endedVideoRef.current = null;
   }, [video.id]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VIDEO_SINGLE_LOOP_KEY, String(singleLoop));
+    } catch {
+      // Keep playback functional when browser storage is unavailable.
+    }
+  }, [singleLoop]);
 
   useEffect(() => {
     if (!media) return;
