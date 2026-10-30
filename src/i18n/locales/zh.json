@@ -587,6 +587,7 @@
       "count_other": "{{count}} 条评论",
       "settings": "评论设置",
       "replying": "正在回复 @{{name}}",
+      "replyingToComment": "正在回复评论",
       "cancelReply": "取消回复",
       "placeholder": "写下你的评论",
       "post": "发表评论",

@@ -146,8 +146,8 @@ type CardVideo = {
 
 type ReplyTarget = {
   rootId: string;
-  userId: string;
-  username: string;
+  userId: string | null;
+  username: string | null;
 };
 
 type UploadDraft = {
@@ -1552,9 +1552,13 @@ function VideoWatch({
     return grouped;
   }, [comments]);
 
-  const startReply = (rootId: string, comment: VideoApiComment) => {
-    const mention = `@${comment.username} `;
-    setReplyTarget({ rootId, userId: comment.userId, username: comment.username });
+  const startReply = (rootId: string, comment: VideoApiComment, mentionUser: boolean) => {
+    const mention = mentionUser ? `@${comment.username} ` : '';
+    setReplyTarget({
+      rootId,
+      userId: mentionUser ? comment.userId : null,
+      username: mentionUser ? comment.username : null,
+    });
     setDraft(mention);
     setEmojiOpen(false);
     window.requestAnimationFrame(() => {
@@ -1881,7 +1885,9 @@ function VideoWatch({
               <div>
                 {replyTarget && (
                   <div className="video-comment-replying">
-                    <span>{t('video.comments.replying', { name: replyTarget.username })}</span>
+                    <span>{replyTarget.username
+                      ? t('video.comments.replying', { name: replyTarget.username })
+                      : t('video.comments.replyingToComment')}</span>
                     <button type="button" aria-label={t('video.comments.cancelReply')} onClick={() => {
                       setReplyTarget(null);
                       setDraft('');
@@ -1939,7 +1945,7 @@ function VideoWatch({
                         <ThumbsUp size={15} fill={comment.liked ? 'currentColor' : 'none'} />
                         {comment.likeCount}
                       </button>
-                      <button type="button" onClick={() => startReply(comment.id, comment)}>
+                      <button type="button" onClick={() => startReply(comment.id, comment, false)}>
                         <MessageCircle size={15} />
                         {t('video.comments.reply')}
                       </button>
@@ -1957,7 +1963,7 @@ function VideoWatch({
                                   <ThumbsUp size={14} fill={reply.liked ? 'currentColor' : 'none'} />
                                   {reply.likeCount}
                                 </button>
-                                <button type="button" onClick={() => startReply(comment.id, reply)}>
+                                <button type="button" onClick={() => startReply(comment.id, reply, true)}>
                                   <MessageCircle size={14} />
                                   {t('video.comments.reply')}
                                 </button>

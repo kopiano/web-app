@@ -587,6 +587,7 @@
       "count_other": "{{count}} comments",
       "settings": "Comment settings",
       "replying": "Replying to @{{name}}",
+      "replyingToComment": "Replying to comment",
       "cancelReply": "Cancel reply",
       "placeholder": "Add a thoughtful comment",
       "post": "Post comment",
