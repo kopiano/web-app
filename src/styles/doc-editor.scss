@@ -114,14 +114,14 @@
 .doc-image-name-list label { display: inline-flex; align-items: center; gap: .45rem; min-width: 0; padding: .35rem .6rem; border: 1px solid rgba(38,48,46,.14); border-radius: .6rem; color: rgba(38,48,46,.65); background: rgba(255,255,255,.52); }
 .doc-image-name-list input { width: 9rem; min-width: 0; border: 0; outline: 0; color: inherit; background: transparent; font: 1.05rem ui-monospace, SFMono-Regular, Menlo, monospace; }
 .doc-markdown-editor-wrap { position: relative; flex: 0 0 auto; min-width: 0; }
-.doc-markdown-editor-mirror { position: absolute; z-index: -1; inset: 0; overflow: hidden; padding: 3rem clamp(2rem, 6vw, 8rem); color: transparent; background: transparent; font: 1.4rem/1.9 "Comfortaa", sans-serif; letter-spacing: .7px; white-space: pre-wrap; overflow-wrap: break-word; tab-size: 2; pointer-events: none; }
-.doc-markdown-editor-mirror-line { display: block; min-height: 1.9em; }
+.doc-markdown-editor-mirror { position: absolute; z-index: -1; inset: 0; overflow: hidden; padding: 3rem clamp(2rem, 6vw, 8rem); color: transparent; background: transparent; font: 1.27rem/1.75 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0; white-space: pre-wrap; overflow-wrap: break-word; tab-size: 2; pointer-events: none; }
+.doc-markdown-editor-mirror-line { display: block; min-height: 1.75em; }
 .doc-markdown-editor { width: 100%; min-width: 0; min-height: 48rem; flex: 0 0 auto; overflow: hidden; resize: none;
   padding: 3rem clamp(2rem, 6vw, 8rem);
   border: 0; outline: 0; color: #34403c; background: rgba(255,255,255,.18);
-  font: 1.4rem/1.9 "Comfortaa", sans-serif;
+  font: 1.27rem/1.75 ui-monospace, SFMono-Regular, Menlo, monospace;
   tab-size: 2;
-  letter-spacing: 0.7px;
+  letter-spacing: 0;
 }
 .doc-markdown-editor.is-image-drop-active { outline: 2px dashed rgba(111,77,131,.62); outline-offset: -1rem; background: rgba(231,220,238,.35); }
 .doc-markdown-editor::selection { color: #26302e; background: rgba(171, 142, 190, .24); }

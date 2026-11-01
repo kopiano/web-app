@@ -126,14 +126,13 @@ function parseCodeTabs(content: string) {
 }
 
 function highlightCodeLines(code: string, language: string) {
-  const expandedCode = code.replace(/\t/g, '  ');
   const normalizedLanguage = language.trim().toLowerCase();
   const languageName = languageAliases[normalizedLanguage] ?? normalizedLanguage;
 
   try {
     const highlighted = languageName && hljs.getLanguage(languageName)
-      ? hljs.highlight(expandedCode, { language: languageName, ignoreIllegals: true }).value
-      : hljs.highlightAuto(expandedCode).value;
+      ? hljs.highlight(code, { language: languageName, ignoreIllegals: true }).value
+      : hljs.highlightAuto(code).value;
     const customKeywords = customCodeKeywords[normalizedLanguage as keyof typeof customCodeKeywords] ?? [];
     const keywordPattern = customKeywords.length
       ? new RegExp(`\\b(?:${customKeywords.map((keyword) => keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'gi')
@@ -176,7 +175,7 @@ function highlightCodeLines(code: string, language: string) {
     result.push(currentLine);
     return result.map((line) => line || '&nbsp;');
   } catch {
-    return expandedCode.split('\n').map((line) => line || '&nbsp;');
+    return code.split('\n').map((line) => line || '&nbsp;');
   }
 }
 
