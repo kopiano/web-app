@@ -142,7 +142,10 @@
 .doc-markdown-preview a { color: #6f4d83; text-decoration: underline; text-decoration-color: rgba(111,77,131,.35); text-underline-offset: .18em; }
 .doc-markdown-image { max-width: 72rem; margin: 2.4rem 0 2.8rem; }
 .doc-markdown-image-preview { display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; }
-.doc-markdown-image img { display: block; width: 100%; max-height: 52rem; object-fit: cover; border: 1px solid rgba(255,255,255,.72); border-radius: 1.5rem; background: rgba(255,255,255,.36); box-shadow: 0 1.2rem 2.8rem rgba(55,63,61,.14); }
+.doc-markdown-image img { display: block;
+  width: 100%;
+  max-width: 400px;
+  max-height: 52rem; object-fit: cover; border: 1px solid rgba(255,255,255,.72); border-radius: 1.5rem; background: rgba(255,255,255,.36); box-shadow: 0 1.2rem 2.8rem rgba(55,63,61,.14); }
 .doc-markdown-image figcaption { margin-top: .85rem; color: rgba(38,48,46,.5); font-size: 1.1rem; line-height: 1.5; text-align: center; }
 .doc-markdown-preview ul { max-width: 72rem; margin: 1.2rem 0 2.2rem; padding-left: 2.2rem; list-style: disc; }
 .doc-markdown-preview ol { max-width: 72rem; margin: 1.2rem 0 2.2rem; padding-left: 2.8rem; list-style: decimal; }
@@ -165,7 +168,9 @@
 .doc-code-header .doc-code-tab-list { display: flex; flex: 1; gap: .25rem; min-width: 0; overflow-x: auto; margin: 0 1rem 0 0; scrollbar-width: thin; }
 .doc-code-header .doc-code-tab-list::-webkit-scrollbar { height: .35rem; }
 .doc-code-header .doc-code-tab-list::-webkit-scrollbar-thumb { border-radius: 1rem; background: #484f58; }
-.doc-code-tab { flex: 0 0 auto; padding: .7rem 1.1rem; border: 1px solid transparent;
+.doc-code-tab {
+  flex: 0 0 auto;
+  padding: .5rem 1.1rem; border: 1px solid transparent;
   border-radius: 3rem; color: #ffffff;
   background: transparent;
   // font: 1.1rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
