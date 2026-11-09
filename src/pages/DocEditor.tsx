@@ -1,6 +1,6 @@
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactElement } from 'react';
 import hljs from 'highlight.js/lib/common';
-import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Eye, FileText, FolderCode, Heading2, Image, ImagePlus, Info, Italic, Link2, List, Pencil, Quote, Rows3, Save, Table2, X } from 'lucide-react';
+import { ArrowLeft, Bold, Braces, Check, Code2, Copy, Download, Eye, FileText, FolderCode, Heading2, Image, ImagePlus, Info, Italic, Link2, List, Minus, Pencil, Plus, Quote, RotateCcw, Rows3, Save, Table2, X } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
@@ -649,7 +649,9 @@ export default function DocEditor() {
   const [remotePublic, setRemotePublic] = useState(false);
   const [remoteCover, setRemoteCover] = useState<string | undefined>();
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
+  const [imagePreviewScale, setImagePreviewScale] = useState(1);
   const [imageUploadError, setImageUploadError] = useState('');
+  const [imageUploadProgress, setImageUploadProgress] = useState<number | null>(null);
   const [isImageDropActive, setIsImageDropActive] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoTab, setInfoTab] = useState<'detail' | 'delete'>('detail');
@@ -682,12 +684,33 @@ export default function DocEditor() {
   const outlineNavRef = useRef<HTMLElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const imageRenameMapRef = useRef<Record<string, string>>({});
+  const pendingImageUploadsRef = useRef(new Set<string>());
+  const imageObjectUrlsRef = useRef(new Set<string>());
   const [imageNameDrafts, setImageNameDrafts] = useState<Record<string, string>>({});
   const previewRef = useRef<HTMLElement>(null);
   const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const displayTitle = remoteTitle || document.title;
   const isRemoteDocument = Boolean(currentUser && id && !documents.some((item) => item.id === id));
   const previewContent = useMemo(() => renderMarkdown(deferredMarkdown, setImagePreviewUrl), [deferredMarkdown]);
+
+  useEffect(() => {
+    if (!imagePreviewUrl) return;
+    setImagePreviewScale(1);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setImagePreviewUrl('');
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [imagePreviewUrl]);
+
+  const downloadPreviewImage = () => {
+    if (!imagePreviewUrl) return;
+    const link = globalThis.document.createElement('a');
+    link.href = imagePreviewUrl;
+    link.download = 'document-image';
+    link.rel = 'noreferrer';
+    link.click();
+  };
   const outline = useMemo(() => {
     const headingOccurrences = new Map<string, number>();
     let fence: MarkdownFence | null = null;
@@ -729,6 +752,8 @@ export default function DocEditor() {
     const contentToSave = markdown;
     const imageRenamesToSave = { ...imageRenameMapRef.current };
     const save = async () => {
+      // Do not persist local image previews before their server paths are ready.
+      if (pendingImageUploadsRef.current.size > 0 || contentToSave.includes('blob:')) return true;
       localStorage.setItem(storageKey, contentToSave);
       if (!isRemoteDocument) {
         setSavedAt(true);
@@ -784,6 +809,12 @@ export default function DocEditor() {
     const timer = window.setTimeout(() => { void saveDocument(); }, 450);
     return () => window.clearTimeout(timer);
   }, [isRemoteDocument, remoteLoaded, saveDocument]);
+
+  useEffect(() => () => {
+    imageObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    imageObjectUrlsRef.current.clear();
+    pendingImageUploadsRef.current.clear();
+  }, []);
 
   useLayoutEffect(() => {
     const editor = editorRef.current;
@@ -926,15 +957,13 @@ export default function DocEditor() {
 
   const insertAtSelection = (text: string) => {
     const editor = editorRef.current;
-    if (!editor) return;
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const next = `${markdown.slice(0, start)}${text}${markdown.slice(end)}`;
-    setMarkdown(next);
+    const start = editor?.selectionStart ?? markdown.length;
+    const end = editor?.selectionEnd ?? start;
+    setMarkdown((value) => `${value.slice(0, start)}${text}${value.slice(end)}`);
     setSavedAt(false);
     requestAnimationFrame(() => {
-      editor.focus();
-      editor.setSelectionRange(start + text.length, start + text.length);
+      editor?.focus();
+      editor?.setSelectionRange(start + text.length, start + text.length);
     });
   };
 
@@ -946,11 +975,48 @@ export default function DocEditor() {
       return;
     }
     setImageUploadError('');
+    const totalBytes = imageFiles.reduce((total, file) => total + file.size, 0);
+    const uploadedBytes = new Map<File, number>();
+    const imagePreviews = imageFiles.map((file) => {
+      const url = URL.createObjectURL(file);
+      imageObjectUrlsRef.current.add(url);
+      pendingImageUploadsRef.current.add(url);
+      return { file, url };
+    });
+    const insertion = `${imagePreviews.map(({ url }) => `![](${url})`).join('\n\n')}\n\n`;
+    insertAtSelection(insertion);
+    setImageUploadProgress(0);
+
+    const removeFailedPreview = (url: string) => {
+      const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      setMarkdown((value) => value.replace(new RegExp(`!\\[[^\\]]*\\]\\(${escapedUrl}\\)\\n?\\n?`, 'g'), ''));
+    };
+
     try {
-      const uploaded = await Promise.all(imageFiles.map((file) => uploadDocumentImage(id, file)));
-      insertAtSelection(uploaded.map((item) => `![](${item.path})`).join('\n\n'));
+      await Promise.all(imagePreviews.map(async ({ file, url }) => {
+        try {
+          const item = await uploadDocumentImage(id, file, (loaded) => {
+            uploadedBytes.set(file, Math.min(loaded, file.size));
+            const currentTotal = Array.from(uploadedBytes.values()).reduce((total, size) => total + size, 0);
+            setImageUploadProgress(Math.round((currentTotal / totalBytes) * 100));
+          });
+          setMarkdown((value) => value.split(url).join(item.path));
+          uploadedBytes.set(file, file.size);
+          const currentTotal = Array.from(uploadedBytes.values()).reduce((total, size) => total + size, 0);
+          setImageUploadProgress(Math.round((currentTotal / totalBytes) * 100));
+        } catch (error) {
+          removeFailedPreview(url);
+          throw error;
+        } finally {
+          pendingImageUploadsRef.current.delete(url);
+          imageObjectUrlsRef.current.delete(url);
+          URL.revokeObjectURL(url);
+        }
+      }));
     } catch {
       setImageUploadError('Image upload failed. Please try again.');
+    } finally {
+      setImageUploadProgress(null);
     }
   };
 
@@ -1307,6 +1373,7 @@ export default function DocEditor() {
         <div className={`doc-editor-edit-pane${mode === 'edit' ? ' is-visible' : ''}`} aria-hidden={mode !== 'edit'}>
             <input ref={imageInputRef} className="doc-image-input" type="file" accept="image/*" multiple onChange={(event) => { if (event.target.files) void uploadAndInsertImages(event.target.files); event.currentTarget.value = ''; }} />
             {imageUploadError && <p className="doc-image-upload-error" role="alert">{imageUploadError}</p>}
+            {imageUploadProgress !== null && <p className="doc-image-upload-progress" role="status">Uploading images: {imageUploadProgress}%</p>}
             {documentImages.length > 0 && <div className="doc-image-name-list" aria-label="Document images">{Array.from(new Set(documentImages)).map((path) => {
               const filename = path.slice(path.lastIndexOf('/') + 1);
               return <label key={path}><Image size={14} /><input aria-label="Image filename" value={imageNameDrafts[path] ?? filename} onChange={(event) => setImageNameDrafts((drafts) => ({ ...drafts, [path]: event.target.value }))} onBlur={(event) => renameDocumentImage(path, event.currentTarget.value)} /></label>;
@@ -1333,7 +1400,49 @@ export default function DocEditor() {
         </div>
         <article ref={previewRef} className={`doc-markdown-preview${mode === 'preview' ? ' is-visible' : ''}`} aria-hidden={mode !== 'preview'}>{previewContent}</article>
       </div>
-      {imagePreviewUrl && <button type="button" className="doc-image-lightbox" onClick={() => setImagePreviewUrl('')} aria-label="Close image preview"><img src={imagePreviewUrl} alt="" /><X size={22} /></button>}
+      {imagePreviewUrl && (
+        <div
+          className="doc-image-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+          onClick={() => setImagePreviewUrl('')}
+        >
+          <div className="doc-image-lightbox-shell" onClick={(event) => event.stopPropagation()}>
+            <div className="doc-image-lightbox-topbar">
+              <span className="doc-image-lightbox-title">Image preview</span>
+              <button type="button" className="doc-image-lightbox-close" onClick={() => setImagePreviewUrl('')} aria-label="Close image preview" title="Close">
+                <X size={19} />
+              </button>
+            </div>
+            <div className="doc-image-lightbox-stage">
+              <img
+                src={imagePreviewUrl}
+                alt=""
+                style={{ transform: `scale(${imagePreviewScale})` }}
+              />
+            </div>
+            <div className="doc-image-lightbox-toolbar" aria-label="Image controls">
+              <button type="button" onClick={() => setImagePreviewScale((scale) => Math.max(.5, scale - .25))} aria-label="Zoom out" title="Zoom out">
+                <Minus size={17} />
+              </button>
+              <button type="button" className="doc-image-lightbox-scale" onClick={() => setImagePreviewScale(1)} aria-label="Reset zoom" title="Reset zoom">
+                {Math.round(imagePreviewScale * 100)}%
+              </button>
+              <button type="button" onClick={() => setImagePreviewScale((scale) => Math.min(3, scale + .25))} aria-label="Zoom in" title="Zoom in">
+                <Plus size={17} />
+              </button>
+              <span className="doc-image-lightbox-divider" aria-hidden="true" />
+              <button type="button" onClick={() => setImagePreviewScale(1)} aria-label="Reset image" title="Reset image">
+                <RotateCcw size={16} />
+              </button>
+              <button type="button" onClick={downloadPreviewImage} aria-label="Download image" title="Download image">
+                <Download size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <nav className="doc-editor-header-mode" aria-label={t('docs.editorMode')}>
         <div className="doc-editor-modes" role="tablist">
           <span className={`doc-editor-modes-thumb is-${mode}`} aria-hidden="true" />

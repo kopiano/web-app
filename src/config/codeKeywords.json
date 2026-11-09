@@ -10,5 +10,9 @@
     "npm",
     "pnpm",
     "make"
+  ],
+  "rsx": [
+    "jsx",
+    "js"
   ]
 }

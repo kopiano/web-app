@@ -42,38 +42,27 @@ export function resolveDocumentAsset(value?: string | null, cacheBust?: string |
 }
 
 export async function prepareDocumentImage(file: File) {
+  const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
+  if (file.type === 'image/webp' || /\.webp$/i.test(file.name)) return file;
+
   let bitmap: ImageBitmap | undefined;
   try {
     bitmap = await createImageBitmap(file);
-    const width = 1200;
-    const height = 800;
+    const width = bitmap.width;
+    const height = bitmap.height;
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext('2d');
     if (!context) return file;
 
-    const scale = Math.max(width / bitmap.width, height / bitmap.height);
-    const cropWidth = width / scale;
-    const cropHeight = height / scale;
-    context.drawImage(
-      bitmap,
-      (bitmap.width - cropWidth) / 2,
-      (bitmap.height - cropHeight) / 2,
-      cropWidth,
-      cropHeight,
-      0,
-      0,
-      width,
-      height,
-    );
+    context.drawImage(bitmap, 0, 0, width, height);
 
     const thumbnail = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/webp', 0.78);
+      canvas.toBlob(resolve, 'image/webp', 0.9);
     });
     if (!thumbnail || thumbnail.type !== 'image/webp') return file;
 
-    const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
     return new File([thumbnail], `${baseName}.webp`, {
       type: 'image/webp',
       lastModified: file.lastModified,
@@ -207,10 +196,23 @@ export async function updateDocument(
   return data;
 }
 
-export async function uploadDocumentImage(id: string, file: File) {
+export async function uploadDocumentImage(
+  id: string,
+  file: File,
+  onProgress?: (loaded: number) => void,
+) {
   const form = new FormData();
   form.append('file', await prepareDocumentImage(file));
-  const { data } = await request.post<{ path: string; url: string }>(`/docs/${id}/images`, form);
+  const uploadRequest = request as unknown as {
+    post<T>(
+      url: string,
+      body: FormData,
+      config?: { onUploadProgress?: (event: { loaded: number }) => void },
+    ): Promise<{ data: T }>;
+  };
+  const { data } = await uploadRequest.post<{ path: string; url: string }>(`/docs/${id}/images`, form, {
+    onUploadProgress: (event) => onProgress?.(event.loaded),
+  });
   return data;
 }
 
