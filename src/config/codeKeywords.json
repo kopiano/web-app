@@ -1,5 +1,6 @@
 {
   "sh": [
+    "shell",
     "cloudflared tunnel",
     "vim",
     "brew",
@@ -9,7 +10,10 @@
     "docker compose",
     "npm",
     "pnpm",
-    "make"
+    "make",
+    "dx new",
+    "dx serve",
+    "dx bundle"
   ],
   "rsx": {
     "keywords": [
