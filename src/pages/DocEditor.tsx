@@ -51,6 +51,7 @@ const languageAliases: Record<string, string> = {
   htm: 'xml',
   jsx: 'javascript',
   tsx: 'javascript',
+  rsx: 'rust',
   vue: 'xml',
   sh: 'bash',
   shell: 'bash',
@@ -133,16 +134,45 @@ function highlightCodeLines(code: string, language: string) {
     const highlighted = languageName && hljs.getLanguage(languageName)
       ? hljs.highlight(code, { language: languageName, ignoreIllegals: true }).value
       : hljs.highlightAuto(code).value;
-    const customKeywords = customCodeKeywords[normalizedLanguage as keyof typeof customCodeKeywords] ?? [];
+    const keywordConfig = customCodeKeywords[normalizedLanguage as keyof typeof customCodeKeywords];
+    const keywordGroups = Array.isArray(keywordConfig)
+      ? { keywords: keywordConfig, htmlElements: [], cssProperties: [] }
+      : keywordConfig ?? { keywords: [], htmlElements: [], cssProperties: [] };
+    const customKeywords = [...keywordGroups.keywords, ...keywordGroups.htmlElements, ...keywordGroups.cssProperties];
     const keywordPattern = customKeywords.length
-      ? new RegExp(`\\b(?:${customKeywords.map((keyword) => keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'gi')
+      ? new RegExp(`\\b(?:${customKeywords.map((keyword) => keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'g')
       : null;
+    const spanClasses: string[][] = [];
+    const htmlElementSet = new Set(keywordGroups.htmlElements);
+    const cssPropertySet = new Set(keywordGroups.cssProperties);
     const highlightedWithCustomKeywords = keywordPattern
-      ? highlighted.split(/(<[^>]+>)/g).map((part) => (
-        part.startsWith('<')
-          ? part
-          : part.replace(keywordPattern, '<span class="hljs-custom-keyword">$&</span>')
-      )).join('')
+      ? highlighted.split(/(<[^>]+>)/g).map((part) => {
+        if (part.startsWith('<')) {
+          if (/^<span\b/.test(part)) {
+            const className = part.match(/\bclass="([^"]*)"/)?.[1] ?? '';
+            spanClasses.push(className.split(/\s+/).filter(Boolean));
+          } else if (part.startsWith('</span')) spanClasses.pop();
+          return part;
+        }
+        if (spanClasses.some((classes) => classes.includes('hljs-string'))) {
+          return part.replace(/(^|[^\w-])([\w-]+)(?=\s*:)/g, (match, prefix: string, word: string) => (
+            cssPropertySet.has(word) ? `${prefix}<span class="hljs-rsx-css-property">${word}</span>` : match
+          ));
+        }
+        return spanClasses.length === 0
+          ? part.replace(keywordPattern, (word, offset: number, source: string) => {
+            if (htmlElementSet.has(word) && /^\s*\{/.test(source.slice(offset + word.length))) {
+              return `<span class="hljs-rsx-html-element">${word}</span>`;
+            }
+            if (cssPropertySet.has(word) && /^\s*:/.test(source.slice(offset + word.length))) {
+              return `<span class="hljs-rsx-css-property">${word}</span>`;
+            }
+            return keywordGroups.keywords.includes(word)
+              ? `<span class="hljs-custom-keyword">${word}</span>`
+              : word;
+          })
+          : part;
+      }).join('')
       : highlighted;
 
     const result: string[] = [];
@@ -270,7 +300,7 @@ const CodeBlock = memo(function CodeBlock({ content, language, headerContent, so
   return (
     <div
       data-source-line={sourceLine}
-      className={`doc-code-block${isScrollReady ? ' is-scroll-ready' : ''}${isResettingScroll ? ' is-resetting-scroll' : ''}`}
+      className={`doc-code-block${codeLanguage.trim().toLowerCase() === 'rsx' ? ' is-rsx' : ''}${isScrollReady ? ' is-scroll-ready' : ''}${isResettingScroll ? ' is-resetting-scroll' : ''}`}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
     >

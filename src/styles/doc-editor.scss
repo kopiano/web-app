@@ -236,8 +236,12 @@
 .doc-code-block .hljs-keyword, .doc-code-block .hljs-selector-tag, .doc-code-block .hljs-literal, .doc-code-block .hljs-section, .doc-code-block .hljs-link { color: #fc64b6; }
 .doc-code-block .hljs-string, .doc-code-block .hljs-title, .doc-code-block .hljs-attribute, .doc-code-block .hljs-symbol, .doc-code-block .hljs-bullet, .doc-code-block .hljs-addition { color: #74d4fe; }
 .doc-code-block .hljs-number, .doc-code-block .hljs-regexp, .doc-code-block .hljs-variable, .doc-code-block .hljs-template-variable { color: #79c0ff; }
+.doc-code-block.is-rsx .hljs-string, .doc-code-block.is-rsx .hljs-number, .doc-code-block.is-rsx .hljs-regexp, .doc-code-block.is-rsx .hljs-variable, .doc-code-block.is-rsx .hljs-template-variable, .doc-code-block.is-rsx .hljs-symbol, .doc-code-block.is-rsx .hljs-bullet, .doc-code-block.is-rsx .hljs-addition { color: #e6edf3; }
 .doc-code-block .hljs-type, .doc-code-block .hljs-built_in, .doc-code-block .hljs-class .hljs-title, .doc-code-block .hljs-title.class_ { color: #ffa657; }
 .doc-code-block .hljs-function .hljs-title, .doc-code-block .hljs-title.function_, .doc-code-block .hljs-params { color: #d2a8ff; }
+.doc-code-block .hljs-attr { color: #74d4fe; }
+.doc-code-block .hljs-rsx-html-element { color: #fc64b6; }
+.doc-code-block .hljs-rsx-css-property { color: #79c0ff; }
 .doc-code-block .hljs-meta, .doc-code-block .hljs-doctag { color: #d2a8ff; }
 .doc-code-block .hljs-custom-keyword { color: #fddc81; font-weight: 650; }
 .doc-code-block .hljs-deletion { color: #ffa198; background: rgba(248,81,73,.12); }
